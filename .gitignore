@@ -1,0 +1,5 @@
+.claude/
+.idea/
+meta/
+vendor/
+.DS_Store
