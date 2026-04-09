@@ -16,9 +16,9 @@ class ODataServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config.php', 'odata');
 
-        $this->app->singleton(
-            ODataServiceRegistryInterface::class,
-            config('odata.service_registry', ODataServiceRegistry::class),
+        $this->app->singleton(ODataServiceRegistryInterface::class, fn ($app) => $app->make(
+                config('odata.service_registry', ODataServiceRegistry::class)
+            ),
         );
     }
 
