@@ -1,8 +1,11 @@
 # LaravelUi5 OData — Roadmap & Changelog
 
-Infrastructure / DX issues and consumer-facing contract gaps in `laravelui5/odata`. Items here are queued for a focused OData-library slice — none of them are blocking individual consumers today (workarounds exist, the library renders correct data), but each one trims a recurring tax on every entity set in the workspace.
+Tracks scheduled work and released changes for `laravelui5/odata`.
 
-Companion package: `laravelui5/core`'s ROADMAP. The two move together; consumer-bump dance (per `feedback_satis_release_pause.md`) applies here too.
+- **Pending** holds items queued for an upcoming slice — design questions settled, scope known. Earlier-stage ideas live as atoms in `docs/meta/atoms/` and are lifted into Pending once they're ready to schedule.
+- **CHANGELOG** records shipped releases in reverse-chronological order, each tagged with the version that carried it.
+
+Releases follow the consumer-bump dance: tag the package → Satis rebuilds → patch the in-house consumers (`laravelui5/core`, `laravelui5/sdk`, `pragmatiqu/timesheet.biz`) → smoke-test before the next slice begins. Companion to `laravelui5/core`'s ROADMAP; the two move together when contract surface is shared.
 
 ---
 
