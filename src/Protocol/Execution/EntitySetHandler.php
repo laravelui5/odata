@@ -53,8 +53,9 @@ final readonly class EntitySetHandler
         $count       = $plan->count ? $resolver->count($plan) : null;
         $serviceRoot = $this->serviceRoot;
         $setName     = $plan->target->getName();
+        $coercion    = new RowCoercion($plan->target->getEntityType());
 
-        $response->setCallback(static function () use ($context, $resolver, $plan, $selectKeys, $count, $pageSize, $serviceRoot, $setName): void {
+        $response->setCallback(static function () use ($context, $resolver, $plan, $selectKeys, $count, $pageSize, $serviceRoot, $setName, $coercion): void {
             $generator = $resolver->resolve($plan);
 
             echo '{"@odata.context":' . json_encode($context);
@@ -79,6 +80,7 @@ final readonly class EntitySetHandler
                     echo ',';
                 }
                 $row = $selectKeys !== null ? array_intersect_key($row, $selectKeys) : $row;
+                $row = $coercion->apply($row);
                 echo json_encode($row, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
                 $first = false;
                 $emitted++;

@@ -1,4 +1,4 @@
-# LaravelUi5 OData — Roadmap
+# LaravelUi5 OData — Roadmap & Changelog
 
 Infrastructure / DX issues and consumer-facing contract gaps in `laravelui5/odata`. Items here are queued for a focused OData-library slice — none of them are blocking individual consumers today (workarounds exist, the library renders correct data), but each one trims a recurring tax on every entity set in the workspace.
 
@@ -22,23 +22,23 @@ Companion package: `laravelui5/core`'s ROADMAP. The two move together; consumer-
 
 ---
 
-### [ ] `Edm.DateTimeOffset` — emit RFC 3339 strings on the wire
+## CHANGELOG
 
-**Why:** When a column is declared `PrimitiveTypeEnum::DateTimeOffset` and the underlying source is a MySQL `dateTime` column accessed via `DB::table()` (raw query builder, no Eloquent casts — the documented pattern in `PARTNER_SCOPES_RECIPE.md`), MySQL hands back `2026-05-05 12:34:56` — space separator, no `T`, no offset. The library currently passes that through to JSON output unchanged, which violates the OData v4 spec (RFC 3339 mandates `T` + `Z` or numeric offset) and breaks `Date.parse()` in Safari (returns `NaN`). Browsers that *do* accept the format (Chrome) silently coerce to local time, masking the underlying bug.
+### `Edm.DateTimeOffset` / `Edm.Date` / `Edm.TimeOfDay` — RFC 3339 wire coercion (v1.0.3)
 
-Workaround today: consumer-side `targetType: 'any'` on the binding to skip parsing, or a UI5 formatter. Both are tax on every consumer.
+Row-emission path now coerces values for columns whose declared type is `Edm.DateTimeOffset`, `Edm.Date`, or `Edm.TimeOfDay` to their OData v4 wire formats. Previously, MySQL `DATETIME`/`DATE`/`TIME` strings (`2026-05-05 12:34:56`) passed through unchanged, violating RFC 3339 (`T` + `Z`/offset) and breaking `Date.parse()` in Safari (returns `NaN`); Chrome silently coerced to local time, masking the bug.
 
-**What needs to ship:** In the row-emission path of `AbstractEntitySet` (or the JSON serializer downstream of it), coerce values for columns whose declared type is `DateTimeOffset` via `Carbon::parse($value)->toRfc3339String()` (preserves offset; safe for values that already round-trip as RFC 3339). Same coercion logic applies to `Edm.Date` (no time, no offset — `->toDateString()` / `Y-m-d`) and `Edm.TimeOfDay` (just time — `->format('H:i:s')`); spec them all in the same patch.
+Coercion lives in `Protocol\Execution\RowCoercion`, applied by `EntitySetHandler` and `EntityHandler` per row using `Carbon::parse(...)`:
 
-**Estimated size:** ~30–50 LOC + a serialization test per type. Backward-compatible — values that are already correctly formatted round-trip cleanly through `Carbon::parse(...)`.
+- `Edm.DateTimeOffset` → `->toRfc3339String()`
+- `Edm.Date`           → `->toDateString()` (`Y-m-d`)
+- `Edm.TimeOfDay`      → `->format('H:i:s')`
 
-**Why this is high marginal ROI:** Bites every consumer that declares a datetime column. Slice 1 of M5 hit it for the second time. One small patch in the library nukes the workaround tax permanently across the workspace.
+`null` values on nullable columns pass through; already-correct strings round-trip cleanly.
 
----
+**Wire-format change** — UI5 consumers that work around the bug today (`targetType: 'any'` on the binding, or a custom formatter that re-parses MySQL strings) should drop those workarounds once on this version.
 
-## Done
-
-### Rename `PrimitiveTypeEnum` → `EdmPrimitiveType` (2026-05-06)
+### Rename `PrimitiveTypeEnum` → `EdmPrimitiveType` (v1.0.2)
 
 Renamed the enum and relocated three sibling interfaces that had been misfiled under `Edm\Contracts\Container\` (the CSDL §13 namespace for `EntityContainer` children).
 
