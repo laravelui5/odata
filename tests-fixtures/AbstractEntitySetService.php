@@ -6,7 +6,7 @@ namespace LaravelUi5\OData\Fixtures;
 
 use LaravelUi5\OData\Edm\Container\EntitySet;
 use LaravelUi5\OData\Edm\Container\NavigationPropertyBinding;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Property\NavigationProperty;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
@@ -39,8 +39,8 @@ final class AbstractEntitySetService extends ODataService
     {
         $this->discoverCustomEntitySet(FlightSummaries::class);
 
-        $int32  = new PrimitiveType(PrimitiveTypeEnum::Int32);
-        $string = new PrimitiveType(PrimitiveTypeEnum::String);
+        $int32  = new PrimitiveType(EdmPrimitiveType::Int32);
+        $string = new PrimitiveType(EdmPrimitiveType::String);
 
         // Minimal Flight + Passenger types for the underlying data
         $flightId   = new Property('id', $int32);

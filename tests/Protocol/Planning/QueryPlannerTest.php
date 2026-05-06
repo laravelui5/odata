@@ -8,7 +8,7 @@ use LaravelUi5\OData\Edm\Contracts\EdmxInterface;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Exception\BadRequestException;
 use LaravelUi5\OData\Http\ODataRequest;
 use LaravelUi5\OData\Protocol\Planning\BatchQueryPlan;
@@ -38,8 +38,8 @@ use LaravelUi5\OData\Service\Contracts\RuntimeSchemaInterface;
  */
 function plannerEdmx(): EdmxInterface
 {
-    $int32  = new PrimitiveType(PrimitiveTypeEnum::Int32);
-    $string = new PrimitiveType(PrimitiveTypeEnum::String);
+    $int32  = new PrimitiveType(EdmPrimitiveType::Int32);
+    $string = new PrimitiveType(EdmPrimitiveType::String);
 
     $idProp   = new Property('id',   $int32);
     $nameProp = new Property('name', $string);

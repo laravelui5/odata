@@ -75,8 +75,8 @@ final class VocabularyGenerator
     private const array APPLIES_TO_INTERFACE_MAP = [
         'EntityType'         => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\EntityTypeInterface',
         'ComplexType'        => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\ComplexTypeInterface',
-        'EnumType'           => 'LaravelUi5\\OData\\Edm\\Contracts\\Container\\EnumTypeInterface',
-        'EnumMember'         => 'LaravelUi5\\OData\\Edm\\Contracts\\Container\\EnumMemberInterface',
+        'EnumType'           => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\EnumTypeInterface',
+        'EnumMember'         => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\EnumMemberInterface',
         'TypeDefinition'     => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\TypeDefinitionInterface',
         'Property'           => 'LaravelUi5\\OData\\Edm\\Contracts\\Property\\PropertyInterface',
         'NavigationProperty' => 'LaravelUi5\\OData\\Edm\\Contracts\\Property\\NavigationPropertyInterface',
@@ -577,9 +577,9 @@ PHP;
             $uses[] = 'LaravelUi5\\OData\\Edm\\Annotation\\RecordAnnotationValue';
             $uses[] = 'LaravelUi5\\OData\\Edm\\Annotation\\PropertyValue';
         }
-        // Edm.PrimitiveType terms require PrimitiveTypeEnum in the constructor.
+        // Edm.PrimitiveType terms require EdmPrimitiveType in the constructor.
         if ($innerType === 'Edm.PrimitiveType') {
-            $uses[] = 'LaravelUi5\\OData\\Edm\\Contracts\\Container\\PrimitiveTypeEnum';
+            $uses[] = 'LaravelUi5\\OData\\Edm\\EdmPrimitiveType';
         }
 
         // Enum type from a different PHP namespace needs a use import.
@@ -724,11 +724,11 @@ PHP;
         }
 
         // Edm.PrimitiveType — the annotator must declare the concrete primitive kind.
-        // PrimitiveTypeEnum is a required first parameter so the kind is never ambiguous.
+        // EdmPrimitiveType is a required first parameter so the kind is never ambiguous.
         if ($innerType === 'Edm.PrimitiveType') {
             $default = $nullable ? ' = null' : '';
             return [
-                "        public readonly PrimitiveTypeEnum \$type,\n"
+                "        public readonly EdmPrimitiveType \$type,\n"
                 . "        public readonly mixed \$value{$default},\n",
                 $docblock,
             ];
@@ -792,23 +792,23 @@ PHP;
             return "return new ConstantAnnotationValue('Integer', (string) \$this->value->value);";
         }
 
-        // Edm.PrimitiveType — dispatch on the annotator-declared PrimitiveTypeEnum.
+        // Edm.PrimitiveType — dispatch on the annotator-declared EdmPrimitiveType.
         if ($innerType === 'Edm.PrimitiveType') {
             $match = "return match (\$this->type) {\n"
-                . "            PrimitiveTypeEnum::Byte,\n"
-                . "            PrimitiveTypeEnum::SByte,\n"
-                . "            PrimitiveTypeEnum::Int16,\n"
-                . "            PrimitiveTypeEnum::Int32,\n"
-                . "            PrimitiveTypeEnum::Int64      => new ConstantAnnotationValue('Integer', (string) \$this->value),\n"
-                . "            PrimitiveTypeEnum::Decimal    => new ConstantAnnotationValue('Decimal', (string) \$this->value),\n"
-                . "            PrimitiveTypeEnum::Double,\n"
-                . "            PrimitiveTypeEnum::Single     => new ConstantAnnotationValue('Float', (string) \$this->value),\n"
-                . "            PrimitiveTypeEnum::Boolean    => new ConstantAnnotationValue('Boolean', \$this->value ? 'true' : 'false'),\n"
-                . "            PrimitiveTypeEnum::Date       => new ConstantAnnotationValue('Date', (string) \$this->value),\n"
-                . "            PrimitiveTypeEnum::DateTimeOffset => new ConstantAnnotationValue('DateTimeOffset', (string) \$this->value),\n"
-                . "            PrimitiveTypeEnum::TimeOfDay  => new ConstantAnnotationValue('TimeOfDay', (string) \$this->value),\n"
-                . "            PrimitiveTypeEnum::Duration   => new ConstantAnnotationValue('Duration', (string) \$this->value),\n"
-                . "            PrimitiveTypeEnum::Guid       => new ConstantAnnotationValue('Guid', (string) \$this->value),\n"
+                . "            EdmPrimitiveType::Byte,\n"
+                . "            EdmPrimitiveType::SByte,\n"
+                . "            EdmPrimitiveType::Int16,\n"
+                . "            EdmPrimitiveType::Int32,\n"
+                . "            EdmPrimitiveType::Int64      => new ConstantAnnotationValue('Integer', (string) \$this->value),\n"
+                . "            EdmPrimitiveType::Decimal    => new ConstantAnnotationValue('Decimal', (string) \$this->value),\n"
+                . "            EdmPrimitiveType::Double,\n"
+                . "            EdmPrimitiveType::Single     => new ConstantAnnotationValue('Float', (string) \$this->value),\n"
+                . "            EdmPrimitiveType::Boolean    => new ConstantAnnotationValue('Boolean', \$this->value ? 'true' : 'false'),\n"
+                . "            EdmPrimitiveType::Date       => new ConstantAnnotationValue('Date', (string) \$this->value),\n"
+                . "            EdmPrimitiveType::DateTimeOffset => new ConstantAnnotationValue('DateTimeOffset', (string) \$this->value),\n"
+                . "            EdmPrimitiveType::TimeOfDay  => new ConstantAnnotationValue('TimeOfDay', (string) \$this->value),\n"
+                . "            EdmPrimitiveType::Duration   => new ConstantAnnotationValue('Duration', (string) \$this->value),\n"
+                . "            EdmPrimitiveType::Guid       => new ConstantAnnotationValue('Guid', (string) \$this->value),\n"
                 . "            default                       => new ConstantAnnotationValue('String', (string) \$this->value),\n"
                 . "        };";
             if ($nullable) {

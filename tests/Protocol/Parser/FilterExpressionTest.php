@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
@@ -23,15 +23,15 @@ use function LaravelUi5\OData\Tests\Protocol\Parser\translateFilter;
  */
 function typedEntityType(): EntityType
 {
-    $id       = new Property('id', new PrimitiveType(PrimitiveTypeEnum::Int32));
-    $origin   = new Property('origin', new PrimitiveType(PrimitiveTypeEnum::String));
-    $dateCol  = new Property('created', new PrimitiveType(PrimitiveTypeEnum::Date));
-    $dtCol    = new Property('modified', new PrimitiveType(PrimitiveTypeEnum::DateTimeOffset));
-    $timeCol  = new Property('startTime', new PrimitiveType(PrimitiveTypeEnum::TimeOfDay));
-    $guidCol  = new Property('uid', new PrimitiveType(PrimitiveTypeEnum::Guid));
-    $durCol   = new Property('elapsed', new PrimitiveType(PrimitiveTypeEnum::Duration));
-    $boolCol  = new Property('active', new PrimitiveType(PrimitiveTypeEnum::Boolean));
-    $dblCol   = new Property('score', new PrimitiveType(PrimitiveTypeEnum::Double));
+    $id       = new Property('id', new PrimitiveType(EdmPrimitiveType::Int32));
+    $origin   = new Property('origin', new PrimitiveType(EdmPrimitiveType::String));
+    $dateCol  = new Property('created', new PrimitiveType(EdmPrimitiveType::Date));
+    $dtCol    = new Property('modified', new PrimitiveType(EdmPrimitiveType::DateTimeOffset));
+    $timeCol  = new Property('startTime', new PrimitiveType(EdmPrimitiveType::TimeOfDay));
+    $guidCol  = new Property('uid', new PrimitiveType(EdmPrimitiveType::Guid));
+    $durCol   = new Property('elapsed', new PrimitiveType(EdmPrimitiveType::Duration));
+    $boolCol  = new Property('active', new PrimitiveType(EdmPrimitiveType::Boolean));
+    $dblCol   = new Property('score', new PrimitiveType(EdmPrimitiveType::Double));
 
     return new EntityType(
         namespace: 'Test',

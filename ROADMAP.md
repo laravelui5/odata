@@ -36,24 +36,21 @@ Workaround today: consumer-side `targetType: 'any'` on the binding to skip parsi
 
 ---
 
-### [ ] Rename `PrimitiveTypeEnum` → `EdmPrimitiveType`
-
-**Where:** `LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum`.
-
-**The rant:** the current name describes the *shape of the PHP construct* ("this is an enum that has primitive types in it") rather than *what the enum represents* ("the set of EDM primitive types"). At the consumer site that asymmetry hurts: `'tier' => PrimitiveTypeEnum::Int64` reads as "the column tier has type 'primitive-type-enum-int-64'" — the `Enum` suffix is dead weight, and "PrimitiveType" without an `Edm` prefix is ambiguous in a codebase that also has PHP type enums, JSON-Schema primitive-type concepts, and SAP UI5 type enums.
-
-`EdmPrimitiveType` reads as what it actually is — *the EDM primitive type* — and the consumer site becomes `'tier' => EdmPrimitiveType::Int64`. The `Enum` suffix vanishes (consumers don't care that the PHP shape is an `enum`; they care about the concept). The `Edm` prefix anchors it in the OData/CSDL vocabulary the rest of the namespace already uses (`Edm\Container\…`, `Edm.EnumType`, `Edm.String`).
-
-Sibling consistency: `EnumTypeInterface` is named for what it represents (an EDM enum type), not for being an interface to an enum-type-enum. `PrimitiveTypeEnum` is the lone hold-out, presumably because someone needed to disambiguate the PHP-enum shape from the EDM concept at name-coining time. With the namespace already saying `Edm`, that disambiguation is redundant — `EdmPrimitiveType` is unambiguous *and* shorter.
-
-**What needs to ship:** Rename the type, update every reference inside the library, ship a deprecated alias (one-line `class_alias()` in a bootstrap file, or a class-extension shim) for one minor release so consumer-side bumps don't break in lock-step. After the deprecation window, the alias goes away.
-
-**Estimated size:** ~5 LOC of rename + the alias shim + a CHANGELOG note. Deprecation window: one minor release. Mechanical.
-
-**Coordination:** consumer-side bumps (host apps, fixtures, tests) flip on the next release after the alias lands. The Satis-pause dance applies — but the alias keeps it boring instead of breaking.
-
----
-
 ## Done
 
-(Reserved for future entries — first finished work moves up here with the version it shipped in.)
+### Rename `PrimitiveTypeEnum` → `EdmPrimitiveType` (2026-05-06)
+
+Renamed the enum and relocated three sibling interfaces that had been misfiled under `Edm\Contracts\Container\` (the CSDL §13 namespace for `EntityContainer` children).
+
+**Renames:**
+
+| Old | New |
+|:---|:---|
+| `LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum` | `LaravelUi5\OData\Edm\EdmPrimitiveType` |
+| `LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeInterface` | `LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface` |
+| `LaravelUi5\OData\Edm\Contracts\Container\EnumTypeInterface` | `LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface` |
+| `LaravelUi5\OData\Edm\Contracts\Container\EnumMemberInterface` | `LaravelUi5\OData\Edm\Contracts\Type\EnumMemberInterface` |
+
+After this, `Edm\Contracts\Container\` cleanly holds only CSDL §13 children: `EntityContainerInterface`, `EntitySetInterface`, `SingletonInterface`, `FunctionImportInterface`, `NavigationPropertyBindingInterface`. Type-level contracts joined their siblings under `Edm\Contracts\Type\`.
+
+**Breaking change** — no `class_alias` shim. Consumers (`core`, `sdk`, `timesheet.biz`) flip in the next release.

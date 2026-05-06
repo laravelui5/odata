@@ -11,7 +11,7 @@ use LaravelUi5\OData\Edm\Contracts\NamedElementInterface;
  * of a structural or navigation property.
  *
  * The four concrete subtypes of this interface are:
- *   - PrimitiveTypeInterface   (wraps a PrimitiveTypeEnum case)
+ *   - PrimitiveTypeInterface   (wraps a EdmPrimitiveType case)
  *   - EntityTypeInterface      (§6)
  *   - ComplexTypeInterface     (§9)
  *   - EnumTypeInterface        (§10)

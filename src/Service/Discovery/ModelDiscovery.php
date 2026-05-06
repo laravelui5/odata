@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use LaravelUi5\OData\Edm\Container\EntitySet;
 use LaravelUi5\OData\Edm\Container\NavigationPropertyBinding;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Service\Builder\ResolverMapBuilder;
 use LaravelUi5\OData\Edm\Property\NavigationProperty;
@@ -241,7 +241,7 @@ final class ModelDiscovery
                 : null;
 
             if ($propAttr?->type !== null) {
-                $enumCase = PrimitiveTypeEnum::tryFrom($propAttr->type);
+                $enumCase = EdmPrimitiveType::tryFrom($propAttr->type);
                 if ($enumCase !== null) {
                     $primitiveType = $enumCase;
                 }
@@ -354,52 +354,52 @@ final class ModelDiscovery
         return $navProps;
     }
 
-    private static function mapColumnType(string $typeName): PrimitiveTypeEnum
+    private static function mapColumnType(string $typeName): EdmPrimitiveType
     {
         return match (true) {
             in_array($typeName, ['string', 'varchar', 'char', 'text', 'tinytext', 'mediumtext', 'longtext', 'enum', 'set'], true)
-                => PrimitiveTypeEnum::String,
+                => EdmPrimitiveType::String,
             in_array($typeName, ['integer', 'int', 'tinyint', 'smallint', 'mediumint'], true)
-                => PrimitiveTypeEnum::Int32,
+                => EdmPrimitiveType::Int32,
             in_array($typeName, ['bigint'], true)
-                => PrimitiveTypeEnum::Int64,
+                => EdmPrimitiveType::Int64,
             in_array($typeName, ['float', 'double', 'real'], true)
-                => PrimitiveTypeEnum::Double,
+                => EdmPrimitiveType::Double,
             in_array($typeName, ['decimal', 'numeric'], true)
-                => PrimitiveTypeEnum::Decimal,
+                => EdmPrimitiveType::Decimal,
             in_array($typeName, ['boolean', 'bool'], true)
-                => PrimitiveTypeEnum::Boolean,
+                => EdmPrimitiveType::Boolean,
             $typeName === 'date'
-                => PrimitiveTypeEnum::Date,
+                => EdmPrimitiveType::Date,
             in_array($typeName, ['datetime', 'timestamp'], true)
-                => PrimitiveTypeEnum::DateTimeOffset,
+                => EdmPrimitiveType::DateTimeOffset,
             $typeName === 'time'
-                => PrimitiveTypeEnum::TimeOfDay,
+                => EdmPrimitiveType::TimeOfDay,
             in_array($typeName, ['blob', 'binary', 'varbinary'], true)
-                => PrimitiveTypeEnum::Binary,
+                => EdmPrimitiveType::Binary,
             in_array($typeName, ['json', 'jsonb'], true)
-                => PrimitiveTypeEnum::String,
+                => EdmPrimitiveType::String,
             in_array($typeName, ['uuid', 'guid'], true)
-                => PrimitiveTypeEnum::Guid,
-            default => PrimitiveTypeEnum::String,
+                => EdmPrimitiveType::Guid,
+            default => EdmPrimitiveType::String,
         };
     }
 
-    private static function mapCastType(string $cast): ?PrimitiveTypeEnum
+    private static function mapCastType(string $cast): ?EdmPrimitiveType
     {
         $baseCast = str_contains($cast, ':') ? substr($cast, 0, (int) strpos($cast, ':')) : $cast;
 
         return match ($baseCast) {
-            'integer', 'int' => PrimitiveTypeEnum::Int32,
-            'float', 'double' => PrimitiveTypeEnum::Double,
-            'decimal' => PrimitiveTypeEnum::Decimal,
-            'boolean', 'bool' => PrimitiveTypeEnum::Boolean,
-            'date' => PrimitiveTypeEnum::Date,
+            'integer', 'int' => EdmPrimitiveType::Int32,
+            'float', 'double' => EdmPrimitiveType::Double,
+            'decimal' => EdmPrimitiveType::Decimal,
+            'boolean', 'bool' => EdmPrimitiveType::Boolean,
+            'date' => EdmPrimitiveType::Date,
             'datetime', 'timestamp', 'immutable_date', 'immutable_datetime'
-                => PrimitiveTypeEnum::DateTimeOffset,
-            'string' => PrimitiveTypeEnum::String,
+                => EdmPrimitiveType::DateTimeOffset,
+            'string' => EdmPrimitiveType::String,
             'array', 'json', 'collection', 'object'
-                => PrimitiveTypeEnum::String,
+                => EdmPrimitiveType::String,
             default => null,
         };
     }

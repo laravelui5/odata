@@ -108,7 +108,7 @@ function makeSchema(
         public function getComplexTypes(): array { return $this->complexTypes; }
         public function getComplexType(string $name): ?\LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface { return null; }
         public function getEnumTypes(): array { return $this->enumTypes; }
-        public function getEnumType(string $name): ?\LaravelUi5\OData\Edm\Contracts\Container\EnumTypeInterface { return null; }
+        public function getEnumType(string $name): ?\LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface { return null; }
         public function getTypeDefinitions(): array { return $this->typeDefs; }
         public function getTypeDefinition(string $name): ?\LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface { return null; }
         public function getFunctions(): array { return $this->functions; }

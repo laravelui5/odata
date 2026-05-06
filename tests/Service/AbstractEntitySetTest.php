@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use LaravelUi5\OData\Edm\Contracts\ColumnarSchemaInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Service\AbstractEntitySet;
 use LaravelUi5\OData\Service\Contracts\CustomEntitySetInterface;
@@ -53,22 +53,22 @@ describe('AbstractEntitySet', function () {
 
     describe('contract', function () {
         it('implements CustomEntitySetInterface', function () {
-            $set = makeEntitySet('Items', ['id' => PrimitiveTypeEnum::Int64]);
+            $set = makeEntitySet('Items', ['id' => EdmPrimitiveType::Int64]);
             expect($set)->toBeInstanceOf(CustomEntitySetInterface::class);
         });
 
         it('implements ColumnarSchemaInterface', function () {
-            $set = makeEntitySet('Items', ['id' => PrimitiveTypeEnum::Int64]);
+            $set = makeEntitySet('Items', ['id' => EdmPrimitiveType::Int64]);
             expect($set)->toBeInstanceOf(ColumnarSchemaInterface::class);
         });
 
         it('implements SqlQueryInterface', function () {
-            $set = makeEntitySet('Items', ['id' => PrimitiveTypeEnum::Int64]);
+            $set = makeEntitySet('Items', ['id' => EdmPrimitiveType::Int64]);
             expect($set)->toBeInstanceOf(SqlQueryInterface::class);
         });
 
         it('implements EntitySetSourceInterface', function () {
-            $set = makeEntitySet('Items', ['id' => PrimitiveTypeEnum::Int64]);
+            $set = makeEntitySet('Items', ['id' => EdmPrimitiveType::Int64]);
             expect($set)->toBeInstanceOf(EntitySetSourceInterface::class);
         });
     });
@@ -76,9 +76,9 @@ describe('AbstractEntitySet', function () {
     describe('entityType() assembly', function () {
         it('builds an EntityType from columns and key', function () {
             $set = makeEntitySet('BillableProjects', [
-                'project_id'   => PrimitiveTypeEnum::Int64,
-                'customer'     => PrimitiveTypeEnum::String,
-                'hours_posted' => PrimitiveTypeEnum::Double,
+                'project_id'   => EdmPrimitiveType::Int64,
+                'customer'     => EdmPrimitiveType::String,
+                'hours_posted' => EdmPrimitiveType::Double,
             ], key: ['project_id']);
 
             $type = $set->entityType('io.pragmatiqu');
@@ -90,9 +90,9 @@ describe('AbstractEntitySet', function () {
 
         it('declares all columns as properties', function () {
             $set = makeEntitySet('Orders', [
-                'id'     => PrimitiveTypeEnum::Int64,
-                'total'  => PrimitiveTypeEnum::Decimal,
-                'status' => PrimitiveTypeEnum::String,
+                'id'     => EdmPrimitiveType::Int64,
+                'total'  => EdmPrimitiveType::Decimal,
+                'status' => EdmPrimitiveType::String,
             ], key: ['id']);
 
             $type = $set->entityType('Test.Ns');
@@ -101,13 +101,13 @@ describe('AbstractEntitySet', function () {
             expect($propNames)->toBe(['id', 'total', 'status']);
         });
 
-        it('maps PrimitiveTypeEnum cases to correct property types', function () {
+        it('maps EdmPrimitiveType cases to correct property types', function () {
             $set = makeEntitySet('Items', [
-                'id'      => PrimitiveTypeEnum::Int64,
-                'name'    => PrimitiveTypeEnum::String,
-                'price'   => PrimitiveTypeEnum::Decimal,
-                'active'  => PrimitiveTypeEnum::Boolean,
-                'created' => PrimitiveTypeEnum::DateTimeOffset,
+                'id'      => EdmPrimitiveType::Int64,
+                'name'    => EdmPrimitiveType::String,
+                'price'   => EdmPrimitiveType::Decimal,
+                'active'  => EdmPrimitiveType::Boolean,
+                'created' => EdmPrimitiveType::DateTimeOffset,
             ], key: ['id']);
 
             $type = $set->entityType('Test.Ns');
@@ -129,8 +129,8 @@ describe('AbstractEntitySet', function () {
 
         it('sets the correct key properties', function () {
             $set = makeEntitySet('Orders', [
-                'id'     => PrimitiveTypeEnum::Int64,
-                'total'  => PrimitiveTypeEnum::Decimal,
+                'id'     => EdmPrimitiveType::Int64,
+                'total'  => EdmPrimitiveType::Decimal,
             ], key: ['id']);
 
             $type = $set->entityType('Test.Ns');
@@ -143,8 +143,8 @@ describe('AbstractEntitySet', function () {
     describe('key() defaults', function () {
         it('defaults key to first column when not overridden', function () {
             $set = makeEntitySet('Items', [
-                'item_code' => PrimitiveTypeEnum::String,
-                'name'      => PrimitiveTypeEnum::String,
+                'item_code' => EdmPrimitiveType::String,
+                'name'      => EdmPrimitiveType::String,
             ]);
 
             expect($set->key())->toBe(['item_code']);
@@ -154,9 +154,9 @@ describe('AbstractEntitySet', function () {
     describe('composite keys', function () {
         it('supports composite keys', function () {
             $set = makeEntitySet('TenantProjects', [
-                'tenant_id'  => PrimitiveTypeEnum::Int64,
-                'project_id' => PrimitiveTypeEnum::Int64,
-                'name'       => PrimitiveTypeEnum::String,
+                'tenant_id'  => EdmPrimitiveType::Int64,
+                'project_id' => EdmPrimitiveType::Int64,
+                'name'       => EdmPrimitiveType::String,
             ], key: ['tenant_id', 'project_id']);
 
             $type = $set->entityType('Test.Ns');
@@ -167,9 +167,9 @@ describe('AbstractEntitySet', function () {
 
         it('preserves key order matching columns order', function () {
             $set = makeEntitySet('Items', [
-                'alpha' => PrimitiveTypeEnum::String,
-                'beta'  => PrimitiveTypeEnum::Int32,
-                'gamma' => PrimitiveTypeEnum::Int64,
+                'alpha' => EdmPrimitiveType::String,
+                'beta'  => EdmPrimitiveType::Int32,
+                'gamma' => EdmPrimitiveType::Int64,
             ], key: ['gamma', 'alpha']);
 
             $type = $set->entityType('Test.Ns');
@@ -191,7 +191,7 @@ describe('AbstractEntitySet', function () {
             ];
 
             foreach ($cases as $setName => $expectedTypeName) {
-                $set = makeEntitySet($setName, ['id' => PrimitiveTypeEnum::Int64]);
+                $set = makeEntitySet($setName, ['id' => EdmPrimitiveType::Int64]);
                 $type = $set->entityType('Test.Ns');
                 expect($type->getName())->toBe($expectedTypeName, "Failed for {$setName}");
             }
@@ -199,24 +199,24 @@ describe('AbstractEntitySet', function () {
     });
 
     describe('all primitive types', function () {
-        it('supports every commonly used PrimitiveTypeEnum case', function () {
+        it('supports every commonly used EdmPrimitiveType case', function () {
             $allTypes = [
-                'binary_col'   => PrimitiveTypeEnum::Binary,
-                'bool_col'     => PrimitiveTypeEnum::Boolean,
-                'byte_col'     => PrimitiveTypeEnum::Byte,
-                'date_col'     => PrimitiveTypeEnum::Date,
-                'datetime_col' => PrimitiveTypeEnum::DateTimeOffset,
-                'decimal_col'  => PrimitiveTypeEnum::Decimal,
-                'double_col'   => PrimitiveTypeEnum::Double,
-                'duration_col' => PrimitiveTypeEnum::Duration,
-                'guid_col'     => PrimitiveTypeEnum::Guid,
-                'int16_col'    => PrimitiveTypeEnum::Int16,
-                'int32_col'    => PrimitiveTypeEnum::Int32,
-                'int64_col'    => PrimitiveTypeEnum::Int64,
-                'sbyte_col'    => PrimitiveTypeEnum::SByte,
-                'single_col'   => PrimitiveTypeEnum::Single,
-                'string_col'   => PrimitiveTypeEnum::String,
-                'time_col'     => PrimitiveTypeEnum::TimeOfDay,
+                'binary_col'   => EdmPrimitiveType::Binary,
+                'bool_col'     => EdmPrimitiveType::Boolean,
+                'byte_col'     => EdmPrimitiveType::Byte,
+                'date_col'     => EdmPrimitiveType::Date,
+                'datetime_col' => EdmPrimitiveType::DateTimeOffset,
+                'decimal_col'  => EdmPrimitiveType::Decimal,
+                'double_col'   => EdmPrimitiveType::Double,
+                'duration_col' => EdmPrimitiveType::Duration,
+                'guid_col'     => EdmPrimitiveType::Guid,
+                'int16_col'    => EdmPrimitiveType::Int16,
+                'int32_col'    => EdmPrimitiveType::Int32,
+                'int64_col'    => EdmPrimitiveType::Int64,
+                'sbyte_col'    => EdmPrimitiveType::SByte,
+                'single_col'   => EdmPrimitiveType::Single,
+                'string_col'   => EdmPrimitiveType::String,
+                'time_col'     => EdmPrimitiveType::TimeOfDay,
             ];
 
             $set = makeEntitySet('TypeTests', $allTypes, key: ['guid_col']);
@@ -243,7 +243,7 @@ describe('AbstractEntitySet', function () {
 
                 public function columns(): array
                 {
-                    return ['id' => PrimitiveTypeEnum::Int64];
+                    return ['id' => EdmPrimitiveType::Int64];
                 }
 
                 public function query(): Builder
@@ -256,7 +256,7 @@ describe('AbstractEntitySet', function () {
                     // Completely custom — ignores columns()
                     $prop = new \LaravelUi5\OData\Edm\Property\Property(
                         'custom_id',
-                        new \LaravelUi5\OData\Edm\Type\PrimitiveType(PrimitiveTypeEnum::Guid),
+                        new \LaravelUi5\OData\Edm\Type\PrimitiveType(EdmPrimitiveType::Guid),
                     );
 
                     return new \LaravelUi5\OData\Edm\Type\EntityType(

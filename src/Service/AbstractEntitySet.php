@@ -7,7 +7,7 @@ namespace LaravelUi5\OData\Service;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Str;
 use LaravelUi5\OData\Driver\Sql\SqlEntitySetResolver;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
@@ -33,9 +33,9 @@ use LaravelUi5\OData\Service\Contracts\SqlQueryInterface;
  *         public function columns(): array
  *         {
  *             return [
- *                 'project_id'   => PrimitiveTypeEnum::Int64,
- *                 'customer'     => PrimitiveTypeEnum::String,
- *                 'hours_posted' => PrimitiveTypeEnum::Double,
+ *                 'project_id'   => EdmPrimitiveType::Int64,
+ *                 'customer'     => EdmPrimitiveType::String,
+ *                 'hours_posted' => EdmPrimitiveType::Double,
  *             ];
  *         }
  *
@@ -58,9 +58,9 @@ abstract readonly class AbstractEntitySet extends SqlEntitySetResolver implement
     }
 
     /**
-     * Flat column definitions using PrimitiveTypeEnum directly.
+     * Flat column definitions using EdmPrimitiveType directly.
      *
-     * @return array<string, PrimitiveTypeEnum>
+     * @return array<string, EdmPrimitiveType>
      */
     abstract public function columns(): array;
 

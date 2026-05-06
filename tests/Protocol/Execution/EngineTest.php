@@ -6,7 +6,7 @@ use LaravelUi5\OData\Driver\Sql\EloquentEntitySetResolver;
 use LaravelUi5\OData\Edm\Container\EntitySet as EdmEntitySet;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\EdmxInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
@@ -45,8 +45,8 @@ const ENGINE_SERVICE_ROOT = 'http://localhost/odata/';
 
 function engineEdmx(): EdmxInterface
 {
-    $int32  = new PrimitiveType(PrimitiveTypeEnum::Int32);
-    $string = new PrimitiveType(PrimitiveTypeEnum::String);
+    $int32  = new PrimitiveType(EdmPrimitiveType::Int32);
+    $string = new PrimitiveType(EdmPrimitiveType::String);
 
     $idProp          = new Property('id', $int32);
     $originProp      = new Property('origin', $string);

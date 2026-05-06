@@ -8,7 +8,7 @@ use Attribute;
 use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
@@ -30,7 +30,7 @@ final readonly class ParameterDefaultValue implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly PrimitiveTypeEnum $type,
+        public readonly EdmPrimitiveType $type,
         public readonly mixed $value = null,
         public readonly ?string $qualifier = null,
     ) {}
@@ -41,20 +41,20 @@ final readonly class ParameterDefaultValue implements TypedAnnotationInterface
             return null;
         }
         return match ($this->type) {
-            PrimitiveTypeEnum::Byte,
-            PrimitiveTypeEnum::SByte,
-            PrimitiveTypeEnum::Int16,
-            PrimitiveTypeEnum::Int32,
-            PrimitiveTypeEnum::Int64      => new ConstantAnnotationValue('Integer', (string) $this->value),
-            PrimitiveTypeEnum::Decimal    => new ConstantAnnotationValue('Decimal', (string) $this->value),
-            PrimitiveTypeEnum::Double,
-            PrimitiveTypeEnum::Single     => new ConstantAnnotationValue('Float', (string) $this->value),
-            PrimitiveTypeEnum::Boolean    => new ConstantAnnotationValue('Boolean', $this->value ? 'true' : 'false'),
-            PrimitiveTypeEnum::Date       => new ConstantAnnotationValue('Date', (string) $this->value),
-            PrimitiveTypeEnum::DateTimeOffset => new ConstantAnnotationValue('DateTimeOffset', (string) $this->value),
-            PrimitiveTypeEnum::TimeOfDay  => new ConstantAnnotationValue('TimeOfDay', (string) $this->value),
-            PrimitiveTypeEnum::Duration   => new ConstantAnnotationValue('Duration', (string) $this->value),
-            PrimitiveTypeEnum::Guid       => new ConstantAnnotationValue('Guid', (string) $this->value),
+            EdmPrimitiveType::Byte,
+            EdmPrimitiveType::SByte,
+            EdmPrimitiveType::Int16,
+            EdmPrimitiveType::Int32,
+            EdmPrimitiveType::Int64      => new ConstantAnnotationValue('Integer', (string) $this->value),
+            EdmPrimitiveType::Decimal    => new ConstantAnnotationValue('Decimal', (string) $this->value),
+            EdmPrimitiveType::Double,
+            EdmPrimitiveType::Single     => new ConstantAnnotationValue('Float', (string) $this->value),
+            EdmPrimitiveType::Boolean    => new ConstantAnnotationValue('Boolean', $this->value ? 'true' : 'false'),
+            EdmPrimitiveType::Date       => new ConstantAnnotationValue('Date', (string) $this->value),
+            EdmPrimitiveType::DateTimeOffset => new ConstantAnnotationValue('DateTimeOffset', (string) $this->value),
+            EdmPrimitiveType::TimeOfDay  => new ConstantAnnotationValue('TimeOfDay', (string) $this->value),
+            EdmPrimitiveType::Duration   => new ConstantAnnotationValue('Duration', (string) $this->value),
+            EdmPrimitiveType::Guid       => new ConstantAnnotationValue('Guid', (string) $this->value),
             default                       => new ConstantAnnotationValue('String', (string) $this->value),
         };
     }

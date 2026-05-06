@@ -7,7 +7,7 @@ namespace LaravelUi5\OData\Service\Contracts;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\SingletonInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\EnumTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\EdmxInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;

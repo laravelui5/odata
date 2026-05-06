@@ -8,7 +8,7 @@ use LaravelUi5\OData\Edm\Container\EntitySet;
 use LaravelUi5\OData\Edm\Container\FunctionImport;
 use LaravelUi5\OData\Edm\Container\NavigationPropertyBinding;
 use LaravelUi5\OData\Edm\Container\Singleton;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\EdmFunction;
 use LaravelUi5\OData\Edm\FunctionParameter;
 use LaravelUi5\OData\Edm\Property\NavigationProperty;
@@ -57,8 +57,8 @@ final class FlightService extends ODataService
     {
         $this->discoverCustomEntitySet(FlightStats::class);
 
-        $int32  = new PrimitiveType(PrimitiveTypeEnum::Int32);
-        $string = new PrimitiveType(PrimitiveTypeEnum::String);
+        $int32  = new PrimitiveType(EdmPrimitiveType::Int32);
+        $string = new PrimitiveType(EdmPrimitiveType::String);
 
         // Flight entity type
         $flightId    = new Property('id', $int32);

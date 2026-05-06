@@ -10,7 +10,7 @@ use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\CollectionAnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\ConstantAnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\RecordAnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\EnumTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;

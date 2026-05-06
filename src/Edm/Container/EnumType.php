@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Edm\Container;
 
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\EnumMemberInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\EnumTypeInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumMemberInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\HasAnnotations;
 
 final readonly class EnumType implements EnumTypeInterface
@@ -21,7 +21,7 @@ final readonly class EnumType implements EnumTypeInterface
     public function __construct(
         private string           $namespace,
         private string           $name,
-        private PrimitiveTypeEnum $underlyingType = PrimitiveTypeEnum::Int32,
+        private EdmPrimitiveType $underlyingType = EdmPrimitiveType::Int32,
         private bool             $isFlags        = false,
         private array            $members        = [],
         array                    $annotations    = [],
@@ -39,7 +39,7 @@ final readonly class EnumType implements EnumTypeInterface
         return $this->namespace . '.' . $this->name;
     }
 
-    public function getUnderlyingType(): PrimitiveTypeEnum
+    public function getUnderlyingType(): EdmPrimitiveType
     {
         return $this->underlyingType;
     }

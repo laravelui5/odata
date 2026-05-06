@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Fixtures;
 
 use LaravelUi5\OData\Edm\Container\FunctionImport;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\EdmFunction;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
 use LaravelUi5\OData\Fixtures\Models\Flight;
@@ -34,7 +34,7 @@ final class DiscoveryWithManualService extends ODataService
     {
         $this->discoverModel(Flight::class);
 
-        $int32 = new PrimitiveType(PrimitiveTypeEnum::Int32);
+        $int32 = new PrimitiveType(EdmPrimitiveType::Int32);
         $countFunc = new EdmFunction(name: 'GetCount', returnType: $int32);
         $countImport = new FunctionImport('GetCount', $countFunc);
 

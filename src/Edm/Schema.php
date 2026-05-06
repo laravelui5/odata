@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Edm;
 
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\EnumTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
 use LaravelUi5\OData\Edm\Contracts\SchemaInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;

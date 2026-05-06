@@ -6,7 +6,7 @@ namespace LaravelUi5\OData\Driver\Sql;
 
 use Illuminate\Database\Query\Builder;
 use LaravelUi5\OData\Driver\Sql\Expression\FilterToQuery;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
 use LaravelUi5\OData\Protocol\Planning\EntityQueryPlan;
 use LaravelUi5\OData\Protocol\Planning\EntitySetQueryPlan;
@@ -125,7 +125,7 @@ readonly class SqlEntitySetResolver implements EntitySetResolverInterface, Entit
         foreach ($entityType->getDeclaredProperties() as $prop) {
             $type = $prop->getType();
             if ($type instanceof PrimitiveType) {
-                if ($type->getPrimitiveType() === PrimitiveTypeEnum::String) {
+                if ($type->getPrimitiveType() === EdmPrimitiveType::String) {
                     $stringColumns[] = $prop->getName();
                 }
             }

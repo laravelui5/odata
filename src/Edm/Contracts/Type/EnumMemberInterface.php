@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelUi5\OData\Edm\Contracts\Container;
+namespace LaravelUi5\OData\Edm\Contracts\Type;
 
 use LaravelUi5\OData\Edm\Contracts\AnnotatableInterface;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;

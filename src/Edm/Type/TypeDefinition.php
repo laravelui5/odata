@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Edm\Type;
 
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeFacetsInterface;
 use LaravelUi5\OData\Edm\HasAnnotations;
@@ -20,7 +20,7 @@ final readonly class TypeDefinition implements TypeDefinitionInterface
     public function __construct(
         private string           $namespace,
         private string           $name,
-        private PrimitiveTypeEnum $underlyingType,
+        private EdmPrimitiveType $underlyingType,
         private ?TypeFacetsInterface $facets = null,
         array                    $annotations = [],
     ) {
@@ -37,7 +37,7 @@ final readonly class TypeDefinition implements TypeDefinitionInterface
         return $this->namespace . '.' . $this->name;
     }
 
-    public function getUnderlyingType(): PrimitiveTypeEnum
+    public function getUnderlyingType(): EdmPrimitiveType
     {
         return $this->underlyingType;
     }

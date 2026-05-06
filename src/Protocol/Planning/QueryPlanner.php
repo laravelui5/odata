@@ -376,7 +376,7 @@ final readonly class QueryPlanner
                     new \LaravelUi5\OData\Edm\Property\Property(
                         $dependentPropName,
                         new \LaravelUi5\OData\Edm\Type\PrimitiveType(
-                            \LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum::Int32
+                            \LaravelUi5\OData\Edm\EdmPrimitiveType::Int32
                         )
                     ),
                 ]),
@@ -395,7 +395,7 @@ final readonly class QueryPlanner
                 new \LaravelUi5\OData\Edm\Property\Property(
                     $fkColumn,
                     new \LaravelUi5\OData\Edm\Type\PrimitiveType(
-                        \LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum::Int32
+                        \LaravelUi5\OData\Edm\EdmPrimitiveType::Int32
                     )
                 ),
             ]),

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use LaravelUi5\OData\Edm\Container\EnumType;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\EdmFunction;
 use LaravelUi5\OData\Edm\Schema;
 use LaravelUi5\OData\Edm\Type\ComplexType;
@@ -109,14 +109,14 @@ describe('Schema', function () {
         });
 
         it('returns the matching type definition by name', function () {
-            $def    = new TypeDefinition(namespace: 'My.Service', name: 'Weight', underlyingType: PrimitiveTypeEnum::Decimal);
+            $def    = new TypeDefinition(namespace: 'My.Service', name: 'Weight', underlyingType: EdmPrimitiveType::Decimal);
             $schema = new Schema('My.Service', typeDefinitions: [$def]);
 
             expect($schema->getTypeDefinition('Weight'))->toBe($def);
         });
 
         it('returns null for an unknown type definition name', function () {
-            $def    = new TypeDefinition(namespace: 'My.Service', name: 'Weight', underlyingType: PrimitiveTypeEnum::Decimal);
+            $def    = new TypeDefinition(namespace: 'My.Service', name: 'Weight', underlyingType: EdmPrimitiveType::Decimal);
             $schema = new Schema('My.Service', typeDefinitions: [$def]);
 
             expect($schema->getTypeDefinition('Distance'))->toBeNull();

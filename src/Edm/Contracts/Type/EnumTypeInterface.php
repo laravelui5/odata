@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace LaravelUi5\OData\Edm\Contracts\Container;
+namespace LaravelUi5\OData\Edm\Contracts\Type;
 
 use LaravelUi5\OData\Edm\Contracts\AnnotatableInterface;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\TypeInterface;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 
 /**
  * An enumeration type, defining a set of named integer constants.
@@ -28,7 +28,7 @@ interface EnumTypeInterface extends TypeInterface, AnnotatableInterface, Annotat
      *
      * @see OData CSDL XML v4.01 §10.1
      */
-    public function getUnderlyingType(): PrimitiveTypeEnum;
+    public function getUnderlyingType(): EdmPrimitiveType;
 
     /**
      * Whether this enum supports bitwise combination of its members.

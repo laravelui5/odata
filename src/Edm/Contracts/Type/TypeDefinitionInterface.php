@@ -6,7 +6,7 @@ namespace LaravelUi5\OData\Edm\Contracts\Type;
 
 use LaravelUi5\OData\Edm\Contracts\AnnotatableInterface;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 
 /**
  * A named type definition, aliasing a primitive type with optional
@@ -26,7 +26,7 @@ interface TypeDefinitionInterface extends TypeInterface, AnnotatableInterface, A
      *
      * @see OData CSDL XML v4.01 §11.1
      */
-    public function getUnderlyingType(): PrimitiveTypeEnum;
+    public function getUnderlyingType(): EdmPrimitiveType;
 
     /**
      * The facets constraining the underlying primitive type,

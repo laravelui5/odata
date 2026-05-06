@@ -425,7 +425,7 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
         foreach ($entityType->getDeclaredProperties() as $prop) {
             $type = $prop->getType();
             if ($type instanceof \LaravelUi5\OData\Edm\Type\PrimitiveType) {
-                if ($type->getPrimitiveType() === \LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum::String) {
+                if ($type->getPrimitiveType() === \LaravelUi5\OData\Edm\EdmPrimitiveType::String) {
                     $stringColumns[] = $prop->getName();
                 }
             }

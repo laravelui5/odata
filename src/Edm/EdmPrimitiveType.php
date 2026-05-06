@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelUi5\OData\Edm\Contracts\Container;
+namespace LaravelUi5\OData\Edm;
 
 /**
  * All built-in primitive types defined by the OData Edm.
@@ -18,7 +18,7 @@ namespace LaravelUi5\OData\Edm\Contracts\Container;
  *
  * @see OData CSDL XML v4.01 §3.3 (Primitive Types)
  */
-enum PrimitiveTypeEnum: string
+enum EdmPrimitiveType: string
 {
     case Binary          = 'Edm.Binary';
     case Boolean         = 'Edm.Boolean';

@@ -6,7 +6,7 @@ namespace LaravelUi5\OData\Fixtures;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Service\AbstractEntitySet;
 
 /**
@@ -31,9 +31,9 @@ final readonly class FlightSummaries extends AbstractEntitySet
     public function columns(): array
     {
         return [
-            'origin'          => PrimitiveTypeEnum::String,
-            'flight_count'    => PrimitiveTypeEnum::Int32,
-            'passenger_count' => PrimitiveTypeEnum::Int32,
+            'origin'          => EdmPrimitiveType::String,
+            'flight_count'    => EdmPrimitiveType::Int32,
+            'passenger_count' => EdmPrimitiveType::Int32,
         ];
     }
 

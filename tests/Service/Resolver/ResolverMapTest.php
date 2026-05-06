@@ -5,7 +5,7 @@ declare(strict_types=1);
 use LaravelUi5\OData\Driver\Sql\EloquentEntitySetResolver;
 use LaravelUi5\OData\Driver\Sql\SqlEntitySetResolver;
 use LaravelUi5\OData\Edm\Container\EntitySet;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
@@ -26,8 +26,8 @@ uses(TestCase::class);
 
 function buildResolverTestEdmx(): \LaravelUi5\OData\Edm\Contracts\EdmxInterface
 {
-    $int32  = new PrimitiveType(PrimitiveTypeEnum::Int32);
-    $string = new PrimitiveType(PrimitiveTypeEnum::String);
+    $int32  = new PrimitiveType(EdmPrimitiveType::Int32);
+    $string = new PrimitiveType(EdmPrimitiveType::String);
 
     $flightType = new EntityType(
         namespace: 'Test.Ns',

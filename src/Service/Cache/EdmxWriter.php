@@ -9,7 +9,7 @@ use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\NavigationPropertyBindingInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\Container\SingletonInterface;
 use LaravelUi5\OData\Edm\Contracts\EdmxInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
@@ -116,7 +116,7 @@ final class EdmxWriter
 
         namespace {$ns};
 
-        use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+        use LaravelUi5\OData\Edm\EdmPrimitiveType;
         use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
         use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
         use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
@@ -216,7 +216,7 @@ final class EdmxWriter
 
         namespace {$ns};
 
-        use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+        use LaravelUi5\OData\Edm\EdmPrimitiveType;
         use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
         use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
         use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
@@ -580,9 +580,9 @@ final class EdmxWriter
      */
     private function generateTypeCode(TypeInterface $type, array $typeMap): string
     {
-        if ($type instanceof \LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeInterface) {
+        if ($type instanceof \LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface) {
             $enumCase = $type->getPrimitiveType()->name;
-            return "new PrimitiveType(PrimitiveTypeEnum::{$enumCase})";
+            return "new PrimitiveType(EdmPrimitiveType::{$enumCase})";
         }
 
         if ($type instanceof EntityTypeInterface || $type instanceof ComplexTypeInterface) {
@@ -592,7 +592,7 @@ final class EdmxWriter
         }
 
         // Fallback for unknown types
-        return "new PrimitiveType(PrimitiveTypeEnum::String)";
+        return "new PrimitiveType(EdmPrimitiveType::String)";
     }
 
     /**
@@ -625,12 +625,12 @@ final class EdmxWriter
      */
     private function generateParamTypeCode(TypeInterface $type): string
     {
-        if ($type instanceof \LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeInterface) {
+        if ($type instanceof \LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface) {
             $enumCase = $type->getPrimitiveType()->name;
-            return "new \\LaravelUi5\\OData\\Edm\\Type\\PrimitiveType(\\LaravelUi5\\OData\\Edm\\Contracts\\Container\\PrimitiveTypeEnum::{$enumCase})";
+            return "new \\LaravelUi5\\OData\\Edm\\Type\\PrimitiveType(\\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::{$enumCase})";
         }
 
-        return "new \\LaravelUi5\\OData\\Edm\\Type\\PrimitiveType(\\LaravelUi5\\OData\\Edm\\Contracts\\Container\\PrimitiveTypeEnum::String)";
+        return "new \\LaravelUi5\\OData\\Edm\\Type\\PrimitiveType(\\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::String)";
     }
 
     // ── Utility ─────────────────────────────────────────────────────────────

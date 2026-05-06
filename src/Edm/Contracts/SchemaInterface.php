@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Edm\Contracts;
 
-use LaravelUi5\OData\Edm\Contracts\Container\EnumTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Tests\Protocol\Parser;
 
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Property\NavigationProperty;
 use LaravelUi5\OData\Edm\Property\Property;
@@ -22,19 +22,19 @@ use LaravelUi5\OData\Protocol\Planning\Expression\FilterExpression;
  */
 function parserEntityType(): EntityTypeInterface
 {
-    $idProp          = new Property('id', new PrimitiveType(PrimitiveTypeEnum::Int32));
-    $originProp      = new Property('origin', new PrimitiveType(PrimitiveTypeEnum::String));
-    $destinationProp = new Property('destination', new PrimitiveType(PrimitiveTypeEnum::String));
-    $priorityProp    = new Property('priority', new PrimitiveType(PrimitiveTypeEnum::String));
+    $idProp          = new Property('id', new PrimitiveType(EdmPrimitiveType::Int32));
+    $originProp      = new Property('origin', new PrimitiveType(EdmPrimitiveType::String));
+    $destinationProp = new Property('destination', new PrimitiveType(EdmPrimitiveType::String));
+    $priorityProp    = new Property('priority', new PrimitiveType(EdmPrimitiveType::String));
 
     $airportType = new EntityType(
         namespace: 'Test',
         name: 'Airport',
-        key: [new Property('id', new PrimitiveType(PrimitiveTypeEnum::Int32))],
+        key: [new Property('id', new PrimitiveType(EdmPrimitiveType::Int32))],
         declaredProperties: [
-            new Property('id', new PrimitiveType(PrimitiveTypeEnum::Int32)),
-            new Property('name', new PrimitiveType(PrimitiveTypeEnum::String)),
-            new Property('code', new PrimitiveType(PrimitiveTypeEnum::String)),
+            new Property('id', new PrimitiveType(EdmPrimitiveType::Int32)),
+            new Property('name', new PrimitiveType(EdmPrimitiveType::String)),
+            new Property('code', new PrimitiveType(EdmPrimitiveType::String)),
         ],
     );
 

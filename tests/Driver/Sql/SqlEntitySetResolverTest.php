@@ -6,7 +6,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use LaravelUi5\OData\Driver\Sql\SqlEntitySetResolver;
 use LaravelUi5\OData\Edm\Container\EntitySet;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
@@ -72,8 +72,8 @@ function sqlClosureSource(Closure $factory): EntitySetSourceInterface
 
 function sqlFlightFixture(): array
 {
-    $int32  = new PrimitiveType(PrimitiveTypeEnum::Int32);
-    $string = new PrimitiveType(PrimitiveTypeEnum::String);
+    $int32  = new PrimitiveType(EdmPrimitiveType::Int32);
+    $string = new PrimitiveType(EdmPrimitiveType::String);
 
     $idProp          = new Property('id', $int32);
     $originProp      = new Property('origin', $string);

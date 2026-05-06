@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Edm\Type;
 
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeInterface;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
+use LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface;
 
 /**
- * Wraps a PrimitiveTypeEnum case as a first-class TypeInterface participant.
+ * Wraps a EdmPrimitiveType case as a first-class TypeInterface participant.
  *
  * The name and qualified name are derived directly from the enum value, e.g.
- * PrimitiveTypeEnum::String → name "String", qualified name "Edm.String".
+ * EdmPrimitiveType::String → name "String", qualified name "Edm.String".
  */
 final readonly class PrimitiveType implements PrimitiveTypeInterface
 {
     public function __construct(
-        private PrimitiveTypeEnum $primitiveType,
+        private EdmPrimitiveType $primitiveType,
     ) {}
 
-    public function getPrimitiveType(): PrimitiveTypeEnum
+    public function getPrimitiveType(): EdmPrimitiveType
     {
         return $this->primitiveType;
     }

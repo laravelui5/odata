@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Query\Builder;
 use LaravelUi5\OData\Edm\Contracts\ColumnarSchemaInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Service\Contracts\EntitySetSourceInterface;
 use LaravelUi5\OData\Service\Contracts\SqlQueryInterface;
 
@@ -23,8 +23,8 @@ describe('SqlQueryInterface', function () {
             public function columns(): array
             {
                 return [
-                    'id'   => PrimitiveTypeEnum::Int64,
-                    'name' => PrimitiveTypeEnum::String,
+                    'id'   => EdmPrimitiveType::Int64,
+                    'name' => EdmPrimitiveType::String,
                 ];
             }
 

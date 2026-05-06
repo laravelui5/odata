@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Edm\Contracts;
 
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 
 /**
  * Declares a typed column schema: column names with their primitive types
@@ -23,14 +23,14 @@ use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
  * - In Core: SqlQueryInterface extends this interface and adds the query
  *   source contract for Report/AnalyticsSet/ValueHelp artifacts.
  *
- * @see PrimitiveTypeEnum for the available column types
+ * @see EdmPrimitiveType for the available column types
  */
 interface ColumnarSchemaInterface
 {
     /**
-     * Flat column definitions using PrimitiveTypeEnum directly.
+     * Flat column definitions using EdmPrimitiveType directly.
      *
-     * @return array<string, PrimitiveTypeEnum>
+     * @return array<string, EdmPrimitiveType>
      */
     public function columns(): array;
 
