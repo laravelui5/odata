@@ -7,6 +7,7 @@ namespace LaravelUi5\OData\Service;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Str;
 use LaravelUi5\OData\Driver\Sql\SqlEntitySetResolver;
+use LaravelUi5\OData\Edm\Container\EnumType;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Property\Property;
@@ -35,6 +36,7 @@ use LaravelUi5\OData\Service\Contracts\SqlQueryInterface;
  *             return [
  *                 'project_id'   => EdmPrimitiveType::Int64,
  *                 'customer'     => EdmPrimitiveType::String,
+ *                 'tier'         => LicenseTier::class,         // int-backed PHP enum
  *                 'hours_posted' => EdmPrimitiveType::Double,
  *             ];
  *         }
@@ -58,9 +60,12 @@ abstract readonly class AbstractEntitySet extends SqlEntitySetResolver implement
     }
 
     /**
-     * Flat column definitions using EdmPrimitiveType directly.
+     * Flat column definitions.
      *
-     * @return array<string, EdmPrimitiveType>
+     * Each value is either an {@see EdmPrimitiveType} case or the class-string
+     * of an int-backed PHP enum (auto-projected to an `Edm.EnumType`).
+     *
+     * @return array<string, EdmPrimitiveType|class-string<\BackedEnum>>
      */
     abstract public function columns(): array;
 
@@ -87,7 +92,10 @@ abstract readonly class AbstractEntitySet extends SqlEntitySetResolver implement
         $properties = [];
 
         foreach ($this->columns() as $name => $type) {
-            $properties[$name] = new Property($name, new PrimitiveType($type));
+            $resolved          = $type instanceof EdmPrimitiveType
+                ? new PrimitiveType($type)
+                : EnumType::fromBackedEnum($namespace, $type);
+            $properties[$name] = new Property($name, $resolved);
         }
 
         $keyProps = array_values(

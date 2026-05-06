@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use LaravelUi5\OData\Edm\Container\EnumMember;
+use LaravelUi5\OData\Edm\Container\EnumType;
+use LaravelUi5\OData\Edm\Contracts\Type\TypeInterface;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
@@ -12,7 +15,8 @@ function buildEntityType(array $columns): EntityType
 {
     $properties = [];
     foreach ($columns as $name => $type) {
-        $properties[] = new Property($name, new PrimitiveType($type));
+        $resolved    = $type instanceof EdmPrimitiveType ? new PrimitiveType($type) : $type;
+        $properties[] = new Property($name, $resolved);
     }
 
     return new EntityType(
@@ -20,6 +24,18 @@ function buildEntityType(array $columns): EntityType
         name: 'Row',
         key: [$properties[0]],
         declaredProperties: $properties,
+    );
+}
+
+function tierEnum(): EnumType
+{
+    return new EnumType(
+        namespace: 'Test.Ns',
+        name: 'LicenseTier',
+        members: [
+            new EnumMember('Single',   1),
+            new EnumMember('Platform', 2),
+        ],
     );
 }
 
@@ -161,6 +177,71 @@ describe('RowCoercion', function () {
             expect($row['id'])->toBe(7);
             expect($row['name'])->toBe('alice');
             expect($row['amount'])->toBe('3.14');
+            expect($row['created_at'])->toMatch('/^2026-05-05T12:34:56[+\-]\d{2}:\d{2}$/');
+        });
+    });
+
+    describe('Edm.EnumType', function () {
+        it('projects an int backing value to the symbolic member name', function () {
+            $type = buildEntityType([
+                'id'   => EdmPrimitiveType::Int64,
+                'tier' => tierEnum(),
+            ]);
+
+            $row = (new RowCoercion($type))->apply([
+                'id'   => 1,
+                'tier' => 1,
+            ]);
+
+            expect($row['tier'])->toBe('Single');
+        });
+
+        it('falls through to the int when the value is not a known member', function () {
+            $type = buildEntityType([
+                'id'   => EdmPrimitiveType::Int64,
+                'tier' => tierEnum(),
+            ]);
+
+            $row = (new RowCoercion($type))->apply([
+                'id'   => 1,
+                'tier' => 99,
+            ]);
+
+            expect($row['tier'])->toBe(99);
+        });
+
+        it('preserves null on a nullable enum column', function () {
+            $type = buildEntityType([
+                'id'   => EdmPrimitiveType::Int64,
+                'tier' => tierEnum(),
+            ]);
+
+            $row = (new RowCoercion($type))->apply([
+                'id'   => 1,
+                'tier' => null,
+            ]);
+
+            expect($row['tier'])->toBeNull();
+        });
+
+        it('coerces alongside other types in a mixed schema', function () {
+            $type = buildEntityType([
+                'id'         => EdmPrimitiveType::Int64,
+                'name'       => EdmPrimitiveType::String,
+                'tier'       => tierEnum(),
+                'created_at' => EdmPrimitiveType::DateTimeOffset,
+            ]);
+
+            $row = (new RowCoercion($type))->apply([
+                'id'         => 7,
+                'name'       => 'alice',
+                'tier'       => 2,
+                'created_at' => '2026-05-05 12:34:56',
+            ]);
+
+            expect($row['id'])->toBe(7);
+            expect($row['name'])->toBe('alice');
+            expect($row['tier'])->toBe('Platform');
             expect($row['created_at'])->toMatch('/^2026-05-05T12:34:56[+\-]\d{2}:\d{2}$/');
         });
     });

@@ -8,21 +8,39 @@ Companion package: `laravelui5/core`'s ROADMAP. The two move together; consumer-
 
 ## Pending
 
-### [ ] PHP backed enum → `Edm.EnumType`
-
-**Why:** Consumers declare int-backed PHP enums (`App\Enums\LicenseTier`: 1=single, 2=platform, …). Today `columns()` only accepts `PrimitiveTypeEnum::*`, so the column ships as `Edm.Int64` and the wire carries the raw int. UIs render "1" / "2"; the human label has to be reconstructed at every binding site by a `formatter` that duplicates the enum's case map. OData v4 has native enum-type support; this library has the EDM-side scaffolding (`EnumTypeInterface`, `EnumType`, `CsdlSerializer` already emits `<EnumType>`) but no bridge from a consumer's PHP `BackedEnum` to a registered EDM type the entity-set column can reference.
-
-**What needs to ship:** A factory `EnumType::fromBackedEnum(BackedEnum::class)`, a widened `columns()` contract so a column can declare `LicenseTier::class` instead of `PrimitiveTypeEnum::Int64`, and a row-emission coercion that maps int → symbolic member name in the OData JSON output (UI5's `sap.ui.model.odata.type.Enum` parses the short form).
-
-**Design parked at:** [`docs/meta/atoms/ODATA_BACKED_ENUM.md`](../docs/meta/atoms/ODATA_BACKED_ENUM.md). Five open design questions documented there; settle them before code.
-
-**Estimated size:** ~100–200 LOC + 10–15 tests + the design discussion. One focused day plus the release dance.
-
-**First consumers:** M5's `MyLicenseEntitySet` (`tier`, `renewal_mode`); future Sales work in M9 (license tier in upgrade-chain UX); generic — every entity set that today reaches for a UI5 formatter to convert int→label.
+(No pending items — ROADMAP cleared. Park new ideas as atoms in `docs/meta/atoms/` and lift them into "Pending" when they're ready to schedule.)
 
 ---
 
 ## CHANGELOG
+
+### PHP backed enum → `Edm.EnumType` (v1.0.4)
+
+Bridges PHP int-backed enums to OData v4 `Edm.EnumType`. A column declared as `LicenseTier::class` now lands as `<EnumType>` in `$metadata` and emits the symbolic member name on the wire (`"tier":"Single"` instead of `"tier":1`) — the short form `sap.ui.model.odata.type.Enum` parses by default.
+
+**What ships:**
+
+- `EnumType::fromBackedEnum(string $namespace, string $enumClass): self` factory. Reflects the enum, validates int-backing, defaults `UnderlyingType` to `Edm.Int32`, emits members in declaration order using PHP case names. Throws `\InvalidArgumentException` on non-enum, pure (non-backed), or string-backed enums.
+- `ColumnarSchemaInterface::columns()` PHPDoc widened to `array<string, EdmPrimitiveType|class-string<\BackedEnum>>`. `AbstractEntitySet::entityType()` branches on each value: primitive → `PrimitiveType`, class-string → factory call.
+- `EdmBuilder::addEntityType()` now walks declared properties and auto-registers any `EnumTypeInterface`-typed property's enum on the schema. Single chokepoint covers `applyCustomEntitySets()`, virtual expands, and any direct caller — consumers never touch `addEnumType()` themselves.
+- `EdmBuilder::addEnumType()` is now keyed by qualified name. Identical re-registration is a silent no-op (factory is deterministic, so two entity sets referencing the same backed enum dedupe naturally). A same-qualified-name registration with a different definition throws `\LogicException` — catches the pathological case where two PHP classes (e.g. `App\Enums\Status` and `App\Other\Status`) collide on the EDM short name.
+- `Protocol\Execution\RowCoercion` extended: `EnumTypeInterface` properties get a per-property value→name lookup. Unknown ints fall through unchanged (defensive — schema drift becomes visible rather than masked).
+
+**Design picks resolved** (parked atom: `docs/meta/atoms/ODATA_BACKED_ENUM.md`):
+
+- Class-string sentinel (`'tier' => LicenseTier::class`), not a union with EnumType instances.
+- Symbolic short form on the wire only — no qualified-long-form toggle.
+- Always default `UnderlyingType: Edm.Int32` — no auto-narrowing by case-value range.
+- PHP case names used verbatim — display labels remain an i18n / UI concern.
+- Same-qualified-name collision throws at registration; identical re-registration is idempotent.
+
+**Out of scope:** string-backed enums, `IsFlags`, complex types, POST/PATCH deserialization (`"Single"` → `1`).
+
+**Migration:**
+
+Purely additive for primitive consumers — existing `EdmPrimitiveType` column declarations continue to work unchanged. To adopt: replace `'tier' => EdmPrimitiveType::Int64` with `'tier' => LicenseTier::class`, then drop any UI5 `formatter` that was reconstructing the label client-side.
+
+One subtle behavior change worth flagging: `addEntityType()` now auto-registers enum types referenced by the entity type. If a consumer was manually pre-registering an `EnumType` with a slightly different definition than what the entity type carried, that latent inconsistency now throws `\LogicException` at build time instead of producing inconsistent `$metadata` silently. Catches a real bug rather than introduces one.
 
 ### `Edm.DateTimeOffset` / `Edm.Date` / `Edm.TimeOfDay` — RFC 3339 wire coercion (v1.0.3)
 

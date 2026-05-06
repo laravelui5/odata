@@ -29,6 +29,62 @@ final readonly class EnumType implements EnumTypeInterface
         $this->annotations = $annotations;
     }
 
+    /**
+     * Build an EnumType from a PHP int-backed enum class-string.
+     *
+     * The EDM short name is derived from the PHP short class name. The
+     * underlying type is fixed at Edm.Int32 — matches OData v4 default
+     * and covers all consumer values today. Members are emitted in
+     * declaration order using PHP case names (display labels are an
+     * i18n concern, not the engine's).
+     *
+     * String-backed and pure enums are rejected — OData v4 EnumTypes
+     * are integer-keyed.
+     *
+     * @param class-string<\BackedEnum> $enumClass
+     */
+    public static function fromBackedEnum(string $namespace, string $enumClass): self
+    {
+        if (!enum_exists($enumClass)) {
+            throw new \InvalidArgumentException(sprintf(
+                'EnumType::fromBackedEnum expected a PHP enum class-string, got "%s".',
+                $enumClass,
+            ));
+        }
+
+        $reflection  = new \ReflectionEnum($enumClass);
+        $backingType = $reflection->getBackingType();
+
+        if ($backingType === null) {
+            throw new \InvalidArgumentException(sprintf(
+                'EnumType::fromBackedEnum expected a backed enum, got pure enum "%s".',
+                $enumClass,
+            ));
+        }
+
+        if ((string) $backingType !== 'int') {
+            throw new \InvalidArgumentException(sprintf(
+                'EnumType::fromBackedEnum expected an int-backed enum, got %s-backed "%s". '
+                . 'OData v4 EnumTypes are integer-keyed.',
+                (string) $backingType,
+                $enumClass,
+            ));
+        }
+
+        $members = [];
+        foreach ($reflection->getCases() as $case) {
+            /** @var \ReflectionEnumBackedCase $case */
+            $members[] = new EnumMember($case->getName(), (int) $case->getBackingValue());
+        }
+
+        return new self(
+            namespace: $namespace,
+            name: $reflection->getShortName(),
+            underlyingType: EdmPrimitiveType::Int32,
+            members: $members,
+        );
+    }
+
     public function getName(): string
     {
         return $this->name;

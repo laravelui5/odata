@@ -28,9 +28,15 @@ use LaravelUi5\OData\Edm\EdmPrimitiveType;
 interface ColumnarSchemaInterface
 {
     /**
-     * Flat column definitions using EdmPrimitiveType directly.
+     * Flat column definitions.
      *
-     * @return array<string, EdmPrimitiveType>
+     * Each value is either an {@see EdmPrimitiveType} case (for primitive
+     * columns) or the class-string of an int-backed PHP enum that should
+     * project to an {@see \LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface}
+     * — the OData engine reflects the enum, registers it on the schema,
+     * and emits the symbolic member name on the wire.
+     *
+     * @return array<string, EdmPrimitiveType|class-string<\BackedEnum>>
      */
     public function columns(): array;
 

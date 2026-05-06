@@ -48,7 +48,7 @@ final class EdmBuilder implements EdmBuilderInterface
     /** @var list<ComplexTypeInterface> */
     private array $complexTypes = [];
 
-    /** @var list<EnumTypeInterface> */
+    /** @var array<string, EnumTypeInterface> indexed by qualified name */
     private array $enumTypes = [];
 
     /** @var list<TypeDefinitionInterface> */
@@ -122,6 +122,14 @@ final class EdmBuilder implements EdmBuilderInterface
     {
         $this->assertNotBuilt();
         $this->entityTypes[] = $type;
+
+        foreach ($type->getDeclaredProperties() as $property) {
+            $propertyType = $property->getType();
+            if ($propertyType instanceof EnumTypeInterface) {
+                $this->addEnumType($propertyType);
+            }
+        }
+
         return $this;
     }
 
@@ -135,8 +143,56 @@ final class EdmBuilder implements EdmBuilderInterface
     public function addEnumType(EnumTypeInterface $type): static
     {
         $this->assertNotBuilt();
-        $this->enumTypes[] = $type;
+
+        $qualifiedName = $type->getQualifiedName();
+        $existing      = $this->enumTypes[$qualifiedName] ?? null;
+
+        if ($existing === null) {
+            $this->enumTypes[$qualifiedName] = $type;
+            return $this;
+        }
+
+        if (!self::enumTypesEqual($existing, $type)) {
+            throw new \LogicException(sprintf(
+                'EnumType "%s" already registered with a different definition. '
+                . 'Two PHP backed enums collide on the EDM short name within this service; '
+                . 'rename one of the source enums or place them in different OData services.',
+                $qualifiedName,
+            ));
+        }
+
         return $this;
+    }
+
+    private static function enumTypesEqual(EnumTypeInterface $a, EnumTypeInterface $b): bool
+    {
+        if ($a->getUnderlyingType() !== $b->getUnderlyingType()) {
+            return false;
+        }
+        if ($a->isFlags() !== $b->isFlags()) {
+            return false;
+        }
+
+        $aMembers = $a->getMembers();
+        $bMembers = $b->getMembers();
+
+        if (count($aMembers) !== count($bMembers)) {
+            return false;
+        }
+
+        $bByName = [];
+        foreach ($bMembers as $member) {
+            $bByName[$member->getName()] = $member->getValue();
+        }
+
+        foreach ($aMembers as $member) {
+            $name = $member->getName();
+            if (!array_key_exists($name, $bByName) || $bByName[$name] !== $member->getValue()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function addTypeDefinition(TypeDefinitionInterface $type): static
@@ -249,7 +305,7 @@ final class EdmBuilder implements EdmBuilderInterface
             alias:           $this->alias,
             entityTypes:     $this->entityTypes,
             complexTypes:    $this->complexTypes,
-            enumTypes:       $this->enumTypes,
+            enumTypes:       array_values($this->enumTypes),
             typeDefinitions: $this->typeDefinitions,
             functions:       $this->functions,
         );

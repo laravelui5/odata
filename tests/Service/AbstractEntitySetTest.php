@@ -5,8 +5,11 @@ declare(strict_types=1);
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use LaravelUi5\OData\Edm\Contracts\ColumnarSchemaInterface;
-use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
+use LaravelUi5\OData\Fixtures\Models\Enums\Colour;
+use LaravelUi5\OData\Fixtures\Models\Enums\Direction;
 use LaravelUi5\OData\Service\AbstractEntitySet;
 use LaravelUi5\OData\Service\Contracts\CustomEntitySetInterface;
 use LaravelUi5\OData\Service\Contracts\EntitySetSourceInterface;
@@ -125,6 +128,39 @@ describe('AbstractEntitySet', function () {
                 'active'  => 'Edm.Boolean',
                 'created' => 'Edm.DateTimeOffset',
             ]);
+        });
+
+        it('projects a backed-enum class-string column to an EnumType property', function () {
+            $set = makeEntitySet('Palettes', [
+                'id'     => EdmPrimitiveType::Int64,
+                'colour' => Colour::class,
+            ], key: ['id']);
+
+            $type     = $set->entityType('Test.Ns');
+            $property = null;
+            foreach ($type->getDeclaredProperties() as $prop) {
+                if ($prop->getName() === 'colour') {
+                    $property = $prop;
+                    break;
+                }
+            }
+
+            expect($property)->not->toBeNull();
+            $propertyType = $property->getType();
+            expect($propertyType)->toBeInstanceOf(EnumTypeInterface::class);
+            expect($propertyType->getQualifiedName())->toBe('Test.Ns.Colour');
+            expect($propertyType->getMember('Red')?->getValue())->toBe(1);
+            expect($propertyType->getMember('Brown')?->getValue())->toBe(8);
+        });
+
+        it('rejects a non-backed enum class-string at entityType() time', function () {
+            $set = makeEntitySet('Palettes', [
+                'id'        => EdmPrimitiveType::Int64,
+                'direction' => Direction::class,
+            ], key: ['id']);
+
+            expect(fn () => $set->entityType('Test.Ns'))
+                ->toThrow(\InvalidArgumentException::class, 'expected a backed enum');
         });
 
         it('sets the correct key properties', function () {

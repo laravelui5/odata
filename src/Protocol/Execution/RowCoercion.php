@@ -7,28 +7,33 @@ namespace LaravelUi5\OData\Protocol\Execution;
 use Carbon\Carbon;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
 
 /**
- * Coerces row values to OData v4 wire formats for temporal primitive types.
+ * Coerces row values to OData v4 wire formats at JSON emission time.
  *
- * MySQL `DATETIME`/`DATE`/`TIME` columns accessed via raw query builder
- * yield strings like `2026-05-05 12:34:56` — no `T`, no offset. That is
- * not a valid `Edm.DateTimeOffset` literal (RFC 3339 §5.6 mandates `T`
- * and a `Z`/numeric offset) and breaks `Date.parse()` in Safari.
+ * Two property kinds get coerced:
  *
- * Coercion happens once per row at JSON emission time:
- *   - Edm.DateTimeOffset → Carbon::parse($v)->toRfc3339String()
- *   - Edm.Date           → Carbon::parse($v)->toDateString()  (Y-m-d)
- *   - Edm.TimeOfDay      → Carbon::parse($v)->format('H:i:s')
+ *   Temporal primitives — MySQL `DATETIME`/`DATE`/`TIME` columns accessed via
+ *   raw query builder yield strings like `2026-05-05 12:34:56` (no `T`, no
+ *   offset), which is not a valid `Edm.DateTimeOffset` literal (RFC 3339
+ *   §5.6 mandates `T` and a `Z`/numeric offset) and breaks `Date.parse()`
+ *   in Safari. Coercion uses Carbon:
+ *     - Edm.DateTimeOffset → Carbon::parse($v)->toRfc3339String()
+ *     - Edm.Date           → Carbon::parse($v)->toDateString()  (Y-m-d)
+ *     - Edm.TimeOfDay      → Carbon::parse($v)->format('H:i:s')
+ *   Already-correct strings round-trip cleanly.
  *
- * Already-correct RFC 3339 strings round-trip cleanly through Carbon::parse,
- * so the coercion is a no-op for callers that already format correctly.
+ *   EnumType properties — backing-int values are projected to the symbolic
+ *   member name on the wire (`tier: 1` → `tier: "Single"`), the short form
+ *   that `sap.ui.model.odata.type.Enum` parses by default. Unknown ints
+ *   pass through unchanged so schema drift is visible rather than masked.
  */
 final readonly class RowCoercion
 {
-    /** @var array<string, callable(mixed): string> */
+    /** @var array<string, callable(mixed): mixed> */
     private array $coercers;
 
     public function __construct(EntityTypeInterface $type)
@@ -55,7 +60,7 @@ final readonly class RowCoercion
         return $row;
     }
 
-    /** @return array<string, callable(mixed): string> */
+    /** @return array<string, callable(mixed): mixed> */
     private static function buildCoercers(EntityTypeInterface $type): array
     {
         $coercers = [];
@@ -66,13 +71,17 @@ final readonly class RowCoercion
             }
 
             $propertyType = $property->getType();
-            if (!$propertyType instanceof PrimitiveTypeInterface) {
+
+            if ($propertyType instanceof PrimitiveTypeInterface) {
+                $coercer = self::coercerForPrimitive($propertyType->getPrimitiveType());
+                if ($coercer !== null) {
+                    $coercers[$property->getName()] = $coercer;
+                }
                 continue;
             }
 
-            $coercer = self::coercerFor($propertyType->getPrimitiveType());
-            if ($coercer !== null) {
-                $coercers[$property->getName()] = $coercer;
+            if ($propertyType instanceof EnumTypeInterface) {
+                $coercers[$property->getName()] = self::coercerForEnum($propertyType);
             }
         }
 
@@ -89,13 +98,27 @@ final readonly class RowCoercion
         }
     }
 
-    private static function coercerFor(EdmPrimitiveType $type): ?callable
+    private static function coercerForPrimitive(EdmPrimitiveType $type): ?callable
     {
         return match ($type) {
             EdmPrimitiveType::DateTimeOffset => static fn (mixed $v): string => Carbon::parse($v)->toRfc3339String(),
             EdmPrimitiveType::Date           => static fn (mixed $v): string => Carbon::parse($v)->toDateString(),
             EdmPrimitiveType::TimeOfDay      => static fn (mixed $v): string => Carbon::parse($v)->format('H:i:s'),
             default                          => null,
+        };
+    }
+
+    /** @return callable(mixed): (string|int) */
+    private static function coercerForEnum(EnumTypeInterface $type): callable
+    {
+        $valueToName = [];
+        foreach ($type->getMembers() as $member) {
+            $valueToName[$member->getValue()] = $member->getName();
+        }
+
+        return static function (mixed $v) use ($valueToName): string|int {
+            $intValue = is_int($v) ? $v : (int) $v;
+            return $valueToName[$intValue] ?? $intValue;
         };
     }
 }
