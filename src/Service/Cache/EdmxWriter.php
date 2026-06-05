@@ -287,7 +287,6 @@ final class EdmxWriter
         use LaravelUi5\OData\Edm\Contracts\Container\NavigationPropertyBindingInterface;
         use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
         use LaravelUi5\OData\Edm\HasAnnotations;
-        use {$typeFqcn};
 
         final readonly class {$className} implements EntitySetInterface
         {
@@ -301,7 +300,7 @@ final class EdmxWriter
             public function __construct()
             {
                 \$this->annotations = [];
-                \$this->entityType = {$typeClass}::instance();
+                \$this->entityType = \\{$typeFqcn}::instance();
         {$bindings}
             }
 

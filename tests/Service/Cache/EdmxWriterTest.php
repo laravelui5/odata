@@ -283,3 +283,48 @@ it('generates directory structure with Types/ and Entities/', function () {
     expect(is_file($edmDir . '/Entities/Flights.php'))->toBeTrue();
     expect(is_file($edmDir . '/Entities/Passengers.php'))->toBeTrue();
 });
+
+it('generates a loadable entity set when the set name equals its type name', function () {
+    // Regression (v1.0.5): writeEntitySet() used to emit `use {ns}\Types\{Name};`
+    // alongside `class {Name}` in the same file. When a set's name equalled its
+    // type's name the import and the declaration collided and PHP fataled at
+    // autoload with "Cannot redeclare class …". Production hit this on MyDraft /
+    // MyOrganization / MyPortalState (2026-06-04). The fix references the type by
+    // FQN and drops the self-import.
+    $int32 = new PrimitiveType(EdmPrimitiveType::Int32);
+    $id = new Property('id', $int32);
+
+    // Set name === type name — the collision case.
+    $type = new EntityType(
+        namespace: 'Test.Ns',
+        name: 'MyDraft',
+        key: [$id],
+        declaredProperties: [$id],
+    );
+    $set = new EntitySet(name: 'MyDraft', entityType: $type);
+
+    $edmx = (new EdmBuilder())
+        ->namespace('Test.Ns')
+        ->addEntityType($type)
+        ->addEntitySet($set)
+        ->build();
+
+    // Use a unique namespace so the loaded classes don't collide with other tests'.
+    $namespace = 'EdmxWriterCollisionTest\\Edm';
+    $outputDir = $this->tmpDir . '/Edm';
+    (new EdmxWriter($edmx, $outputDir, $namespace))->write();
+
+    // The entity-set file must not import its own type (the old collision line).
+    $entitySrc = file_get_contents($outputDir . '/Entities/MyDraft.php');
+    expect($entitySrc)->not->toContain('use ' . $namespace . '\\Types\\MyDraft;');
+
+    // And it must actually load + resolve its type without a redeclare fatal.
+    require_once $outputDir . '/Types/MyDraft.php';
+    require_once $outputDir . '/Entities/MyDraft.php';
+
+    $setClass = $namespace . '\\Entities\\MyDraft';
+    $loadedSet = new $setClass();
+
+    expect($loadedSet->getName())->toBe('MyDraft');
+    expect($loadedSet->getEntityType()->getName())->toBe('MyDraft');
+});
