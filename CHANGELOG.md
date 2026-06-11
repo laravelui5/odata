@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [1.0.6] – 2026-06-11
+
+`OData::forService()` — registry-independent request handling.
+
+The controller resolved its service from the `ODataServiceRegistryInterface` inside
+`handle()`, so every service necessarily shared one route group and one middleware
+pipeline (`ODataServiceProvider` registers a single `Route::any('{path?}')` under one
+prefix). That left no seam for serving a service to a different client over a different
+pipeline — e.g. a Basic-auth endpoint for Excel/Power BI beside the session-authenticated
+`/odata` space the standard registry serves.
+
+`handle()` now delegates to a new public
+`OData::forService(Request, ODataServiceInterface)` — the same request-handling core,
+given an already-resolved service. The registry path is unchanged (`handle()` resolves,
+then delegates), so the change is **purely additive**. Consumers can compose their own
+route with their own middleware and bind a specific service:
+
+```php
+Route::any('excel/{path?}', fn (Request $r) =>
+    app(OData::class)->forService($r, app(ExcelService::class))
+)->where('path', '.*')->middleware('auth.basic');
+```
+
+A service mounted on a non-standard prefix must declare that mount by overriding **both**
+`route()` (path-stripping) and `endpoint()` (the `@odata.context` / `@odata.nextLink`
+service root) — otherwise paginated responses emit next-links into the default `/odata`
+namespace and downstream clients (Excel follows `@odata.nextLink`) page into the wrong
+place. The standard `/odata` registry space follows the SAP/Microsoft prefix + service +
+data convention unchanged; alternative clients get their own namespace + a dedicated service.
+
 ## [1.0.5] – 2026-06-05
 
 `odata:cache` entity-set / type name collision.

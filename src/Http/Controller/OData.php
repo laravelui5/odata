@@ -15,6 +15,7 @@ use LaravelUi5\OData\Http\ODataResponse;
 use LaravelUi5\OData\Protocol\Execution\BatchHandler;
 use LaravelUi5\OData\Protocol\Execution\Engine;
 use LaravelUi5\OData\Protocol\Planning\QueryPlanner;
+use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use Throwable;
 
@@ -26,14 +27,37 @@ use Throwable;
 class OData extends Controller
 {
     /**
-     * Handle an OData request.
+     * Handle an OData request, resolving the service from the registry.
+     *
+     * The registry-backed entry point: one route group, one middleware pipeline,
+     * services selected by path. Delegates to {@see self::forService()}.
      */
     public function handle(Request $request, ODataServiceRegistryInterface $resolver): ODataResponse
     {
-        $oDataService = $resolver->resolve($request->path());
+        return $this->forService($request, $resolver->resolve($request->path()));
+    }
 
+    /**
+     * Handle an OData request against an already-resolved service.
+     *
+     * The registry-independent seam: compose your own route, choose your own
+     * middleware pipeline, and bind a specific service — e.g. a curated, Basic-auth
+     * endpoint for Excel/Power BI beside the standard registry-resolved `/odata` space:
+     *
+     *     Route::any('excel/{path?}', fn (Request $r) =>
+     *         app(OData::class)->forService($r, app(ExcelService::class))
+     *     )->where('path', '.*')->middleware('auth.basic');
+     *
+     * The service declares its own mount via route()/endpoint(). When mounting a
+     * service on a non-standard prefix, override BOTH so path-stripping (route()) AND
+     * the self-referential URLs — @odata.context, @odata.nextLink (endpoint()) — follow
+     * that prefix; otherwise paginated responses emit next-links into the default
+     * `/odata` namespace and downstream clients page into the wrong place.
+     */
+    public function forService(Request $request, ODataServiceInterface $service): ODataResponse
+    {
         try {
-            $route   = $oDataService->route();
+            $route   = $service->route();
             $rawPath = '/' . ltrim($request->path(), '/');
             $path    = substr($rawPath, strlen('/' . ltrim($route, '/'))) ?: '/';
 
@@ -60,8 +84,8 @@ class OData extends Controller
             // Batch — handled separately since it re-dispatches inner requests.
             // Supports both JSON batch and multipart/mixed batch formats.
             if (trim($path, '/') === '$batch') {
-                $schema = $oDataService->schema();
-                return (new BatchHandler($schema, $oDataService))
+                $schema = $service->schema();
+                return (new BatchHandler($schema, $service))
                     ->handle($request->getContent(), $request->header('Content-Type'));
             }
 
@@ -82,10 +106,10 @@ class OData extends Controller
                 maxPageSize: $maxPageSize,
             );
 
-            $schema = $oDataService->schema();
+            $schema = $service->schema();
             $plan   = (new QueryPlanner)->plan($planRequest, $schema);
 
-            return (new Engine($schema, $oDataService->endpoint()))->execute($plan);
+            return (new Engine($schema, $service->endpoint()))->execute($plan);
         } catch (ProtocolException $e) {
             throw $e;
         } catch (Throwable $e) {
