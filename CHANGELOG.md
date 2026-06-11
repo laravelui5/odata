@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [1.0.7] – 2026-06-11
+
+`odata:cache` / `odata:clear` learn `--class`; cache-dir collisions fail loud.
+
+The cache commands discovered services only through the `ODataServiceRegistryInterface`, so a
+**route-composed** service (served via `OData::forService()` on its own route, deliberately
+outside the registry — see 1.0.6) could not be pre-cached and always ran the cold build path.
+
+Both commands now accept `--class=FQCN1,FQCN2`: the named services are cached / cleared **in
+addition** to the registry's, validated (an unknown class or a non-`ODataServiceInterface`
+fails), and deduped against the registry.
+
+```bash
+php artisan odata:cache --class="App\Excel\ExcelService"
+php artisan odata:clear --class="App\Excel\ExcelService"
+```
+
+`odata:cache` also gained a **fail-loud pre-pass**: if two services resolve to the same cache
+directory (same namespace), it errors before writing anything, rather than letting one
+overwrite the other's `Edm/` — which the warm loader would then serve as the wrong schema. (The
+complementary load-side guard / identity-based cache keying remains on the ROADMAP.) The
+autoloader refresh is now skipped under tests.
+
 ## [1.0.6] – 2026-06-11
 
 `OData::forService()` — registry-independent request handling.

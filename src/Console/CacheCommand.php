@@ -6,6 +6,7 @@ namespace LaravelUi5\OData\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use LaravelUi5\OData\Console\Concerns\ResolvesServices;
 use LaravelUi5\OData\Service\Cache\EdmxWriter;
 use LaravelUi5\OData\Service\Cache\ResolverMapWriter;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
@@ -13,9 +14,11 @@ use ReflectionClass;
 
 class CacheCommand extends Command
 {
-    protected $signature = 'odata:cache';
+    use ResolvesServices;
 
-    protected $description = 'Generate cached Edm PHP classes for all registered OData services (dev only)';
+    protected $signature = 'odata:cache {--class= : Comma-separated FQCNs of additional OData services to cache (route-composed/bound services not in the registry)}';
+
+    protected $description = 'Generate cached Edm PHP classes for OData services — the registry, plus any --class services (dev only)';
 
     public function handle(ODataServiceRegistryInterface $registry): int
     {
@@ -27,9 +30,35 @@ class CacheCommand extends Command
             return self::FAILURE;
         }
 
+        $services = $this->resolveServices($registry);
+
+        if ($services === null) {
+            return self::FAILURE;
+        }
+
+        // Pre-pass: each service must own its cache directory. Two services sharing a
+        // namespace would overwrite each other's Edm/ — and the warm path would then serve
+        // the wrong schema. Fail loud BEFORE writing anything, rather than silently.
+        $claimedBy = [];
+        foreach ($services as $service) {
+            $dir = dirname((new ReflectionClass($service))->getFileName()) . '/Edm';
+            if (isset($claimedBy[$dir])) {
+                $this->error(sprintf(
+                    'Cache directory collision: %s and %s both map to %s.',
+                    $service::class,
+                    $claimedBy[$dir],
+                    $dir,
+                ));
+                $this->error('Each OData service must live in its own namespace/directory.');
+
+                return self::FAILURE;
+            }
+            $claimedBy[$dir] = $service::class;
+        }
+
         $fs = new Filesystem();
 
-        foreach ($registry->services() as $service) {
+        foreach ($services as $service) {
             $reflected = new ReflectionClass($service);
             $outputDir = dirname($reflected->getFileName()) . '/Edm';
             $namespace = $reflected->getNamespaceName() . '\\Edm';
@@ -58,8 +87,12 @@ class CacheCommand extends Command
         }
 
         // Refresh autoloader so the newly generated Edm classes are discoverable.
-        $this->info('Refreshing autoloader...');
-        passthru('composer dump-autoload 2>&1');
+        // Skipped under tests — it shells out to composer and would regenerate the
+        // package's own autoloader.
+        if (!app()->runningUnitTests()) {
+            $this->info('Refreshing autoloader...');
+            passthru('composer dump-autoload 2>&1');
+        }
 
         $this->info('OData schema cached successfully.');
 

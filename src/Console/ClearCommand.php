@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Console;
 
 use Illuminate\Console\Command;
+use LaravelUi5\OData\Console\Concerns\ResolvesServices;
 use LaravelUi5\OData\Service\Cache\EdmxLoader;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 
 class ClearCommand extends Command
 {
-    protected $signature = 'odata:clear';
+    use ResolvesServices;
 
-    protected $description = 'Remove cached Edm PHP classes for all registered OData services (dev only)';
+    protected $signature = 'odata:clear {--class= : Comma-separated FQCNs of additional OData services to clear}';
+
+    protected $description = 'Remove cached Edm PHP classes for OData services — the registry, plus any --class services (dev only)';
 
     public function handle(ODataServiceRegistryInterface $registry): int
     {
@@ -24,7 +27,13 @@ class ClearCommand extends Command
             return self::FAILURE;
         }
 
-        foreach ($registry->services() as $service) {
+        $services = $this->resolveServices($registry);
+
+        if ($services === null) {
+            return self::FAILURE;
+        }
+
+        foreach ($services as $service) {
             $cacheDir = EdmxLoader::cacheDir($service);
 
             if (!is_dir($cacheDir)) {
