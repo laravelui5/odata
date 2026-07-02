@@ -7,6 +7,7 @@ namespace LaravelUi5\OData\Service\Resolver;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use LaravelUi5\OData\Driver\Sql\SqlEntitySetResolver;
+use LaravelUi5\OData\Http\CustomQueryOptions;
 use LaravelUi5\OData\Service\Contracts\EntitySetResolverInterface;
 use LaravelUi5\OData\Service\Contracts\EntitySetSourceInterface;
 use LaravelUi5\OData\Service\Contracts\ResolverBindingInterface;
@@ -25,7 +26,7 @@ final readonly class SqlBinding implements ResolverBindingInterface, EntitySetSo
         public ?string $connection = null,
     ) {}
 
-    public function query(): Builder
+    public function query(CustomQueryOptions $options): Builder
     {
         return DB::connection($this->connection)->table($this->table);
     }

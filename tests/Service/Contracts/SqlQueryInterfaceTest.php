@@ -33,7 +33,7 @@ describe('SqlQueryInterface', function () {
                 return ['id'];
             }
 
-            public function query(): Builder
+            public function query(\LaravelUi5\OData\Http\CustomQueryOptions $options): Builder
             {
                 return \Illuminate\Support\Facades\DB::table('test');
             }

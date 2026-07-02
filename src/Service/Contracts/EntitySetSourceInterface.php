@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Service\Contracts;
 
 use Illuminate\Database\Query\Builder;
+use LaravelUi5\OData\Http\CustomQueryOptions;
 
 /**
  * Formal contract for SQL-backed entity set data sources.
@@ -23,7 +24,7 @@ use Illuminate\Database\Query\Builder;
  *   {
  *       public function __construct(private TenantContext $tenant) {}
  *
- *       public function query(): Builder
+ *       public function query(CustomQueryOptions $options): Builder
  *       {
  *           return DB::table('partner_value_help')
  *               ->where('tenant_id', $this->tenant->id);
@@ -36,7 +37,12 @@ interface EntitySetSourceInterface
      * Return the base query for this entity set.
      *
      * The returned builder must be a fresh instance on each call — it will be
-     * mutated by the resolver when applying OData query options.
+     * mutated by the resolver when applying OData system query options
+     * (`$filter`/`$orderby`/`$top`/`$skip`) on top.
+     *
+     * @param CustomQueryOptions $options The request's custom (non-`$`) query
+     *   options, threaded from the URL. Correct under `$batch` (each inner
+     *   request carries its own). Sources that don't use them ignore the arg.
      */
-    public function query(): Builder;
+    public function query(CustomQueryOptions $options): Builder;
 }

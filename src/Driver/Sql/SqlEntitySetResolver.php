@@ -8,6 +8,7 @@ use Illuminate\Database\Query\Builder;
 use LaravelUi5\OData\Driver\Sql\Expression\FilterToQuery;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
+use LaravelUi5\OData\Http\CustomQueryOptions;
 use LaravelUi5\OData\Protocol\Planning\EntityQueryPlan;
 use LaravelUi5\OData\Protocol\Planning\EntitySetQueryPlan;
 use LaravelUi5\OData\Protocol\Planning\Expression\PropertyPathExpression;
@@ -37,7 +38,7 @@ readonly class SqlEntitySetResolver implements EntitySetResolverInterface, Entit
     public function resolve(QueryPlanInterface $plan): \Generator
     {
         /** @var EntitySetQueryPlan $plan */
-        $query = $this->baseQuery();
+        $query = $this->baseQuery($plan->customQueryOptions);
 
         $this->applyFilter($query, $plan);
         $this->applySearch($query, $plan);
@@ -58,7 +59,7 @@ readonly class SqlEntitySetResolver implements EntitySetResolverInterface, Entit
     public function resolveOne(QueryPlanInterface $plan): ?array
     {
         /** @var EntityQueryPlan $plan */
-        $query = $this->baseQuery();
+        $query = $this->baseQuery($plan->customQueryOptions);
 
         foreach ($plan->key->values as $column => $literal) {
             $query->where($column, '=', $literal->value);
@@ -86,7 +87,7 @@ readonly class SqlEntitySetResolver implements EntitySetResolverInterface, Entit
     public function count(QueryPlanInterface $plan): int
     {
         /** @var EntitySetQueryPlan $plan */
-        $query = $this->baseQuery();
+        $query = $this->baseQuery($plan->customQueryOptions);
 
         $this->applyFilter($query, $plan);
         $this->applySearch($query, $plan);
@@ -96,9 +97,9 @@ readonly class SqlEntitySetResolver implements EntitySetResolverInterface, Entit
 
     // ── Internal ─────────────────────────────────────────────────────────────
 
-    private function baseQuery(): Builder
+    private function baseQuery(CustomQueryOptions $options): Builder
     {
-        return $this->source->query();
+        return $this->source->query($options);
     }
 
     private function applyFilter(Builder $query, EntitySetQueryPlan $plan): void

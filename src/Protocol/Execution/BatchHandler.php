@@ -7,6 +7,7 @@ namespace LaravelUi5\OData\Protocol\Execution;
 use LaravelUi5\OData\Http\ODataResponse;
 use LaravelUi5\OData\Exception\BadRequestException;
 use LaravelUi5\OData\Exception\ProtocolException;
+use LaravelUi5\OData\Http\CustomQueryOptions;
 use LaravelUi5\OData\Http\ODataRequest;
 use LaravelUi5\OData\Protocol\Planning\QueryPlanner;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
@@ -304,6 +305,9 @@ final readonly class BatchHandler
             search:  $query['$search'] ?? null,
             compute: $query['$compute'] ?? null,
             count:   ($query['$count'] ?? '') === 'true',
+            // Custom query options live only on this inner request's URL, never on
+            // the outer $batch envelope — carry them on the request value object.
+            customQueryOptions: CustomQueryOptions::fromQuery($query),
         );
 
         try {

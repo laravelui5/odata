@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Protocol\Planning;
 
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
+use LaravelUi5\OData\Http\CustomQueryOptions;
 use LaravelUi5\OData\Protocol\Planning\Expression\FilterExpression;
 
 final readonly class EntitySetQueryPlan extends QueryPlan
@@ -26,5 +27,6 @@ final readonly class EntitySetQueryPlan extends QueryPlan
         public array              $compute   = [],
         public ?int               $maxPageSize = null,
         public ?NavigationAnchor  $anchor    = null,
+        public CustomQueryOptions $customQueryOptions = new CustomQueryOptions(),
     ) {}
 }

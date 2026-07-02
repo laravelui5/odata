@@ -4,6 +4,8 @@ A read-only OData v4 engine for Laravel 11+, built for OpenUI5 frontends.
 
 This package is a clean-room rewrite of [flat3/lodata](https://github.com/flat3/lodata). Its protocol test suite served as the pivot: ~400 HTTP tests define the OData wire contract the new implementation must honor. No original implementation code was preserved; only relevant, refactored tests remain, forming the permanent regression suite.
 
+> **Release acceptance.** Beyond the regression suite, releases are validated in production by [timesheet.biz](https://timesheet.biz), which runs this engine as its OData layer. There is no separate acceptance host — production use is the gate.
+
 ## What it does
 
 - read-only [OData v4](https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part1-protocol.html) engine

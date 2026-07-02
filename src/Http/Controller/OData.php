@@ -10,6 +10,7 @@ use LaravelUi5\OData\Exception\BadRequestException;
 use LaravelUi5\OData\Exception\InternalServerErrorException;
 use LaravelUi5\OData\Exception\NotImplementedException;
 use LaravelUi5\OData\Exception\ProtocolException;
+use LaravelUi5\OData\Http\CustomQueryOptions;
 use LaravelUi5\OData\Http\ODataRequest;
 use LaravelUi5\OData\Http\ODataResponse;
 use LaravelUi5\OData\Protocol\Execution\BatchHandler;
@@ -104,6 +105,7 @@ class OData extends Controller
                 compute:     $request->query('$compute'),
                 count:       $request->query('$count') === 'true',
                 maxPageSize: $maxPageSize,
+                customQueryOptions: CustomQueryOptions::fromQuery($request->query()),
             );
 
             $schema = $service->schema();

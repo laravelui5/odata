@@ -43,7 +43,7 @@ function makeEntitySet(string $name, array $columns, ?array $key = null): Abstra
             return $this->k ?? parent::key();
         }
 
-        public function query(): Builder
+        public function query(\LaravelUi5\OData\Http\CustomQueryOptions $options): Builder
         {
             return DB::table('dummy');
         }
@@ -282,7 +282,7 @@ describe('AbstractEntitySet', function () {
                     return ['id' => EdmPrimitiveType::Int64];
                 }
 
-                public function query(): Builder
+                public function query(\LaravelUi5\OData\Http\CustomQueryOptions $options): Builder
                 {
                     return DB::table('dummy');
                 }

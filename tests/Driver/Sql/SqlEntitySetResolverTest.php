@@ -51,7 +51,7 @@ function sqlTableSource(string $table): EntitySetSourceInterface
     return new class($table) implements EntitySetSourceInterface {
         public function __construct(private readonly string $table) {}
 
-        public function query(): Builder
+        public function query(\LaravelUi5\OData\Http\CustomQueryOptions $options): Builder
         {
             return DB::table($this->table);
         }
@@ -63,7 +63,7 @@ function sqlClosureSource(Closure $factory): EntitySetSourceInterface
     return new class($factory) implements EntitySetSourceInterface {
         public function __construct(private readonly Closure $factory) {}
 
-        public function query(): Builder
+        public function query(\LaravelUi5\OData\Http\CustomQueryOptions $options): Builder
         {
             return ($this->factory)();
         }

@@ -242,7 +242,7 @@ describe('ResolverMap', function () {
 
 class TestEntitySetSource implements EntitySetSourceInterface
 {
-    public function query(): \Illuminate\Database\Query\Builder
+    public function query(\LaravelUi5\OData\Http\CustomQueryOptions $options): \Illuminate\Database\Query\Builder
     {
         return \Illuminate\Support\Facades\DB::table('flights');
     }

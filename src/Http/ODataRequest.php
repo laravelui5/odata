@@ -29,6 +29,7 @@ final readonly class ODataRequest
         public readonly ?string $compute   = null,
         public readonly bool    $count     = false,
         public readonly ?int    $maxPageSize = null,
+        public readonly CustomQueryOptions $customQueryOptions = new CustomQueryOptions(),
     ) {}
 
     /**

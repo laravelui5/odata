@@ -6,6 +6,7 @@ namespace LaravelUi5\OData\Fixtures;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use LaravelUi5\OData\Http\CustomQueryOptions;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Service\AbstractEntitySet;
 
@@ -37,7 +38,7 @@ final readonly class FlightSummaries extends AbstractEntitySet
         ];
     }
 
-    public function query(): Builder
+    public function query(CustomQueryOptions $options): Builder
     {
         return DB::query()->fromSub(
             DB::table('flights')

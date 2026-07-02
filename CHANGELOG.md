@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [2.0.0] – 2026-07-02
+
+Custom query options now reach an entity set's `query()` as data on the request — correct inside a
+`$batch`, not just on direct GETs.
+
+**BREAKING:** `EntitySetSourceInterface::query()` gains a required parameter —
+`query(CustomQueryOptions $options): Builder`. Every custom entity set / source updates its signature
+(mechanical; sources that don't use custom options just ignore the arg). This is a public MIT package
+that follows SemVer, so a breaking change to a public contract is a **major** — the only bump a `^1`
+constraint excludes, which is what keeps downstream consumers from breaking on `composer update`.
+In-house consumers upgrade deliberately: `sdk-host` now, the others (`timesheet`, `pragmatiqu.io`)
+whenever they choose to pin `^2` — until then they stay on `1.0.7`, unaffected.
+
+### Upgrade
+
+Add the parameter to every `EntitySetSourceInterface::query()` implementation (custom
+`AbstractEntitySet`s and any manual sources):
+
+```diff
+-public function query(): Builder
++public function query(CustomQueryOptions $options): Builder
+```
+
+Sources that consume a custom query option read it straight off the argument —
+`$options->get('roleCode')`; sources that don't simply ignore it. Nothing else changes.
+
+An entity set that read a custom query option (a non-`$` URL parameter, e.g. `?roleCode=customer`)
+off the global Illuminate request worked on a **direct** request but silently returned unfiltered
+results inside a UI5 v4 **`$batch`** — the default client mode. The options live only on each inner
+request's URL; the global request during dispatch is the outer `POST …/$batch` envelope, which
+carries none of them.
+
+The fix threads them as **data** instead of reaching for global state:
+
+- **`Http\CustomQueryOptions`** — a value object of the non-`$`, non-`@` options, now a property on
+  **`Http\ODataRequest`**, populated by both entry points from the parsed URL (`OData::forService`
+  for a direct request; `BatchHandler` per inner `$batch` request — so each inner request carries its
+  own, no shared state).
+- The `QueryPlanner` copies it onto the query plan; `SqlEntitySetResolver` hands it to
+  `query($options)`. Entity sets read it directly: `$options->get('roleCode')`.
+
+Guarded by `tests/Service/CustomQueryOptionHttpTest.php` — the same option asserted over a direct GET
+and inside a `$batch`.
+
 ## [1.0.7] – 2026-06-11
 
 `odata:cache` / `odata:clear` learn `--class`; cache-dir collisions fail loud.

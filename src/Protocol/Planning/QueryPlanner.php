@@ -139,6 +139,7 @@ final readonly class QueryPlanner
             search:      $request->search,
             compute:     $this->parseCompute($request->compute),
             maxPageSize: $request->maxPageSize,
+            customQueryOptions: $request->customQueryOptions,
         );
     }
 

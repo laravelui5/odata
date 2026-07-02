@@ -41,7 +41,7 @@ use LaravelUi5\OData\Service\Contracts\SqlQueryInterface;
  *             ];
  *         }
  *
- *         public function query(): Builder
+ *         public function query(CustomQueryOptions $options): Builder
  *         {
  *             return DB::query()->fromSub($sql, 't');
  *         }
