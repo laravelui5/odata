@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [3.0.1] – 2026-07-20
+
+`4xx` OData errors no longer spam the application error log. A `ProtocolException` whose HTTP
+status is `< 500` — a malformed query (`400`), an unauthorized read (`403`), an unknown set
+(`404`) — is an **expected client outcome**, not a server fault, so `ProtocolException::report()`
+now suppresses Laravel's default error logging for it. `5xx` (a genuine engine failure — `500`,
+`501`) is still reported.
+
+**A patch, not a minor.** No public API changes and the HTTP responses are byte-identical — only
+the server-side log severity changes. This corrects a pre-existing defect (4xx logged at `ERROR`
+with a full stack trace), surfaced now because the `2.1.0` read-authz feature makes `403` a
+routine outcome — every denied read was flooding the log with a ~60-frame trace.
+
+Keyed on `httpCode < 500` in the base `ProtocolException`, so it is correct for every subclass,
+including future ones. Follows Laravel's `report()` contract (a non-false return skips default
+logging). Hosts that *want* 4xx logged can still add their own `reportable()` callback.
+
 ## [3.0.0] – 2026-07-20
 
 `ResolverBindingInterface` gains `getSourceClass(): ?string` — the authored class-string that

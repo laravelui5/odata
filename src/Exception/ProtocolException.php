@@ -43,6 +43,28 @@ abstract class ProtocolException extends RuntimeException implements Responsable
     }
 
     /**
+     * Control whether Laravel's exception handler logs this exception.
+     *
+     * A `4xx` OData error is an **expected client outcome** (a malformed query, an
+     * unauthorized read, an unknown set) — not a server fault — so it must not spam the
+     * error log with a stack trace. A `5xx` is a genuine engine failure and is reported.
+     *
+     * The return value follows Laravel's `report()` contract (Foundation `Handler`):
+     * a **non-false** return means "handled — skip default logging"; a **false** return
+     * lets the handler perform its normal error logging. Hence: `4xx → true` (suppressed),
+     * `5xx → false` (logged). The HTTP response is unchanged either way — this governs
+     * server-side logging only.
+     */
+    public function report(): bool
+    {
+        if ($this->httpCode < 500) {
+            return true;  // expected client outcome → suppress default logging
+        }
+
+        return false;     // genuine server error → let Laravel log it
+    }
+
+    /**
      * Set the OData error code
      * @param  string  $code  Code
      * @return $this
