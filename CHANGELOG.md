@@ -6,6 +6,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [2.1.0] – 2026-07-20
+
+Read authorization comes to OData as a pluggable seam. OData stays security-agnostic, the default is
+a no-op, so an authenticated actor who reaches a URL still gets the rows exactly as before. A host that
+knows about actors and permissions binds an enforcer and gains a hard **403** gate on any read, plus an
+honest-partial response for a gated `$expand`.
+
+**Purely additive → a minor.** New contracts and classes only; the default `AllowAllReadAuthorizer`
+records no verdict, so every existing consumer is byte-identical (the full suite proves it). No public
+signature broke — `EntitySetSourceInterface::query()` and the `Engine` / handler pipeline are untouched.
+Contrast [2.0.0], a major for a breaking `query()` change: this one a `^2` constraint picks up on
+`composer update` with no behaviour change.
+
+### The seam — `Service\Contracts\ReadAuthorizerInterface`
+
+A forward-exit in `OData::forService` (and each `$batch` inner request), called after planning and
+before execution:
+
+```
+authorize(QueryPlanInterface $plan, Request $request, ReadContext $read): void
+```
+
+The authorizer records verdicts into a **`Service\ReadContext`** (the read-side collector); the engine
+never learns about authorization. Default binding: **`Service\AllowAllReadAuthorizer`** (records nothing
+→ read proceeds), overridable via the new **`odata.read_authorizer`** config key or by rebinding the
+interface.
+
+### What a verdict does
+
+- **Hard denial** (`denyHard`) on a primary / root target → a standard OData **403** error envelope
+  (`Exception\ForbiddenException` → `{"error": {…}}`) carrying the message. The UI5 v4 model surfaces a
+  failed request's error body to the message model natively — the reliable carrier for a root denial.
+- **Drop** (`denyDrop`) on an `$expand` target → the gated expand is **pruned** and the allowed sets
+  still serve (**200**); each drop is reported in a standard **`sap-messages`** response header (an
+  unbound warning the v4 model ingests natively). Read authorization is per entity **set**, so a dropped
+  set name removes every expand pointing at it, at **any depth** — no bypass via nesting.
+- No verdict → served as-is.
+
+`$batch` inner requests run through the identical gate (`Http\ReadGate`), so a denied inner request
+produces a per-inner 403 while its siblings serve normally.
+
+### Adopt
+
+Bind your enforcer — it decides off the plan (downcast to `EntitySetQueryPlan` / `EntityQueryPlan` for
+`->target`) and your own actor context:
+
+```php
+// config/odata.php
+'read_authorizer' => \App\OData\MyReadAuthorizer::class,
+
+// or rebind in a service provider
+$this->app->bind(ReadAuthorizerInterface::class, MyReadAuthorizer::class);
+```
+
+Emit `Service\ReadMessage`s in the standard SAP shape (`code`, `message`, `numericSeverity`, `target`,
+`longtextUrl`); resolve the text server-side, and give **unbound** messages `target: ""` (a
+non-resolvable target is dropped by the v4 model).
+
+### New surface
+
+- `Service\Contracts\ReadAuthorizerInterface` · `Service\AllowAllReadAuthorizer`
+- `Service\ReadContext` · `Service\ReadMessage`
+- `Exception\ForbiddenException`
+- `Http\ReadGate` (the shared authorize-then-execute path)
+- `Protocol\Planning\ExpandPruner` + `withExpand()` on `EntitySetQueryPlan` / `EntityQueryPlan` / `ExpandItem`
+- config key `odata.read_authorizer`
+
 ## [2.0.0] – 2026-07-02
 
 Custom query options now reach an entity set's `query()` as data on the request — correct inside a
