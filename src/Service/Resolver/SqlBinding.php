@@ -35,4 +35,13 @@ final readonly class SqlBinding implements ResolverBindingInterface, EntitySetSo
     {
         return new SqlEntitySetResolver($this);
     }
+
+    /**
+     * A raw table/view has no authored class to reflect on — it is gated by
+     * converting it to a SqlSourceBinding with an EntitySetSourceInterface class.
+     */
+    public function getSourceClass(): ?string
+    {
+        return null;
+    }
 }

@@ -28,4 +28,9 @@ final readonly class SqlSourceBinding implements ResolverBindingInterface
     {
         return new SqlEntitySetResolver(app($this->sourceClass));
     }
+
+    public function getSourceClass(): ?string
+    {
+        return $this->sourceClass;
+    }
 }

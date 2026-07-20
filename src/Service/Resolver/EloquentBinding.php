@@ -26,4 +26,9 @@ final readonly class EloquentBinding implements ResolverBindingInterface
     {
         return new EloquentEntitySetResolver($this->modelClass);
     }
+
+    public function getSourceClass(): ?string
+    {
+        return $this->modelClass;
+    }
 }

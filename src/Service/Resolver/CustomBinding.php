@@ -32,4 +32,9 @@ final readonly class CustomBinding implements ResolverBindingInterface
     {
         return app($this->resolverClass);
     }
+
+    public function getSourceClass(): ?string
+    {
+        return $this->resolverClass;
+    }
 }

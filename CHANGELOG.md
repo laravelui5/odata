@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [3.0.0] – 2026-07-20
+
+`ResolverBindingInterface` gains `getSourceClass(): ?string` — the authored class-string that
+backs an entity set, so a consumer can reflect class attributes (permissions, capabilities,
+annotations) on the right class without knowing the binding taxonomy.
+
+**BREAKING:** `ResolverBindingInterface` gains a required method. The four shipped bindings
+implement it; any external implementor of the interface must add it. This is a public MIT package
+on strict SemVer (see [2.0.0]), so a new interface method is a **major** — the bump a `^2`
+constraint excludes. In-house consumers upgrade deliberately (`core`, `sdk`, `timesheet` — the same
+three that moved for 2.0.0).
+
+### Why
+
+`getSourceClass()` returns the class the developer **authored**, which is not always the runtime
+resolver `createResolver()` builds:
+
+| Binding            | `createResolver()` (runtime resolver)      | `getSourceClass()` (authored class) |
+|:-------------------|:-------------------------------------------|:------------------------------------|
+| `EloquentBinding`  | `EloquentEntitySetResolver` (generic)      | the **Eloquent model**              |
+| `CustomBinding`    | the app's resolver class                   | that class                          |
+| `SqlSourceBinding` | `SqlEntitySetResolver` wrapping the source | the **source** class                |
+| `SqlBinding`       | built from a table name                    | `null` — no authored class          |
+
+A consumer that wants to read a class attribute on an entity set (e.g. an SDK read-authorization
+gate reflecting a `#[Read]` attribute) needs the **authored** class — the model for a
+`discoverModel` set, the custom/source class otherwise. Reflecting the *resolver* would find the
+generic `EloquentEntitySetResolver` for every model-backed set and miss the attribute entirely.
+`getSourceClass()` names the authored class directly, so the harvest is one loop over
+`ResolverMap::getBindings()` with no binding-type matching. `null` marks a raw table/view (no class
+to reflect on — gate it by giving it a `SqlSourceBinding` with a source class instead).
+
+### Upgrade
+
+Implement `getSourceClass(): ?string` on any custom `ResolverBindingInterface` — return the
+class-string your binding reflects on, or `null` if none:
+
+```php
+public function getSourceClass(): ?string
+{
+    return $this->myBackingClass;   // or null for a class-less binding
+}
+```
+
+Consumers using only the four shipped bindings need no change.
+
 ## [2.1.0] – 2026-07-20
 
 Read authorization comes to OData as a pluggable seam. OData stays security-agnostic, the default is
