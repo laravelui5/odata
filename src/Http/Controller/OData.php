@@ -16,11 +16,16 @@ use LaravelUi5\OData\Http\ODataRequest;
 use LaravelUi5\OData\Http\ODataResponse;
 use LaravelUi5\OData\Protocol\Execution\BatchHandler;
 use LaravelUi5\OData\Protocol\Execution\Engine;
+use LaravelUi5\OData\Protocol\Planning\EntityQueryPlan;
+use LaravelUi5\OData\Protocol\Planning\EntitySetQueryPlan;
+use LaravelUi5\OData\Protocol\Planning\ExpandPruner;
+use LaravelUi5\OData\Protocol\Planning\QueryPlan;
 use LaravelUi5\OData\Protocol\Planning\QueryPlanner;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use LaravelUi5\OData\Service\Contracts\ReadAuthorizerInterface;
 use LaravelUi5\OData\Service\ReadContext;
+use LaravelUi5\OData\Service\ReadMessage;
 use Throwable;
 
 /**
@@ -119,17 +124,30 @@ class OData extends Controller
             $plan   = (new QueryPlanner)->plan($planRequest, $schema);
 
             // Read-authorization forward-exit. The host's authorizer records verdicts into the
-            // ReadContext; a hard denial (a primary/root target) answers a 403. The default
-            // AllowAll records nothing, so unconfigured OData proceeds unchanged. ($expand
-            // drops + the sap-messages partial response arrive in the next slice.)
+            // ReadContext; the default AllowAll records nothing, so unconfigured OData proceeds
+            // unchanged.
             $read = new ReadContext();
             $this->readAuthorizer->authorize($plan, $request, $read);
 
+            // A hard denial (a primary/root target) answers a 403.
             if ($read->hasHardDenial()) {
                 throw ForbiddenException::fromContext($read);
             }
 
-            return (new Engine($schema, $service->endpoint()))->execute($plan);
+            // Honest-partial: prune any gated $expand from the plan so the allowed sets still
+            // serve (200), and report each drop in a sap-messages header. Denials are known at
+            // plan time, so the header is set before the response streams.
+            if ($read->dropped() !== []) {
+                $plan = $this->pruneDroppedExpands($plan, $read->dropped());
+            }
+
+            $response = (new Engine($schema, $service->endpoint()))->execute($plan);
+
+            if ($read->dropMessages() !== []) {
+                $response->headers->set('sap-messages', $this->encodeSapMessages($read->dropMessages()));
+            }
+
+            return $response;
         } catch (ProtocolException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -141,6 +159,36 @@ class OData extends Controller
      * Resolve the effective max page size from the client Prefer header
      * and the server-side pagination config.
      */
+    /**
+     * Rebuild the plan without the gated $expand targets. Read authorization is per entity
+     * set, so a dropped set name removes every expand pointing at it, at any depth. Plan types
+     * that carry no expands are returned unchanged.
+     *
+     * @param list<string> $droppedSetNames
+     */
+    private function pruneDroppedExpands(QueryPlan $plan, array $droppedSetNames): QueryPlan
+    {
+        if ($plan instanceof EntitySetQueryPlan || $plan instanceof EntityQueryPlan) {
+            return $plan->withExpand(ExpandPruner::prune($plan->expand, $droppedSetNames));
+        }
+
+        return $plan;
+    }
+
+    /**
+     * Serialize the drop messages as the standard `sap-messages` header value (a JSON array of
+     * unbound messages) — the carrier the UI5 v4 model ingests natively.
+     *
+     * @param list<ReadMessage> $messages
+     */
+    private function encodeSapMessages(array $messages): string
+    {
+        return json_encode(
+            array_map(static fn (ReadMessage $message) => $message->toArray(), $messages),
+            JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        );
+    }
+
     private function resolveMaxPageSize(Request $request): ?int
     {
         // 1. Parse client preference from Prefer header.

@@ -21,4 +21,20 @@ final readonly class ExpandItem
         public ?int                        $skip     = null,
         public bool                        $count    = false,
     ) {}
+
+    /** Readonly clone with a replaced nested expand list (used by ExpandPruner). */
+    public function withExpand(ExpandList $expand): self
+    {
+        return new self(
+            $this->property,
+            $this->targetSet,
+            $this->filter,
+            $this->select,
+            $expand,
+            $this->orderBy,
+            $this->top,
+            $this->skip,
+            $this->count,
+        );
+    }
 }

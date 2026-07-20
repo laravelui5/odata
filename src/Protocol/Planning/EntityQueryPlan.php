@@ -17,4 +17,17 @@ final readonly class EntityQueryPlan extends QueryPlan
         public ?NavigationAnchor  $anchor = null,
         public CustomQueryOptions $customQueryOptions = new CustomQueryOptions(),
     ) {}
+
+    /** Readonly clone with a replaced expand list (used by the read-authz honest-partial prune). */
+    public function withExpand(ExpandList $expand): self
+    {
+        return new self(
+            $this->target,
+            $this->key,
+            $this->select,
+            $expand,
+            $this->anchor,
+            $this->customQueryOptions,
+        );
+    }
 }
