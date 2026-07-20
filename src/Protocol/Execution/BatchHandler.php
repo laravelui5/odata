@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Protocol\Execution;
 
+use Illuminate\Http\Request;
 use LaravelUi5\OData\Http\ODataResponse;
 use LaravelUi5\OData\Exception\BadRequestException;
 use LaravelUi5\OData\Exception\ProtocolException;
 use LaravelUi5\OData\Http\CustomQueryOptions;
 use LaravelUi5\OData\Http\ODataRequest;
+use LaravelUi5\OData\Http\ReadGate;
 use LaravelUi5\OData\Protocol\Planning\QueryPlanner;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\RuntimeSchemaInterface;
@@ -32,6 +34,8 @@ final readonly class BatchHandler
     public function __construct(
         private RuntimeSchemaInterface $schema,
         private ODataServiceInterface  $service,
+        private ReadGate               $gate,
+        private Request                $request,
     ) {}
 
     /**
@@ -68,8 +72,10 @@ final readonly class BatchHandler
 
         $schema  = $this->schema;
         $service = $this->service;
+        $gate    = $this->gate;
+        $request = $this->request;
 
-        $response->setCallback(static function () use ($requests, $schema, $service): void {
+        $response->setCallback(static function () use ($requests, $schema, $service, $gate, $request): void {
             echo '{"responses":[';
 
             $first = true;
@@ -78,7 +84,7 @@ final readonly class BatchHandler
                     echo ',';
                 }
 
-                $innerResponse = self::dispatchInnerRequest($requestData, $schema, $service);
+                $innerResponse = self::dispatchInnerRequest($requestData, $schema, $service, $gate, $request);
                 echo json_encode($innerResponse, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
                 $first = false;
@@ -108,15 +114,17 @@ final readonly class BatchHandler
         $responseBoundary = 'batchresponse_' . bin2hex(random_bytes(16));
         $schema  = $this->schema;
         $service = $this->service;
+        $gate    = $this->gate;
+        $request = $this->request;
 
         $response = new ODataResponse(null, 200, [
             'Content-Type' => 'multipart/mixed; boundary=' . $responseBoundary,
             'OData-Version' => '4.0',
         ]);
 
-        $response->setCallback(static function () use ($requests, $schema, $service, $responseBoundary): void {
+        $response->setCallback(static function () use ($requests, $schema, $service, $gate, $request, $responseBoundary): void {
             foreach ($requests as $requestData) {
-                $innerResult = self::dispatchInnerRequest($requestData, $schema, $service);
+                $innerResult = self::dispatchInnerRequest($requestData, $schema, $service, $gate, $request);
 
                 $status     = $innerResult['status'];
                 $statusText = self::httpStatusText($status);
@@ -264,6 +272,8 @@ final readonly class BatchHandler
         array $requestData,
         RuntimeSchemaInterface $schema,
         ODataServiceInterface $service,
+        ReadGate $gate,
+        Request $request,
     ): array {
         $url = $requestData['url'];
 
@@ -311,8 +321,10 @@ final readonly class BatchHandler
         );
 
         try {
+            // Same read-authz gate as the direct path: a hard denial throws ForbiddenException
+            // (caught below → a per-inner 403 entry); a gated $expand is pruned + reported.
             $plan     = (new QueryPlanner)->plan($planRequest, $schema);
-            $response = (new Engine($schema, $service->endpoint()))->execute($plan);
+            $response = $gate->execute($plan, $request, $schema, $service->endpoint());
 
             ob_start();
             $response->sendContent();
