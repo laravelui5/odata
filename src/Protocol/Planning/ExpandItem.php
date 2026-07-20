@@ -11,14 +11,14 @@ use LaravelUi5\OData\Protocol\Planning\Expression\FilterExpression;
 final readonly class ExpandItem
 {
     public function __construct(
-        public readonly NavigationPropertyInterface $property,
-        public readonly EntitySetInterface          $targetSet,   // resolved at plan time
-        public readonly ?FilterExpression           $filter   = null,
-        public readonly SelectList                  $select   = new SelectList(),
-        public readonly ExpandList                  $expand   = new ExpandList(),
-        public readonly ?OrderByList                $orderBy  = null,
-        public readonly ?int                        $top      = null,
-        public readonly ?int                        $skip     = null,
-        public readonly bool                        $count    = false,
+        public NavigationPropertyInterface $property,
+        public EntitySetInterface          $targetSet,   // resolved at plan time
+        public ?FilterExpression           $filter   = null,
+        public SelectList                  $select   = new SelectList(),
+        public ExpandList                  $expand   = new ExpandList(),
+        public ?OrderByList                $orderBy  = null,
+        public ?int                        $top      = null,
+        public ?int                        $skip     = null,
+        public bool                        $count    = false,
     ) {}
 }

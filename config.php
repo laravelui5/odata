@@ -45,6 +45,17 @@ return [
     'service_registry' => LaravelUi5\OData\ODataServiceRegistry::class,
 
     /*
+     * The ReadAuthorizerInterface implementation to use.
+     *
+     * OData is security-agnostic. The default AllowAllReadAuthorizer records no
+     * verdict, so every read proceeds — an authenticated actor who reaches a URL
+     * gets the rows, exactly as before. A host that knows about actors and
+     * permissions binds its own enforcer here (or rebinds the interface) to gate
+     * reads: a hard denial → 403; a dropped $expand → pruned + a sap-messages warning.
+     */
+    'read_authorizer' => LaravelUi5\OData\Service\AllowAllReadAuthorizer::class,
+
+    /*
      * Server-driven pagination.
      */
     'pagination' => [

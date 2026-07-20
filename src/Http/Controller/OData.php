@@ -7,6 +7,7 @@ namespace LaravelUi5\OData\Http\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use LaravelUi5\OData\Exception\BadRequestException;
+use LaravelUi5\OData\Exception\ForbiddenException;
 use LaravelUi5\OData\Exception\InternalServerErrorException;
 use LaravelUi5\OData\Exception\NotImplementedException;
 use LaravelUi5\OData\Exception\ProtocolException;
@@ -18,6 +19,8 @@ use LaravelUi5\OData\Protocol\Execution\Engine;
 use LaravelUi5\OData\Protocol\Planning\QueryPlanner;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
+use LaravelUi5\OData\Service\Contracts\ReadAuthorizerInterface;
+use LaravelUi5\OData\Service\ReadContext;
 use Throwable;
 
 /**
@@ -27,6 +30,10 @@ use Throwable;
  */
 class OData extends Controller
 {
+    public function __construct(private readonly ReadAuthorizerInterface $readAuthorizer)
+    {
+    }
+
     /**
      * Handle an OData request, resolving the service from the registry.
      *
@@ -110,6 +117,17 @@ class OData extends Controller
 
             $schema = $service->schema();
             $plan   = (new QueryPlanner)->plan($planRequest, $schema);
+
+            // Read-authorization forward-exit. The host's authorizer records verdicts into the
+            // ReadContext; a hard denial (a primary/root target) answers a 403. The default
+            // AllowAll records nothing, so unconfigured OData proceeds unchanged. ($expand
+            // drops + the sap-messages partial response arrive in the next slice.)
+            $read = new ReadContext();
+            $this->readAuthorizer->authorize($plan, $request, $read);
+
+            if ($read->hasHardDenial()) {
+                throw ForbiddenException::fromContext($read);
+            }
 
             return (new Engine($schema, $service->endpoint()))->execute($plan);
         } catch (ProtocolException $e) {
