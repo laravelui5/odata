@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [3.0.2] – 2026-08-17
+
+Model discovery no longer emits PHP warnings from unrelated classes.
+
+`ModelDiscovery::discoverRelationships()` finds Eloquent relations by walking every public,
+parameterless method of a model and **invoking** it to see whether a `Relation` comes back. That
+sweep does not distinguish a relation from an ordinary accessor, so a method like
+
+```php
+public function fullKey(): string
+{
+    return $this->artifact->namespace . '.' . $this->type->label() . '.' . $this->ability;
+}
+```
+
+was called on the unhydrated probe instance, dereferenced a null relation, and produced
+
+```
+Attempt to read property "namespace" on null in .../Security/Models/Ability.php on line 73
+```
+
+— a warning attributed to a class with no OData involvement, on every registry load. The
+surrounding `try/catch (\Throwable)` cannot suppress it: **a PHP warning is not a `Throwable`.**
+
+### Fixed
+
+- **The declared return type is consulted before invoking.** A method typed `string`, `int`,
+  `array`, `void`, a union, or any class that is not a `Relation` is skipped outright. Untyped
+  methods are still probed by calling — that is the common Eloquent idiom
+  (`public function orders() { return $this->hasMany(...); }`) and cannot be decided statically.
+  Methods typed `HasMany`, `BelongsTo`, … are invoked as before.
+
+No behavioural change to discovery itself: every relation found before is still found. Typed
+non-relation methods are now skipped without being executed, which also removes a class of
+side effects nobody asked discovery to trigger.
+
+**Found by** `pragmatiqu.io` during its Core 2.x / SDK 1.0 upgrade, 2026-08-17.
+
 ## [3.0.1] – 2026-07-20
 
 `4xx` OData errors no longer spam the application error log. A `ProtocolException` whose HTTP

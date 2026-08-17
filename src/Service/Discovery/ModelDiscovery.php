@@ -28,6 +28,7 @@ use LaravelUi5\OData\Service\Discovery\Attributes\ODataNavigation;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataProperty;
 use ReflectionClass;
 use ReflectionMethod;
+use ReflectionNamedType;
 
 final class ModelDiscovery
 {
@@ -309,6 +310,16 @@ final class ModelDiscovery
                 continue;
             }
 
+            // A declared return type that cannot be a Relation settles it
+            // without invoking anything. Probing by calling is unavoidable
+            // for untyped methods, but calling a `fullKey(): string` on an
+            // unhydrated model is how discovery used to emit warnings from
+            // code that has nothing to do with OData — the try/catch below
+            // does not help, because a PHP warning is not a Throwable.
+            if (! $this->mayReturnRelation($method)) {
+                continue;
+            }
+
             // Try calling the method to get a Relation
             try {
                 $result = $method->invoke($model);
@@ -352,6 +363,41 @@ final class ModelDiscovery
         }
 
         return $navProps;
+    }
+
+    /**
+     * Can this method possibly return an Eloquent {@see Relation}?
+     *
+     * Answered from the declared return type alone, so the decision costs no
+     * invocation:
+     *
+     *  - **no return type** → unknown, must be probed (the common Eloquent
+     *    idiom `public function orders() { return $this->hasMany(...); }`)
+     *  - **`Relation` or a subclass** → yes
+     *  - **anything else** — `string`, `int`, `bool`, `array`, `void`, a
+     *    union, an unrelated class — → no
+     *
+     * Discovery walks *every* public no-arg method of a model, including ones
+     * that merely read state. Invoking those on the unhydrated probe instance
+     * can dereference a null relation and emit a PHP warning attributed to a
+     * class that has nothing to do with OData; the surrounding `try/catch`
+     * cannot suppress it, because a warning is not a `Throwable`.
+     */
+    private function mayReturnRelation(ReflectionMethod $method): bool
+    {
+        $type = $method->getReturnType();
+
+        if ($type === null) {
+            return true;
+        }
+
+        if (! $type instanceof ReflectionNamedType || $type->isBuiltin()) {
+            return false;
+        }
+
+        $name = $type->getName();
+
+        return $name === Relation::class || is_subclass_of($name, Relation::class);
     }
 
     private static function mapColumnType(string $typeName): EdmPrimitiveType
