@@ -19,6 +19,7 @@ use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\SchemaInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeInterface;
 
 /**
@@ -372,6 +373,14 @@ final class EdmxWriter
             $complexTypeInits[] = "            \\{$typeClass}::instance(),";
         }
 
+        // Build enum type instantiations for schema. Without these the CSDL
+        // serializer emits no <EnumType> element and a client that resolves the
+        // property's type by name finds nothing.
+        $enumTypeInits = [];
+        foreach ($this->allEnumTypes() as $type) {
+            $enumTypeInits[] = '            ' . $this->generateEnumTypeCode($type) . ',';
+        }
+
         // Build function instantiations for schema
         $funcInits = [];
         if ($schema) {
@@ -401,6 +410,7 @@ final class EdmxWriter
         $funcImportBlock = implode("\n", $funcImportInits);
         $typeBlock = implode("\n", $typeInits);
         $complexTypeBlock = implode("\n", $complexTypeInits);
+        $enumTypeBlock = implode("\n", $enumTypeInits);
         $funcBlock = implode("\n", $funcInits);
         $navInitBlock = implode("\n", $navInitCalls);
 
@@ -451,6 +461,9 @@ final class EdmxWriter
                         ],
                         complexTypes: [
         {$complexTypeBlock}
+                        ],
+                        enumTypes: [
+        {$enumTypeBlock}
                         ],
                         functions: [
         {$funcBlock}
@@ -584,6 +597,10 @@ final class EdmxWriter
             return "new PrimitiveType(EdmPrimitiveType::{$enumCase})";
         }
 
+        if ($type instanceof EnumTypeInterface) {
+            return $this->generateEnumTypeCode($type);
+        }
+
         if ($type instanceof EntityTypeInterface || $type instanceof ComplexTypeInterface) {
             $className = $typeMap[$type->getQualifiedName()] ?? $type->getName();
             $fqcn = $this->namespace . '\\Types\\' . $className;
@@ -592,6 +609,59 @@ final class EdmxWriter
 
         // Fallback for unknown types
         return "new PrimitiveType(EdmPrimitiveType::String)";
+    }
+
+    /**
+     * Generate PHP code for an EnumTypeInterface.
+     *
+     * Emitted inline rather than as a generated class in `Types/`: an
+     * `EnumType` is a final readonly value object with a plain constructor and
+     * no circular references, so there is nothing for an `instance()` seam to
+     * solve. Property sites and the schema's `enumTypes` therefore hold equal
+     * but distinct instances — which is what the cold path produces too, since
+     * `entityType()` calls `EnumType::fromBackedEnum()` per column.
+     */
+    private function generateEnumTypeCode(EnumTypeInterface $type): string
+    {
+        $members = [];
+        foreach ($type->getMembers() as $member) {
+            $members[] = sprintf(
+                "new \\LaravelUi5\\OData\\Edm\\Container\\EnumMember('%s', %d)",
+                $this->e($member->getName()),
+                $member->getValue(),
+            );
+        }
+
+        // EnumTypeInterface exposes no getNamespace(); the qualified name is
+        // "{namespace}.{name}", so the prefix is what remains once the name goes.
+        $namespace = substr($type->getQualifiedName(), 0, -(strlen($type->getName()) + 1));
+
+        return sprintf(
+            // Fully qualified: the same literal is emitted into Types/*.php,
+            // which imports EdmPrimitiveType, and into Edmx.php, which does not.
+            "new \\LaravelUi5\\OData\\Edm\\Container\\EnumType('%s', '%s', \\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::%s, %s, [%s])",
+            $this->e($namespace),
+            $this->e($type->getName()),
+            $type->getUnderlyingType()->name,
+            $this->bool($type->isFlags()),
+            implode(', ', $members),
+        );
+    }
+
+    /**
+     * Every enum type the schemas declare, deduplicated by qualified name.
+     *
+     * @return list<EnumTypeInterface>
+     */
+    private function allEnumTypes(): array
+    {
+        $types = [];
+        foreach ($this->edmx->getSchemas() as $schema) {
+            foreach ($schema->getEnumTypes() as $type) {
+                $types[$type->getQualifiedName()] = $type;
+            }
+        }
+        return array_values($types);
     }
 
     /**

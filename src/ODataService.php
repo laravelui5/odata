@@ -118,35 +118,7 @@ class ODataService implements ODataServiceInterface
             }
 
             // ── Cold path: build from configure() + discovery ───────────
-            $builder = (new EdmBuilder())->version(config('odata.version', '4.0'));
-            $builder = $this->configure($builder);
-
-            // Register custom entity types first so discovery and the builder
-            // can wire virtual navigation properties.
-            $this->applyCustomEntitySets($builder);
-
-            if ($this->discovery !== null) {
-                $this->applyVirtualExpandsToDiscovery();
-                $this->discovery->apply($builder, $this->namespace());
-            }
-
-            // Wire virtual expands on entity types NOT managed by discovery
-            // (manually defined types). Discovery-managed types are handled
-            // by applyVirtualExpandsToDiscovery() above.
-            $this->applyVirtualExpandsToBuilder($builder);
-
-            $edmx = $builder->build();
-
-            // Build the ResolverMap from registerBindings() + discovery + custom entity sets
-            $mapBuilder = new ResolverMapBuilder($edmx);
-
-            if ($this->discovery !== null) {
-                $this->discovery->registerOnMap($mapBuilder);
-            }
-
-            $this->applyCustomEntitySetBindings($mapBuilder);
-            $this->registerBindings($mapBuilder);
-            $resolverMap = $mapBuilder->build();
+            [$edmx, $resolverMap] = $this->buildFromConfigure();
 
             $runtimeBuilder = new RuntimeSchemaBuilder($edmx);
             $resolverMap->applyTo($runtimeBuilder);
@@ -160,15 +132,63 @@ class ODataService implements ODataServiceInterface
     /**
      * Return the ResolverMap for this service (used by odata:cache).
      *
-     * Forces a cold-path schema build if not already cached.
+     * **Always built from `configure()`, never from the cache.** The previous
+     * version called `schema()` first and then rebuilt the map from whatever
+     * state that left behind — which is empty whenever `schema()` took the
+     * warm path, because `configure()` (and with it `discoverCustomEntitySet()`
+     * and `discoverModel()`) never ran. `odata:cache` then wrote an empty map
+     * over a perfectly good one, and every entity set of the service went dark
+     * on the next request: an empty cached map wins over the runtime bindings.
+     *
+     * The failure was silent in both directions — nothing threw at write time,
+     * and the error that eventually surfaced named the *entity sets*, not the
+     * file that had emptied them.
      */
     public function resolverMap(): ResolverMap
     {
-        // Ensure schema() has run so the map is built
-        $this->schema();
+        [, $resolverMap] = $this->buildFromConfigure();
 
-        // Rebuild the map (schema() doesn't store it separately)
-        $edmx = $this->cachedSchema->getEdmx();
+        return $resolverMap;
+    }
+
+    /**
+     * The cold build: run `configure()` and discovery, and return the Edmx
+     * together with the ResolverMap that belongs to it.
+     *
+     * Both come out of the *same* pass, which is the point — a map built
+     * against a different Edmx than the one being cached is exactly the class
+     * of bug this replaced.
+     *
+     * Repeatable: the accumulators `configure()` appends to are reset first,
+     * so calling this twice cannot double-register a model or an entity set.
+     *
+     * @return array{0: \LaravelUi5\OData\Edm\Contracts\EdmxInterface, 1: ResolverMap}
+     */
+    private function buildFromConfigure(): array
+    {
+        $this->customEntitySets = [];
+        $this->discovery        = null;
+
+        $builder = (new EdmBuilder())->version(config('odata.version', '4.0'));
+        $builder = $this->configure($builder);
+
+        // Register custom entity types first so discovery and the builder
+        // can wire virtual navigation properties.
+        $this->applyCustomEntitySets($builder);
+
+        if ($this->discovery !== null) {
+            $this->applyVirtualExpandsToDiscovery();
+            $this->discovery->apply($builder, $this->namespace());
+        }
+
+        // Wire virtual expands on entity types NOT managed by discovery
+        // (manually defined types). Discovery-managed types are handled
+        // by applyVirtualExpandsToDiscovery() above.
+        $this->applyVirtualExpandsToBuilder($builder);
+
+        $edmx = $builder->build();
+
+        // Build the ResolverMap from registerBindings() + discovery + custom entity sets
         $mapBuilder = new ResolverMapBuilder($edmx);
 
         if ($this->discovery !== null) {
@@ -178,7 +198,7 @@ class ODataService implements ODataServiceInterface
         $this->applyCustomEntitySetBindings($mapBuilder);
         $this->registerBindings($mapBuilder);
 
-        return $mapBuilder->build();
+        return [$edmx, $mapBuilder->build()];
     }
 
     // ── Extension hooks ─────────────────────────────────────────────────────

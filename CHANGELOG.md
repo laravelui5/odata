@@ -6,6 +6,85 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [3.0.3] – 2026-08-19
+
+`odata:cache` no longer flattens enum-typed properties to `Edm.String`.
+
+`EdmxWriter::generateTypeCode()` handled `PrimitiveType`, `EntityType` and `ComplexType` and
+then fell through to
+
+```php
+// Fallback for unknown types
+return "new PrimitiveType(EdmPrimitiveType::String)";
+```
+
+An `EnumTypeInterface` — the shape `AbstractEntitySet::entityType()` produces when a column
+declares an int-backed enum class-string — landed in exactly that branch. The cached schema
+therefore declared `Edm.String` where the cold path declares `Edm.EnumType`, and the generated
+`Schema` carried no `enumTypes` at all, so `$metadata` emitted no `<EnumType>` element either.
+
+The failure was silent at write time and load-bearing at runtime. `RowCoercion` is built from
+the entity **type**, so a `String` property is never coerced: the same service answered
+
+```
+warm (cached):  {"tier": 1}
+cold (runtime): {"tier": "Single"}
+```
+
+Surfaced in `pragmatiqu.io`, whose portal keys its texts by member name
+(`license.tier.Single`, …) and had been silently rendering the raw backing int since the first
+`odata:cache` run after the enum feature shipped in 1.0.x.
+
+Fixed by giving `generateTypeCode()` an `EnumTypeInterface` branch, emitting the type inline as
+a `Container\EnumType` literal (fully qualified — the same literal goes into `Types/*.php`,
+which imports `EdmPrimitiveType`, and into `Edmx.php`, which does not), and writing the
+schema's `enumTypes`. Three round-trip regressions in `tests/Service/Cache/EdmxWriterTest.php`
+cover the property type, the schema declaration, and — the one that matters — that warm and
+cold produce the **same wire value**.
+
+`odata:cache` no longer writes an empty ResolverMap.
+
+`ODataService::resolverMap()` called `schema()` first and then rebuilt the map from whatever
+state that left behind. Whenever `schema()` took the **warm** path — a cached Edmx and map are
+present, which is the normal state of a cached consumer — `configure()` never ran, so
+`discoverCustomEntitySet()` and `discoverModel()` never registered anything and the rebuilt map
+came out empty. `odata:cache` then wrote that over a perfectly good one.
+
+The result was a booby trap rather than an error: an empty cached map **wins over the runtime
+bindings**, so every entity set of the service went dark on the next request, and the exception
+named the *entity sets* rather than the file that had emptied them. In `pragmatiqu.io` one run
+took out 25 sets in `laravelui5/sdk` and 103 feature tests with them.
+
+`resolverMap()` is now built from `configure()` unconditionally, out of the same pass that
+produces the Edmx, via a new private `buildFromConfigure()`. The accumulators `configure()`
+appends to are reset first, so the build is repeatable and cannot double-register a model or an
+entity set.
+
+`odata:cache` builds every service before it deletes any cache directory.
+
+The command used to delete, build and write per service in one loop, so a failure part-way left
+the services before it rewritten and the ones after it with **no** cache at all. It now runs two
+passes: build everything, then replace. A failure anywhere leaves every existing cache exactly
+as it was.
+
+`odata:cache` and `odata:clear` no longer touch services that live in a package.
+
+Both derive their target directory from the service class's own location
+(`dirname(classFile)/Edm`), so a packaged service had its cache written into — or deleted from —
+`vendor/`. Nothing there is version-controlled, the next `composer install` silently reverts it,
+and the guarantee `odata:cache` prints in production ("the generated Edm/ cache is committed to
+version control and deployed as-is") cannot hold for such a path. `odata:clear` was worse: it
+deleted a package's cache outright, recoverable only by reinstalling the package, with nothing
+in the resulting error pointing there.
+
+`ResolvesServices::resolveServices()` now drops any service whose class file sits under the
+composer vendor directory, and names each one it skips. A package that wants a shipped cache
+generates it in its own build and commits it to its own repository.
+
+**Consumer note.** After upgrading, re-generate the cache: any committed `Edm/` written by an
+older version still carries `Edm.String` for enum columns and keeps serving backing ints. Check
+the result — a `ResolverMap.php` with no bindings is the old defect and must not be committed.
+
 ## [3.0.2] – 2026-08-17
 
 Model discovery no longer emits PHP warnings from unrelated classes.

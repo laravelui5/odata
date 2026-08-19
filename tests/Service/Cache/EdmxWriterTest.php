@@ -2,7 +2,17 @@
 
 declare(strict_types=1);
 
+/** Fixture enum — int-backed, as OData v4 EnumTypes require. */
+enum EdmxWriterTestTier: int
+{
+    case Single   = 1;
+    case Platform = 2;
+}
+
 use LaravelUi5\OData\Edm\Container\EntitySet;
+use LaravelUi5\OData\Edm\Container\EnumType;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
+use LaravelUi5\OData\Protocol\Execution\RowCoercion;
 use LaravelUi5\OData\Edm\Container\FunctionImport;
 use LaravelUi5\OData\Edm\Container\NavigationPropertyBinding;
 use LaravelUi5\OData\Edm\Container\Singleton;
@@ -91,9 +101,8 @@ function buildTestEdmx(): EdmxInterface
 /**
  * Helper: write cache, autoload generated classes, return loaded EdmxInterface.
  */
-function writeAndLoad(EdmxInterface $edmx, string $tmpDir): EdmxInterface
+function writeAndLoad(EdmxInterface $edmx, string $tmpDir, string $namespace = 'EdmxWriterTest\\Edm'): EdmxInterface
 {
-    $namespace = 'EdmxWriterTest\\Edm';
     $outputDir = $tmpDir . '/Edm';
 
     $writer = new EdmxWriter($edmx, $outputDir, $namespace);
@@ -117,6 +126,32 @@ function writeAndLoad(EdmxInterface $edmx, string $tmpDir): EdmxInterface
 
     $edmxClass = $namespace . '\\Edmx';
     return new $edmxClass();
+}
+
+
+/**
+ * A minimal Edmx with one entity type carrying one enum-typed property.
+ */
+function buildEnumEdmx(): EdmxInterface
+{
+    $tier = EnumType::fromBackedEnum('Test.Ns', EdmxWriterTestTier::class);
+
+    $id       = new Property('id', new PrimitiveType(EdmPrimitiveType::Int32));
+    $tierProp = new Property('tier', $tier);
+
+    $type = new EntityType(
+        namespace: 'Test.Ns',
+        name: 'Licence',
+        key: [$id],
+        declaredProperties: [$id, $tierProp],
+    );
+
+    return (new EdmBuilder())
+        ->namespace('Test.Ns')
+        ->addEnumType($tier)
+        ->addEntityType($type)
+        ->addEntitySet(new EntitySet('Licences', $type))
+        ->build();
 }
 
 beforeEach(function () {
@@ -327,4 +362,64 @@ it('generates a loadable entity set when the set name equals its type name', fun
 
     expect($loadedSet->getName())->toBe('MyDraft');
     expect($loadedSet->getEntityType()->getName())->toBe('MyDraft');
+});
+
+/**
+ * Regression for the enum-flattening defect found 2026-08-19 in
+ * `pragmatiqu.io`: an `EnumTypeInterface` fell through `generateTypeCode()`'s
+ * final `return new PrimitiveType(EdmPrimitiveType::String)`, so the cached
+ * schema declared `Edm.String` where the cold path declares `Edm.EnumType`.
+ *
+ * The consequence was invisible at write time and load-bearing at runtime:
+ * `RowCoercion` is built from the entity **type**, so with a String property
+ * the backing int was never projected to its member name — the same service
+ * served `tier: 1` warm and `tier: "Single"` cold.
+ */
+it('preserves enum-typed properties instead of flattening them to String', function () {
+    $edmx = buildEnumEdmx();
+
+    $loaded = writeAndLoad($edmx, $this->tmpDir . '/enum', 'EdmxWriterEnumTest\\Edm');
+
+    $type = $loaded->getSchema('Test.Ns')->getEntityTypes()[0];
+    $tier = $type->getProperty('tier');
+
+    expect($tier->getType())->toBeInstanceOf(EnumTypeInterface::class);
+    // The EDM short name comes from the PHP short class name (EnumType::fromBackedEnum).
+    expect($tier->getType()->getQualifiedName())->toBe('Test.Ns.EdmxWriterTestTier');
+    expect($tier->getType()->getUnderlyingType())->toBe(EdmPrimitiveType::Int32);
+
+    $members = array_map(
+        fn ($m) => [$m->getName(), $m->getValue()],
+        $tier->getType()->getMembers(),
+    );
+    expect($members)->toBe([['Single', 1], ['Platform', 2]]);
+});
+
+it('declares enum types on the schema so $metadata can emit them', function () {
+    $edmx = buildEnumEdmx();
+
+    $loaded = writeAndLoad($edmx, $this->tmpDir . '/enum_schema', 'EdmxWriterEnumSchemaTest\\Edm');
+
+    $schema = $loaded->getSchema('Test.Ns');
+
+    expect($schema->getEnumTypes())->toHaveCount(1);
+    expect($schema->getEnumType('EdmxWriterTestTier'))->not->toBeNull();
+    expect($schema->getEnumType('EdmxWriterTestTier')->getName())->toBe('EdmxWriterTestTier');
+});
+
+it('serves the same wire value warm and cold for an enum column', function () {
+    // The property the whole defect was about: a cached schema must coerce the
+    // backing int exactly as the freshly built one does.
+    $edmx = buildEnumEdmx();
+
+    $cold = $edmx->getSchema('Test.Ns')->getEntityTypes()[0];
+    $warm = writeAndLoad($edmx, $this->tmpDir . '/enum_wire', 'EdmxWriterEnumWireTest\\Edm')
+        ->getSchema('Test.Ns')
+        ->getEntityTypes()[0];
+
+    $row = ['id' => 7, 'tier' => 2];
+
+    expect((new RowCoercion($warm))->apply($row))
+        ->toBe((new RowCoercion($cold))->apply($row))
+        ->and((new RowCoercion($warm))->apply($row)['tier'])->toBe('Platform');
 });

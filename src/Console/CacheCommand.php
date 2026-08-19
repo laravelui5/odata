@@ -9,6 +9,7 @@ use Illuminate\Filesystem\Filesystem;
 use LaravelUi5\OData\Console\Concerns\ResolvesServices;
 use LaravelUi5\OData\Service\Cache\EdmxWriter;
 use LaravelUi5\OData\Service\Cache\ResolverMapWriter;
+use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use ReflectionClass;
 
@@ -36,6 +37,12 @@ class CacheCommand extends Command
             return self::FAILURE;
         }
 
+        if ($services === []) {
+            $this->info('Nothing to cache — every registered service lives in a package.');
+
+            return self::SUCCESS;
+        }
+
         // Pre-pass: each service must own its cache directory. Two services sharing a
         // namespace would overwrite each other's Edm/ — and the warm path would then serve
         // the wrong schema. Fail loud BEFORE writing anything, rather than silently.
@@ -56,20 +63,38 @@ class CacheCommand extends Command
             $claimedBy[$dir] = $service::class;
         }
 
-        $fs = new Filesystem();
+        // ── Pass 1: build everything, write nothing ─────────────────────
+        //
+        // Deleting as we go was the second half of the empty-map disaster: a
+        // service that threw part-way left the ones before it rewritten and the
+        // ones after it with no cache at all. Building first means a failure
+        // anywhere leaves every existing cache exactly as it was.
+        $built = [];
 
         foreach ($services as $service) {
             $reflected = new ReflectionClass($service);
+
+            // `schema()` runs the RuntimeSchemaBuilder, which already refuses a
+            // schema whose declared sets have no binding — no second guard is
+            // added here, because a branch that cannot fire is dead code. What
+            // this pass adds is *when* it fires: before anything is deleted.
+            $edmx        = $service->schema()->getEdmx();
+            $resolverMap = $service->resolverMap();
+
+            $built[] = [$service, $reflected, $edmx, $resolverMap];
+        }
+
+        // ── Pass 2: replace the caches ──────────────────────────────────
+        $fs = new Filesystem();
+
+        foreach ($built as [$service, $reflected, $edmx, $resolverMap]) {
             $outputDir = dirname($reflected->getFileName()) . '/Edm';
             $namespace = $reflected->getNamespaceName() . '\\Edm';
 
-            // Remove stale cache so schema() takes the cold path.
             if ($fs->isDirectory($outputDir)) {
                 $fs->deleteDirectory($outputDir);
                 $this->info("Cleared {$outputDir}");
             }
-
-            $edmx = $service->schema()->getEdmx();
 
             $writer = new EdmxWriter(
                 edmx: $edmx,
@@ -80,7 +105,6 @@ class CacheCommand extends Command
 
             $writer->write();
 
-            $resolverMap = $service->resolverMap();
             ResolverMapWriter::write($service, $resolverMap);
 
             $this->info("Cached: {$reflected->getName()}");
