@@ -235,9 +235,12 @@ newly registered entity set has to be added to the committed cache by hand — f
 `Edm/ResolverMap.php`. Mechanical, and it keeps the served schema honest until the generator
 can be trusted again.
 
-**Shipped 3.0.3.** `resolverMap()` is built from `configure()` unconditionally, out of the same
-pass that produces the Edmx (`buildFromConfigure()`), with the accumulators reset so the build
-is repeatable. `odata:cache` additionally builds every service before deleting any cache
+**Shipped 3.0.3, completed in 3.0.4.** `resolverMap()` is built from `configure()`
+unconditionally, out of the same pass that produces the Edmx (`buildFromConfigure()`), with the
+accumulators reset so the build is repeatable. 3.0.3 left one half undone — `CacheCommand` still
+took the *Edmx* from `schema()`, which memoises and prefers the warm path, so a stale schema
+survived every regeneration; 3.0.4 added `buildForCache()` and takes both artefacts from the one
+cold pass. `odata:cache` additionally builds every service before deleting any cache
 directory, so a failure part-way leaves the tree as it found it. See `CHANGELOG.md` v3.0.3.
 
 ## [x] `EdmxWriter` flattens enum-typed properties to `Edm.String` — cached and cold schemas disagree (v3.0.3)

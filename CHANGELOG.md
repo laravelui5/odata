@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [3.0.4] – 2026-08-19
+
+`odata:cache` re-caches from `configure()`, not from the cache it is replacing.
+
+3.0.3 fixed `resolverMap()` to build cold but left `CacheCommand` taking the Edmx from
+`$service->schema()`. That call memoises and prefers the warm path, so on any consumer that
+already had a cache — every consumer, in practice — the **previous** Edmx was handed back and
+written straight out again.
+
+The effect was that 3.0.3 appeared to do nothing on exactly the consumers that needed it. In
+`pragmatiqu.io` the regeneration ran clean, reported success, wrote the new `enumTypes` key into
+`Edmx.php` — and left every enum property as `Edm.String`, because that is what the old cache
+said and the old cache is what it read.
+
+`ODataService::buildForCache()` now returns the Edmx and the ResolverMap from one cold pass, and
+`CacheCommand` uses it for both. `schema()` is still called, but only so the RuntimeSchemaBuilder
+runs its unbound-set check inside the build pass, before any directory is removed.
+
+Regression: `tests/Console/CacheGuardsTest.php` caches a service with an enum column, ages the
+generated type by hand to what a pre-3.0.3 writer produced, and re-runs the command — the enum
+must come back.
+
+**Consumer note.** If you regenerated on 3.0.3, do it again: that run preserved whatever your
+committed cache already said. Check one enum-typed property afterwards — `Edm.String` where the
+entity set declares an enum class-string means the cache is still the old one.
+
 ## [3.0.3] – 2026-08-19
 
 `odata:cache` no longer flattens enum-typed properties to `Edm.String`.

@@ -74,12 +74,16 @@ class CacheCommand extends Command
         foreach ($services as $service) {
             $reflected = new ReflectionClass($service);
 
-            // `schema()` runs the RuntimeSchemaBuilder, which already refuses a
-            // schema whose declared sets have no binding — no second guard is
-            // added here, because a branch that cannot fire is dead code. What
-            // this pass adds is *when* it fires: before anything is deleted.
-            $edmx        = $service->schema()->getEdmx();
-            $resolverMap = $service->resolverMap();
+            // Both out of one cold pass — never from `schema()`, which memoises and
+            // prefers the warm path, so on a consumer that already has a cache it
+            // would hand back the previous Edmx to be written out again.
+            [$edmx, $resolverMap] = $service->buildForCache();
+
+            // `schema()` runs the RuntimeSchemaBuilder, which refuses a schema
+            // whose declared sets have no binding. Calling it here keeps that
+            // check in the build pass — before anything is deleted — without a
+            // second guard of our own: a branch that cannot fire is dead code.
+            $service->schema();
 
             $built[] = [$service, $reflected, $edmx, $resolverMap];
         }

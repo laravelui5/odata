@@ -152,6 +152,23 @@ class ODataService implements ODataServiceInterface
     }
 
     /**
+     * The Edmx and ResolverMap `odata:cache` should write — both from one cold
+     * pass, neither from the cache.
+     *
+     * `schema()` must not be used for this. It memoises, and it prefers the
+     * warm path, so on any consumer that already has a cache it hands back the
+     * *previous* Edmx — which the writer then faithfully writes out again. A
+     * schema defect therefore survived every regeneration, and 3.0.3's enum fix
+     * appeared to do nothing on exactly the consumers that needed it.
+     *
+     * @return array{0: \LaravelUi5\OData\Edm\Contracts\EdmxInterface, 1: ResolverMap}
+     */
+    public function buildForCache(): array
+    {
+        return $this->buildFromConfigure();
+    }
+
+    /**
      * The cold build: run `configure()` and discovery, and return the Edmx
      * together with the ResolverMap that belongs to it.
      *

@@ -8,7 +8,9 @@ use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Fixtures\DiscoveryFlightService;
+use LaravelUi5\OData\Fixtures\EnumService;
 use LaravelUi5\OData\ODataService;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
@@ -170,4 +172,33 @@ it('skips services that live in a package, and says so', function () {
         ->expectsOutputToContain('Skipped (lives in a package)')
         ->expectsOutputToContain('Nothing to cache')
         ->assertSuccessful();
+});
+
+it('re-caches from configure(), not from the cache it is replacing', function () {
+    // The defect 3.0.3 missed. `CacheCommand` took the Edmx from `schema()`,
+    // which memoises and prefers the warm path — so on a consumer that already
+    // had a cache, the *previous* Edmx was handed back and written straight out
+    // again. A schema defect therefore survived every regeneration, and 3.0.3's
+    // enum fix appeared to do nothing on exactly the consumers that needed it.
+    bindGuardRegistry([new EnumService()]);
+    $this->artisan('odata:cache')->assertSuccessful();
+
+    $typeFile = guardFixturesEdmDir() . '/Types/PassengerColour.php';
+    expect(file_get_contents($typeFile))->toContain('EnumType');
+
+    // Age the cache: this is what a pre-3.0.3 writer left behind, and what
+    // every consumer had committed.
+    file_put_contents($typeFile, preg_replace(
+        '/new \\\\LaravelUi5\\\\OData\\\\Edm\\\\Container\\\\EnumType\\(.*?\\]\\)/s',
+        'new PrimitiveType(EdmPrimitiveType::String)',
+        file_get_contents($typeFile),
+    ));
+    expect(file_get_contents($typeFile))->not->toContain('EnumType');
+
+    // A fresh instance, so schema() finds that stale cache and takes the warm
+    // path — the exact situation that used to keep flattening the type.
+    bindGuardRegistry([new EnumService()]);
+    $this->artisan('odata:cache')->assertSuccessful();
+
+    expect(file_get_contents($typeFile))->toContain('EnumType');
 });
