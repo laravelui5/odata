@@ -1,170 +1,150 @@
 # laravelui5/odata
 
-A read-only OData v4 engine for Laravel 11+, built for OpenUI5 frontends.
+[![Packagist Version](https://img.shields.io/packagist/v/laravelui5/odata.svg)](https://packagist.org/packages/laravelui5/odata)
+[![PHP Version](https://img.shields.io/packagist/dependency-v/laravelui5/odata/php.svg)](https://packagist.org/packages/laravelui5/odata)
+[![License](https://img.shields.io/packagist/l/laravelui5/odata.svg)](./LICENSE)
 
-This package is a clean-room rewrite of [flat3/lodata](https://github.com/flat3/lodata). Its protocol test suite served as the pivot: ~400 HTTP tests define the OData wire contract the new implementation must honor. No original implementation code was preserved; only relevant, refactored tests remain, forming the permanent regression suite.
+**A read-only OData v4 engine for Laravel.** Point it at an Eloquent model and every client that
+speaks OData — a UI5 table, Excel, Power BI, your own frontend — can filter, sort, page, project,
+and traverse your data over plain HTTP. No controllers, no serializers, no query parameters you
+have to invent and then document.
 
-> **Release acceptance.** Beyond the regression suite, releases are validated in production by [timesheet.biz](https://timesheet.biz), which runs this engine as its OData layer. There is no separate acceptance host — production use is the gate.
+## The problem it solves
 
-## What it does
+Every Laravel app that grows a frontend grows an API, and every one of them re-invents the same
+five things: projection, filtering, sorting, paging, and a schema nobody can trust. Controllers,
+resources, query scopes, an `?include=` convention, and a document that starts drifting in week
+three. For every project. Every time.
 
-- read-only [OData v4](https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part1-protocol.html) engine
-- Supports multiple service endpoints
-- Supports schema caching (no discovery at request time; `php artisan odata:cache` pre-compiles the EDM to PHP classes)
-- Serves `$metadata`, service documents, entity collections, single entities, navigation, functions, singletons
-- Full query support: `$filter`, `$select`, `$orderby`, `$expand` (nested), `$top`, `$skip`, `$count`, `$search`, `$compute`
-- Supports `$batch` with partial failure
-- Supports server-driven paging via `Prefer: odata.maxpagesize`
-- Serves streamed responses (large result sets never buffer in memory)
+OData already answers all five. It is an [OASIS Standard](https://www.oasis-open.org/committees/tc_home.php?wg_abbrev=odata),
+published by ISO as ISO/IEC 20802, and spoken natively by SAP, Microsoft, Salesforce, Excel, and
+every UI5 SmartControl. This package brings it to Laravel:
+
+```
+GET /odata/Products?$filter=price gt 10&$orderby=name&$top=20&$select=name,price
+GET /odata/Products(42)?$expand=supplier
+GET /odata/$metadata
+```
+
+Those URLs work the moment you declare a service. The last one returns a machine-readable schema,
+generated from the same model that serves the data — so it cannot drift from the API it describes.
+
+Not sure OData is the right call for your project?
+[**Why OData?**](https://laravelui5.com/odata/getting-started/why-odata) makes the argument, and
+names the cases where the answer is something else.
+
+## What you get
+
+- **Full query support** — `$filter`, `$select`, `$expand` (nested), `$orderby`, `$top`, `$skip`,
+  `$count`, `$search`, `$compute`, and `$batch` with partial failure
+- **A real schema** — `$metadata` as CSDL XML, service documents, functions, singletons, and
+  [annotations](https://laravelui5.com/odata/annotations/overview) that carry meaning, not just types
+- **Any backing store** — an Eloquent model, a SQL view, an external API, a directory of files;
+  the key is the only hard requirement
+- **Multiple services** in one application, each on its own route
+- **Compiled schemas** — `php artisan odata:cache` pre-compiles the EDM to PHP classes, so no
+  discovery happens at request time
+- **Streamed responses** — large result sets never buffer in memory
+
+Read-only by design: queries in, JSON out. Writes stay in your application, where validation and
+business rules belong. Also out of scope: ETags, `$apply`, and OData actions.
 
 ## Requirements
 
-- PHP 8.4+
-- Laravel 11+
+PHP 8.4+ · Laravel 11, 12, or 13 · the `dom`, `json`, `libxml`, and `simplexml` extensions
 
-## Installation
+## Install
 
 ```bash
 composer require laravelui5/odata
+php artisan vendor:publish --provider="LaravelUi5\OData\ODataServiceProvider"
 ```
 
-The service provider registers automatically. Publish the config:
+The service provider registers itself through Laravel's auto-discovery. The published
+`config/odata.php` controls the route prefix, middleware, streaming, page sizes, and the service
+registry — see [Installation](https://laravelui5.com/odata/getting-started/installation) and the
+[Configuration reference](https://laravelui5.com/odata/advanced/configuration).
 
-```bash
-php artisan vendor:publish --tag=config --provider="LaravelUi5\OData\ODataServiceProvider"
-```
+## Quickstart
 
-## Quick start
-
-### 1. Define a service
+Declare a service:
 
 ```php
-namespace App\OData;
-
 use LaravelUi5\OData\ODataService;
-use LaravelUi5\OData\Driver\Sql\EloquentEntitySetResolver;
-use LaravelUi5\OData\Edm\Container\EntitySet;
-use LaravelUi5\OData\Edm\Contracts\Container\PrimitiveTypeEnum;
-use LaravelUi5\OData\Edm\Property\Property;
-use LaravelUi5\OData\Edm\Type\EntityType;
-use LaravelUi5\OData\Edm\Type\PrimitiveType;
 use LaravelUi5\OData\Service\Contracts\EdmBuilderInterface;
-use LaravelUi5\OData\Service\Contracts\RuntimeSchemaBuilderInterface;
 
-class PartnerService extends ODataService
+class ProductService extends ODataService
 {
-    public function serviceUri(): string  { return 'partners'; }
-    public function namespace(): string   { return 'io.pragmatiqu.partners'; }
+    public function serviceUri(): string { return ''; }
+    public function namespace(): string  { return 'App.Products'; }
 
     protected function configure(EdmBuilderInterface $builder): EdmBuilderInterface
     {
-        $this->discoverModel(Partner::class);
-        
+        $this->discoverModel(Product::class);
+
         return $builder->namespace($this->namespace());
     }
 }
 ```
 
-### 2. Register the service
+`discoverModel()` reads the table, maps columns to typed properties, detects the key, and turns
+Eloquent relationships into navigation properties. Point `config/odata.php` at a registry that
+returns the service, and `/odata/Products` is live.
 
-Create a registry that returns your service:
+The [**Quickstart**](https://laravelui5.com/odata/getting-started/quickstart) walks the whole path
+in five minutes, from `make:model` to the first `$filter`.
 
-```php
-namespace App\OData;
+## Talk to it from anything
 
-use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
-use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
+The API is URLs, so the smallest possible client is `fetch`:
 
-class AppServiceRegistry implements ODataServiceRegistryInterface
-{
-    public function services(): array
-    {
-        return [new PartnerService()];
-    }
-
-    public function resolve(string $fullPath): ODataServiceInterface
-    {
-        return new PartnerService();
-    }
-}
+```js
+const res = await fetch(
+  "/odata/Products?$filter=active eq true&$orderby=price desc&$top=10",
+  { headers: { Accept: "application/json" } },
+);
+const { value: products } = await res.json();
 ```
 
-Point the config at it in `config/odata.php`:
+Ready-made clients exist where you would want them. UI5's `sap.ui.model.odata.v4.ODataModel` binds
+tables and forms straight to an entity set — see the
+[Smart Table](https://laravelui5.com/odata/recipes/sapui5-smart-table) and
+[Value Help](https://laravelui5.com/odata/recipes/sapui5-valuehelp) recipes. Excel and Power BI
+consume a service as an OData feed out of the box (*Get Data → From OData feed*). And npm carries
+typed clients such as [`@odata/client`](https://www.npmjs.com/package/@odata/client) and
+[`ra-data-odata-server`](https://www.npmjs.com/package/ra-data-odata-server) for react-admin.
 
-```php
-'service_registry' => App\OData\AppServiceRegistry::class,
-```
+## Documentation
 
-### 3. Use it
+Full documentation lives at **[laravelui5.com/odata](https://laravelui5.com/odata)**.
 
-```
-GET /odata/partners/Partners              → entity collection
-GET /odata/partners/Partners(1)           → single entity
-GET /odata/partners/Partners?$filter=name eq 'Acme'
-GET /odata/partners/Partners?$select=id,name&$top=10&$orderby=name
-GET /odata/partners/$metadata             → CSDL XML
-```
+| Section | What's there |
+|:---|:---|
+| [Getting Started](https://laravelui5.com/odata/getting-started/why-odata) | why OData, the concepts, installation, quickstart |
+| [Services](https://laravelui5.com/odata/services/defining-a-service) | defining a service, model discovery, manual schema, functions, multi-service |
+| [Resolvers](https://laravelui5.com/odata/resolvers/eloquent-resolver) | Eloquent, raw SQL, custom entity sets, custom resolvers |
+| [Query Options](https://laravelui5.com/odata/query-options/filter) | `$filter`, `$select`/`$expand`, `$orderby`, paging, `$search`, `$count`, `$compute` |
+| [Metadata & Annotations](https://laravelui5.com/odata/metadata/metadata-document) | `$metadata`, service document, vocabulary terms |
+| [Advanced](https://laravelui5.com/odata/advanced/architecture) | architecture, configuration, `$batch`, caching, error handling |
+| [Recipes](https://laravelui5.com/odata/recipes/sapui5-smart-table) | UI5 Smart Table, value help, testing |
+| [API Reference](https://laravelui5.com/api/odata/index.html) | generated class reference |
 
-## Configuration
+## Support
 
-Published to `config/odata.php`:
+- **Bugs and feature requests** — [github.com/laravelui5/odata/issues](https://github.com/laravelui5/odata/issues)
+- **Security** — please do not open a public issue; see [SECURITY.md](./SECURITY.md)
+- **What shipped** — [CHANGELOG.md](./CHANGELOG.md) · **what's queued** — [ROADMAP.md](./ROADMAP.md)
+- **The wider stack** — this engine is the MIT foundation of
+  [LaravelUi5](https://laravelui5.com): Core adds UI5 artifact routing, the SDK adds the
+  enterprise runtime
 
-| Key                  | Default                       | Description                                       |
-|:---------------------|:------------------------------|:--------------------------------------------------|
-| `prefix`             | `odata`                       | URL route prefix                                  |
-| `middleware`         | `[]`                          | Middleware for OData routes                       |
-| `streaming`          | `true`                        | Stream JSON responses                             |
-| `namespace`          | `com.example.odata`           | Default XML namespace                             |
-| `version`            | `4.0`                         | OData protocol version                            |
-| `service_registry`   | `ODataServiceRegistry::class` | Registry implementation                           |
-| `pagination.max`     | `null`                        | Server max page size cap                          |
-| `pagination.default` | `200`                         | Default page size when client sends no preference |
+## Provenance
 
-## Schema caching
-
-For production, pre-compile the EDM object graph to PHP classes:
-
-```bash
-php artisan odata:cache    # generates Edm/ directory next to each service class
-php artisan odata:clear    # removes generated Edm/ directories
-```
-
-Cached classes are plain `readonly` PHP implementing `Edm\Contracts\` interfaces.
-On warm boot, `ODataService::schema()` loads them directly — skipping the builder entirely.
-
-## Architecture
-
-Three concentric layers. Each layer only depends on the layers inside it.
-
-```
-Http\         → routes requests to the engine
-Protocol\     → parses OData URLs, plans queries, executes via handlers
-Service\      → contracts, builders, caching, serialization
-Edm\          → pure read-only metamodel (zero framework dependencies)
-Driver\       → implements resolver contracts (Eloquent/SQL)
-```
-
-Services declare their schema in `configure()` (what the service looks like) and
-bind resolvers in `bindResolvers()` (how to fetch the data). The engine never
-touches the schema after planning — it works entirely from the resolved query plan.
-
-## Roadmap
-
-Post-GA improvements for the extensibility layer:
-
-- **Serialize EDXML** on `odata:cache` and serve XML directly
-- **In-memory filter/sort/paginate helpers for custom resolvers.** Tier 3 (fully custom) resolvers must interpret the filter AST, ordering, and pagination themselves. A small utility (e.g. `InMemoryFilter::apply($rows, $plan)`) would reduce boilerplate for resolvers backed by REST APIs, PHP computation, or other non-SQL sources.
-- **Nullable column declaration in AbstractEntitySet.** `columns()` maps names to `PrimitiveTypeEnum` but cannot express nullability. Marking a column nullable currently requires overriding `entityType()`. A declarative option (e.g. nullable enum wrapper or separate `nullable()` method) would close this gap.
-- **Composite key order validation.** `entityType()` resolves key properties in column-declaration order, not in the order returned by `key()`. A validation warning during schema build would catch accidental reordering.
-- **Discovery logging for skipped relations.** Polymorphic and through-relations on Eloquent models are silently ignored during discovery. A `logger->debug()` message would help developers understand why a navigation property is absent from `$metadata`.
-
-## Not in scope (by design)
-
-- Write operations (POST/PUT/PATCH/DELETE)
-- ETags / conditional requests
-- `$apply` (aggregation)
-- Actions
+A clean-room rewrite of [flat3/lodata](https://github.com/flat3/lodata). Its protocol test suite
+was the pivot: ~400 HTTP tests that define the OData wire contract this implementation has to
+honor. No original implementation code was preserved; the refactored tests remain as the permanent
+regression suite.
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE).
