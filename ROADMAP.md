@@ -115,6 +115,67 @@ need the relations). This would let one discovered set serve a **fast lean list*
 
 In the spirit of the engine: the fast path should be the default, hydration the opt-in that expands require.
 
+## [ ] `@odata.nextLink` drops every query option except `$skip` — page 2 is unfiltered
+
+Surfaced 2026-08-22 (docs/code drift audit of `docs/odata/`). `EntitySetHandler.php:93` builds the
+server-driven-paging continuation as
+
+```php
+$nextLink = $serviceRoot . $setName . '?$skip=' . $skip;
+```
+
+The request's other system query options are not carried over. A client that pages through
+`Products?$filter=active eq true&$orderby=price desc&$select=name,price` gets a correct first page,
+then follows `@odata.nextLink` to `Products?$skip=200` — **unfiltered, unsorted, unprojected, and
+without `$count`**. Page 2 is a different result set than page 1 claimed to be paging through, and
+nothing in the response says so.
+
+Same silent-wrong-value family as the SQL-coercion and cache items: the response is well-formed and
+the client has no way to detect the substitution. It is arguably worse, because the client did
+exactly what the protocol told it to do — a next link stands for the remainder of *the same*
+collection query, so a conforming client (the UI5 v4 model's paged `ODataListBinding`, Excel's
+"load more") follows it without re-sending its own options.
+
+**Fix:** reconstruct the next link from the request's full query string with `$skip` replaced (and
+`$top`, where the client sent one, decremented by the rows already emitted) rather than composing it
+from the set name alone. `EntitySetHandler` already receives `$plan`, but the plan is the parsed
+form; the honest source is the original query string, so the service root/URL builder should carry
+it in. Worth covering with a protocol test that pages a filtered collection to exhaustion and
+asserts every page satisfies the filter.
+
+Until it is fixed, `docs/odata/query-options/pagination.md` carries a warning and tells clients to
+re-send their options on the follow-up request.
+
+## [ ] Unsupported `$filter` constructs are silently dropped, widening the result set
+
+Surfaced 2026-08-22 (docs/code drift audit of `docs/odata/`). Both translators end their dispatch in
+a no-op default:
+
+- `FilterToQuery::visitBinary` — arithmetic (`add`/`sub`/`mul`/`div`/`mod`) and `has` fall to
+  `default => null`
+- `FilterToQuery::visitFunctionCall` / `FilterToEloquent::visitFunctionCall` — every function except
+  `contains`/`startswith`/`endswith` falls to `default => null`
+- `FilterToQuery::visitLambda` — `any`/`all` return `null` (the Eloquent translator implements both)
+
+The parser accepts all of them (`FilterParser::OPERATORS` carries 27 functions plus the arithmetic
+and lambda operators), so the expression is valid, planned, and then **contributes no WHERE clause**.
+`Products?$filter=year(created_at) eq 2026` answers `200 OK` with the whole collection.
+
+A filter that silently doesn't filter is a data-exposure shape, not a missing feature: a caller who
+believes they scoped a read gets rows they meant to exclude, and the honest-partial channel the read
+authorizer uses (`sap-messages`) is not involved. It is also the one failure mode a client cannot
+detect — an empty predicate looks exactly like a permissive one.
+
+**Fix:** the translators should refuse what they cannot translate — throw `NotImplementedException`
+(501) naming the construct, rather than returning `null`. That turns an invisible wrong answer into
+a legible error, and it makes the supported set self-documenting: whatever 501s is what the docs
+must list. If a softer landing is wanted for lambdas on the SQL path, `FilterToQuery` could record a
+`sap-messages` warning through `ReadContext` instead — but never a bare drop.
+
+Note the asymmetry to resolve alongside it: `FilterToEloquent` supports `any`/`all` (`whereHas` /
+`whereDoesntHave`) and `FilterToQuery` does not, so the same URL behaves differently depending on
+which resolver backs the set.
+
 ---
 
 ## Done

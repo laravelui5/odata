@@ -42,6 +42,8 @@ names the cases where the answer is something else.
 - **Any backing store** — an Eloquent model, a SQL view, an external API, a directory of files;
   the key is the only hard requirement
 - **Multiple services** in one application, each on its own route
+- **A read-authorization seam** — bind one interface to gate entity sets per actor: a denied root
+  answers `403`, a denied `$expand` is pruned with a warning instead of failing the whole read
 - **Compiled schemas** — `php artisan odata:cache` pre-compiles the EDM to PHP classes, so no
   discovery happens at request time
 - **Streamed responses** — large result sets never buffer in memory
@@ -61,8 +63,9 @@ php artisan vendor:publish --provider="LaravelUi5\OData\ODataServiceProvider"
 ```
 
 The service provider registers itself through Laravel's auto-discovery. The published
-`config/odata.php` controls the route prefix, middleware, streaming, page sizes, and the service
-registry — see [Installation](https://laravelui5.com/odata/getting-started/installation) and the
+`config/odata.php` controls the route prefix, middleware, streaming, page sizes, the service
+registry, and read authorization — see
+[Installation](https://laravelui5.com/odata/getting-started/installation) and the
 [Configuration reference](https://laravelui5.com/odata/advanced/configuration).
 
 ## Quickstart
