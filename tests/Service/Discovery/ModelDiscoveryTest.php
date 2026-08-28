@@ -8,6 +8,7 @@ use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
 use LaravelUi5\OData\Fixtures\DiscoveryFlightService;
 use LaravelUi5\OData\Fixtures\DiscoveryWithManualService;
+use LaravelUi5\OData\Fixtures\Models\Crew;
 use LaravelUi5\OData\Fixtures\Models\Flight;
 use LaravelUi5\OData\Fixtures\Models\Passenger;
 use LaravelUi5\OData\Service\Builder\EdmBuilder;
@@ -114,6 +115,25 @@ describe('ModelDiscovery → type mapping', function () {
         $openTimeProp = $passengerType->getProperty('open_time');
 
         expect($openTimeProp->getType()->getPrimitiveType())->toBe(EdmPrimitiveType::DateTimeOffset);
+    });
+
+    // Regression: before 2026-08-28 discovery instantiated models with
+    // `newInstanceWithoutConstructor()`, and Eloquent merges `casts()` into
+    // `$this->casts` in the constructor — so casts declared the modern way were
+    // invisible and every column fell back to its database type. `Passenger`
+    // uses the legacy `protected $casts` property and could not catch it.
+    it('reads casts declared with the casts() method, not just the $casts property', function () {
+        $edmx = buildEdmx('Test.Ns', [Crew::class]);
+        $crew = $edmx->getSchemas()['Test.Ns']->getEntityTypes()[0];
+
+        // boolean() is tinyint on SQLite and MySQL — Int32 without the cast
+        expect($crew->getProperty('on_duty')->getType()->getPrimitiveType())
+            ->toBe(EdmPrimitiveType::Boolean)
+            // varchar columns — String without the cast
+            ->and($crew->getProperty('rank')->getType()->getPrimitiveType())
+            ->toBe(EdmPrimitiveType::Int32)
+            ->and($crew->getProperty('hired_at')->getType()->getPrimitiveType())
+            ->toBe(EdmPrimitiveType::DateTimeOffset);
     });
 
     it('casts array maps to String', function () {

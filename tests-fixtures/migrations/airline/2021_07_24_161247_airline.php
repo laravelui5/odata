@@ -49,6 +49,18 @@ class Airline extends Migration
             $table->json('emails')->nullable();
         });
 
+        // Regression fixture for cast discovery on models using the modern
+        // `casts()` method. Every column here is typed so that the *database*
+        // type and the *cast* disagree — so each assertion fails if casts are
+        // not read.
+        Schema::create('crews', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('name');
+            $table->boolean('on_duty')->nullable();   // tinyint  → Int32  unless the cast wins
+            $table->string('rank')->nullable();       // varchar  → String unless the cast wins
+            $table->string('hired_at')->nullable();   // varchar  → String unless the cast wins
+        });
+
         Schema::create('pets', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->bigInteger('passenger_id')->nullable();
@@ -79,7 +91,7 @@ class Airline extends Migration
      */
     public function down()
     {
-        foreach (['airport_flight', 'flights', 'airports', 'passengers', 'pets', 'countries'] as $table) {
+        foreach (['airport_flight', 'flights', 'airports', 'passengers', 'crews', 'pets', 'countries'] as $table) {
             Schema::drop($table);
         }
     }

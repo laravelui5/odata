@@ -104,7 +104,7 @@ final class ModelDiscovery
         // Pass 2: discover relationships, rebuild types with nav props, register on builder
         foreach (array_keys($this->modelClasses) as $modelClass) {
             $ref = new ReflectionClass($modelClass);
-            $model = $ref->newInstanceWithoutConstructor();
+            $model = self::instantiate($ref);
             $navProps = $this->discoverRelationships($model, $ref, $namespace);
 
             // Append virtual navigation properties targeting this entity type
@@ -204,7 +204,7 @@ final class ModelDiscovery
     private function discoverModel(string $modelClass, string $namespace): void
     {
         $ref = new ReflectionClass($modelClass);
-        $model = $ref->newInstanceWithoutConstructor();
+        $model = self::instantiate($ref);
 
         // Resolve names (with attribute overrides)
         $entityAttr = $this->readEntityAttribute($ref);
@@ -398,6 +398,33 @@ final class ModelDiscovery
         $name = $type->getName();
 
         return $name === Relation::class || is_subclass_of($name, Relation::class);
+    }
+
+    /**
+     * Instantiate a model for inspection — **through its constructor**.
+     *
+     * This used to be `newInstanceWithoutConstructor()`, which silently broke
+     * cast discovery. Since Laravel 11 the idiomatic declaration is a
+     * `protected function casts(): array` method, and Eloquent merges its return
+     * into `$this->casts` **in the constructor**. Skipping the constructor left
+     * `getCasts()` returning only the auto-added key cast, so the cast-override
+     * branch below was dead for every model written the modern way — including
+     * everything `laravel new` scaffolds.
+     *
+     * It went unnoticed because the usual column types happen to map correctly
+     * from the database alone (`datetime` → DateTimeOffset, `varchar` → String).
+     * The first divergence is a boolean: SQLite and MySQL store it as
+     * `tinyint(1)`, `tinyint` sits in the integer branch of
+     * {@see mapColumnType()}, and the column surfaced as `Edm.Int32` while the
+     * payload — serialized from a properly constructed model — carried `true`.
+     * Contract and wire disagreed.
+     *
+     * Eloquent's constructor takes no required arguments, boots the model and
+     * initializes its traits, all of which discovery wants anyway.
+     */
+    private static function instantiate(ReflectionClass $ref): Model
+    {
+        return $ref->newInstance();
     }
 
     private static function mapColumnType(string $typeName): EdmPrimitiveType

@@ -6,6 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [3.0.5] – 2026-08-28
+
+`$casts` reach discovery again — models declaring them the modern way were being read as if they
+had none.
+
+`ModelDiscovery` instantiated models with `newInstanceWithoutConstructor()` and then read
+`$model->getCasts()`. Since Laravel 11 the idiomatic declaration is a
+`protected function casts(): array` method, and Eloquent merges its return into `$this->casts`
+**in the constructor**. Skipping the constructor left `getCasts()` returning only the auto-added
+key cast, so the cast-override branch was dead for every model written the modern way — which is
+everything `laravel new` scaffolds.
+
+**Why it survived a full test suite and several consumers.** The usual column types map correctly
+from the database alone — `datetime` → `Edm.DateTimeOffset`, `varchar` → `Edm.String` — so nothing
+diverges until a column's cast disagrees with its storage. The first one that does is a boolean:
+SQLite and MySQL both store `$table->boolean()` as `tinyint(1)`, and `tinyint` sits in the integer
+branch of `mapColumnType()`. The fixture model `Passenger` uses the legacy `protected $casts`
+property, so the existing cast tests exercised the one idiom that still worked.
+
+**The failure was worse than a wrong type name.** The payload is serialized from a properly
+constructed model, so the wire carried `true` while `$metadata` promised `Edm.Int32`. Contract and
+wire disagreed, and a v4 client types the property from the contract. Downstream that shows up as a
+UI5 expression binding — `{= true === ${locked} ? … }` — that never matches.
+
+Discovery now constructs models through `ModelDiscovery::instantiate()`, at both call sites (the
+relationship pass and `describeModel()`). Eloquent's constructor takes no required arguments and
+boots the model, which discovery wants anyway.
+
+### Fixed
+
+- Cast-derived Edm types are read from models declaring `casts()` (Laravel 11+), not only from the
+  legacy `protected $casts` property.
+
+### Tests
+
+- `tests-fixtures/Models/Crew.php` — a fixture declaring casts the modern way, with a `crews` table
+  whose column types deliberately disagree with its casts (`boolean` column cast to boolean, two
+  `varchar` columns cast to integer and datetime), so every assertion fails if casts are not read.
+- `ModelDiscoveryTest` — *"reads casts declared with the casts() method, not just the $casts
+  property"*. Verified red against the previous implementation before being committed green.
+
+### Not affected
+
+- **Enum columns.** An int-backed enum cast on a discovered model was never projected to
+  `Edm.EnumType`, by design — the symbolic projection lives on custom entity sets, where `columns()`
+  takes an enum class-string. `mapCastType()` returns `null` for a class-string and the column falls
+  back to its database type, which is the documented behaviour and is unchanged.
+
 ## [3.0.4] – 2026-08-19
 
 `odata:cache` re-caches from `configure()`, not from the cache it is replacing.
