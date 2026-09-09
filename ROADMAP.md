@@ -3,7 +3,7 @@
 Tracks scheduled work for `laravelui5/odata`. Shipped releases live in
 [`CHANGELOG.md`](./CHANGELOG.md), each tagged with the version that carried it.
 
-- **Pending** holds items queued for an upcoming slice — design questions settled, scope known. Earlier-stage ideas live as atoms in `docs/meta/atoms/` and are lifted into Pending once they're ready to schedule.
+- **Pending** holds items queued for an upcoming slice — design questions settled, scope known. Earlier-stage ideas live as atoms in a private notes repository and are lifted into Pending once they're ready to schedule.
 
 Releases follow the consumer-bump dance: tag the package → Satis rebuilds → patch the in-house consumers (`laravelui5/core`, `laravelui5/sdk`, `pragmatiqu/timesheet.biz`) → smoke-test before the next slice begins. Companion to `laravelui5/core`'s ROADMAP; the two move together when contract surface is shared.
 
@@ -29,7 +29,8 @@ cache dir, before writing anything (see Done). **Still pending — the load side
 service-provided cache key) so a pre-existing or hand-placed collision can't be silently served.
 Silent-wrong-schema is the worst failure mode — same family as the 1.0.5 collision.
 
-Atom [[ODATA_ALTERNATIVE_CLIENT_DEDICATED_SERVICE]] · spec `docs/meta/specs/odata-route-composition.md` OP5.
+Reasoned through in the internal route-composition notes.
+<!-- Atom [[ODATA_ALTERNATIVE_CLIENT_DEDICATED_SERVICE]] · spec docs/meta/specs/odata-route-composition.md OP5. -->
 
 ## [ ] SQL-driver serialization emits raw DB scalars, not values coerced to the declared Edm type
 
@@ -84,7 +85,9 @@ this one — and unblocks the canonical **object-page-header skill**.
 **Resolved downstream by not being custom (2026-07-08):** `ui5-partners` reverted `PartnerDetails` from a
 computed `fromSub` set to an **Eloquent** `discoverModel(PartnerDetail)` header and moved its counts to
 virtual `$expand`s (`authorization` summary, `delegations` collection, `settings` summary) — the
-object-page-header pattern (`docs/meta/atoms/OBJECT_PAGE_HEADER_AS_ELOQUENT_EXPAND.md`). So this item is **no
+object-page-header pattern ([choosing a resolver](https://laravelui5.com/odata/resolvers/choosing-a-resolver)).
+<!-- Atom: docs/meta/atoms/OBJECT_PAGE_HEADER_AS_ELOQUENT_EXPAND.md. -->
+So this item is **no
 longer blocking** — it stands for the residual case where a header genuinely *must* be a computed set and
 still wants expand-able adornments. Until then, prefer an Eloquent header over a custom one.
 
@@ -104,7 +107,9 @@ Consequence: a `discoverModel` set is the right tool for a **small-N** read (a k
 `$expand`s — hydration is ~1 ms, negligible) but a **speed regression for a large-N list** (a Master, an
 export, an aggregate). Today that forces large lists to stay custom raw-SQL sets — correct, but it blocks
 the clean "one Eloquent model, one set for master + detail" shape (a list read of the Eloquent set would
-hydrate every row). See `docs/meta/atoms/ODATA_STREAMING_NOT_HYDRATION.md`.
+hydrate every row). See [choosing a resolver](https://laravelui5.com/odata/resolvers/choosing-a-resolver),
+which carries the per-row measurements.
+<!-- Atom: docs/meta/atoms/ODATA_STREAMING_NOT_HYDRATION.md. -->
 
 **Fix:** when an `EloquentEntitySetResolver` read has **no `$expand`** and no properties needing cast/accessor
 transformation (or those can be applied cheaply on the raw row), take a **lean path** — `->toBase()->get()`
@@ -322,7 +327,7 @@ so it is the writer, not a one-off.
 service. A client that binds an enum property — an `sap.ui.mdc` field with a type map, or
 anything relying on `Edm.EnumType` member names — behaves differently depending on whether a
 cache happens to exist. That is the same silent-divergence family as the collision item below,
-and it defeats the point of `[[reference_odata_enumtype_columns]]`: the entity set deliberately
+and it defeats the point of declaring an enum column at all: the entity set deliberately
 declares the enum class-string *so that* the engine emits `Edm.EnumType`.
 
 **Shape of a fix.** `EdmxWriter` must emit the enum types into the schema's `enumTypes` and

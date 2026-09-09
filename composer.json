@@ -17,7 +17,11 @@
     ],
     "autoload": {
         "psr-4": {
-            "LaravelUi5\\OData\\": "src/",
+            "LaravelUi5\\OData\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
             "LaravelUi5\\OData\\Tests\\": "tests/",
             "LaravelUi5\\OData\\Fixtures\\": "tests-fixtures/"
         }

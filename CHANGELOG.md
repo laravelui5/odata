@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [3.0.6] – 2026-09-09
+
+The distributed package stops carrying the test suite.
+
+`laravelui5/odata` had no `.gitattributes`, so every file in the repository travelled into the
+Composer archive: `tests/`, `tests-fixtures/`, `phpunit.xml`, `phpstan.neon`, `composer.lock`,
+`ROADMAP.md`, `CHANGELOG.md` and PHPUnit's result cache. A consumer's `vendor/` carried 930 KB it
+could never run — a little over a third of the archive. The rules now mirror `laravelui5/core`'s;
+what ships is `src/`, `config.php`, `routes/`, `bin/`, `composer.json`, and the three files a
+reader is owed — `README.md`, `LICENSE`, `SECURITY.md`.
+
+PHPUnit's result cache was not merely shipped, it was **versioned** — 36 KB of local run state in a
+public repository. It is now untracked and ignored.
+
+**The test namespaces moved to `autoload-dev`, and had to.** `LaravelUi5\OData\Tests\` and
+`LaravelUi5\OData\Fixtures\` were declared in `autoload`, which is the section a consumer's
+generated autoloader inherits. Excluding the directories while leaving those PSR-4 prefixes in
+place would have pointed every installation at two paths that no longer exist. They belong in
+`autoload-dev` regardless: they are the package's own test namespaces, and no shipped class
+references either.
+
+No source change, no contract change. `composer validate` passes and the suite is green at 606.
+
 ## [3.0.5] – 2026-08-28
 
 `$casts` reach discovery again — models declaring them the modern way were being read as if they
@@ -466,7 +489,8 @@ Bridges PHP int-backed enums to OData v4 `Edm.EnumType`. A column declared as `L
 - `EdmBuilder::addEnumType()` is now keyed by qualified name. Identical re-registration is a silent no-op (factory is deterministic, so two entity sets referencing the same backed enum dedupe naturally). A same-qualified-name registration with a different definition throws `\LogicException` — catches the pathological case where two PHP classes (e.g. `App\Enums\Status` and `App\Other\Status`) collide on the EDM short name.
 - `Protocol\Execution\RowCoercion` extended: `EnumTypeInterface` properties get a per-property value→name lookup. Unknown ints fall through unchanged (defensive — schema drift becomes visible rather than masked).
 
-**Design picks resolved** (parked atom: `docs/meta/atoms/ODATA_BACKED_ENUM.md`):
+**Design picks resolved:**
+<!-- Parked atom: docs/meta/atoms/ODATA_BACKED_ENUM.md. -->
 
 - Class-string sentinel (`'tier' => LicenseTier::class`), not a union with EnumType instances.
 - Symbolic short form on the wire only — no qualified-long-form toggle.

@@ -1,0 +1,15 @@
+# Ensure LF line endings everywhere
+* text=auto eol=lf
+
+# Exclude non-essential files from distribution archives (Composer installs)
+/tests/ export-ignore
+/tests-fixtures/ export-ignore
+/vendor/ export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
+.phpunit.result.cache export-ignore
+CHANGELOG.md export-ignore
+composer.lock export-ignore
+phpstan.neon export-ignore
+phpunit.xml export-ignore
+ROADMAP.md export-ignore
