@@ -17,6 +17,11 @@ could never run — a little over a third of the archive. The rules now mirror `
 what ships is `src/`, `config.php`, `routes/`, `bin/`, `composer.json`, and the three files a
 reader is owed — `README.md`, `LICENSE`, `SECURITY.md`.
 
+> **Correction (2026-09-22).** That sentence enumerates what happened to remain and reads like an
+> allowlist. It is not one. `.gitattributes` is a **denylist**: only the named paths carry
+> `export-ignore`, so **any path not named there ships**. A new top-level directory travels into the
+> Composer archive unless it is added to the file.
+
 PHPUnit's result cache was not merely shipped, it was **versioned** — 36 KB of local run state in a
 public repository. It is now untracked and ignored.
 
