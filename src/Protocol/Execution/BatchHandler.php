@@ -338,7 +338,7 @@ final readonly class BatchHandler
             // Same read-authz gate as the direct path: a hard denial throws ForbiddenException
             // (caught below → a per-inner 403 entry); a gated $expand is pruned + reported.
             $plan     = (new QueryPlanner)->plan($planRequest, $schema);
-            $response = $gate->execute($plan, $request, $schema, $service->endpoint(), self::innerWireFormat($requestData, $request));
+            $response = $gate->execute($plan, $request, $schema, $service->endpoint(), self::innerWireFormat($requestData, $request), new RequestTarget($path, $queryString ?? ''));
 
             ob_start();
             $response->sendContent();

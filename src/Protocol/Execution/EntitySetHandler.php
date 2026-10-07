@@ -26,6 +26,7 @@ final readonly class EntitySetHandler
         private RuntimeSchemaInterface $schema,
         private string $serviceRoot,
         private WireFormat $format = new WireFormat(),
+        private ?RequestTarget $target = null,
     ) {}
 
     public function handle(EntitySetQueryPlan $plan): ODataResponse
@@ -55,8 +56,9 @@ final readonly class EntitySetHandler
         $serviceRoot = $this->serviceRoot;
         $setName     = $plan->target->getName();
         $coercion    = new RowCoercion($plan->target->getEntityType(), $this->format);
+        $target      = $this->target;
 
-        $response->setCallback(static function () use ($context, $resolver, $plan, $selectKeys, $count, $pageSize, $serviceRoot, $setName, $coercion): void {
+        $response->setCallback(static function () use ($context, $resolver, $plan, $selectKeys, $count, $pageSize, $serviceRoot, $setName, $coercion, $target): void {
             $generator = $resolver->resolve($plan);
 
             echo '{"@odata.context":' . json_encode($context);
@@ -91,7 +93,11 @@ final readonly class EntitySetHandler
 
             if ($hasMore) {
                 $skip = ($plan->skip ?? 0) + $emitted;
-                $nextLink = $serviceRoot . $setName . '?$skip=' . $skip;
+                // The same query, only $skip moved. Without the request (a plan executed
+                // outside the HTTP layer) the set name is all there is to link to.
+                $nextLink = $target !== null
+                    ? $target->nextLink($serviceRoot, $skip)
+                    : $serviceRoot . $setName . '?$skip=' . $skip;
                 echo ',"@odata.nextLink":' . json_encode($nextLink);
             }
 

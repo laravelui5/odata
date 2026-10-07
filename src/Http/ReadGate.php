@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Http;
 
+use LaravelUi5\OData\Protocol\Execution\RequestTarget;
 use LaravelUi5\OData\Protocol\Execution\WireFormat;
 use Illuminate\Http\Request;
 use LaravelUi5\OData\Exception\ForbiddenException;
@@ -43,6 +44,7 @@ final readonly class ReadGate
         RuntimeSchemaInterface $schema,
         string $endpoint,
         WireFormat $format = new WireFormat(),
+        ?RequestTarget $target = null,
     ): ODataResponse {
         $read = new ReadContext();
         $this->authorizer->authorize($plan, $request, $read);
@@ -55,7 +57,7 @@ final readonly class ReadGate
             $plan = $this->pruneDroppedExpands($plan, $read->dropped());
         }
 
-        $response = (new Engine($schema, $endpoint, $format))->execute($plan);
+        $response = (new Engine($schema, $endpoint, $format, $target))->execute($plan);
 
         if ($read->dropMessages() !== []) {
             $response->headers->set('sap-messages', $this->encodeSapMessages($read->dropMessages()));

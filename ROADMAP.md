@@ -105,56 +105,6 @@ need the relations). This would let one discovered set serve a **fast lean list*
 
 In the spirit of the engine: the fast path should be the default, hydration the opt-in that expands require.
 
-## [ ] `OP05` `@odata.nextLink` drops every query option except `$skip` — page 2 is unfiltered
-
-Surfaced 2026-08-22 (docs/code drift audit of `docs/odata/`). `EntitySetHandler.php:93` builds the
-server-driven-paging continuation as
-
-```php
-$nextLink = $serviceRoot . $setName . '?$skip=' . $skip;
-```
-
-The request's other system query options are not carried over. A client that pages through
-`Products?$filter=active eq true&$orderby=price desc&$select=name,price` gets a correct first page,
-then follows `@odata.nextLink` to `Products?$skip=200` — **unfiltered, unsorted, unprojected, and
-without `$count`**. Page 2 is a different result set than page 1 claimed to be paging through, and
-nothing in the response says so.
-
-Same silent-wrong-value family as the SQL-coercion and cache items: the response is well-formed and
-the client has no way to detect the substitution. It is arguably worse, because the client did
-exactly what the protocol told it to do — a next link stands for the remainder of *the same*
-collection query, so a conforming client (the UI5 v4 model's paged `ODataListBinding`, Excel's
-"load more") follows it without re-sending its own options.
-
-**Fix:** reconstruct the next link from the request's full query string with `$skip` replaced (and
-`$top`, where the client sent one, decremented by the rows already emitted) rather than composing it
-from the set name alone. `EntitySetHandler` already receives `$plan`, but the plan is the parsed
-form; the honest source is the original query string, so the service root/URL builder should carry
-it in. Worth covering with a protocol test that pages a filtered collection to exhaustion and
-asserts every page satisfies the filter.
-
-Until it is fixed, `docs/odata/query-options/pagination.md` carries a warning and tells clients to
-re-send their options on the follow-up request.
-
-**Same cause, second symptom (confirmed 2026-09-18, `acme`, Core 2.11.0 / odata 3.0.6).** The link
-is built from the *target set's* name, not the request's path, so a paged **navigation collection**
-(`Products(1)/Orders`) links to `Orders?$skip=…`, and page 2 is the whole target set. Live check on
-a Core app: `Users?$filter=id gt 50&$select=name&$orderby=name` with `Prefer: odata.maxpagesize=5`
-returned five matching rows, then a next link `Users?$skip=5` whose page held ids 6–10, all columns,
-ordered by id.
-
-**Blast radius (assessed 2026-09-18).** One construction site (`EntitySetHandler.php:93`). The
-request path and query have to be passed down explicitly, controller or `BatchHandler` →
-`ReadGate::execute()` → `Engine` → `EntitySetHandler`: inside `$batch` the gate holds the **outer**
-request, so the handler cannot read the inner query from it. Three source files, no use of `ReadGate`,
-`Engine` or the handlers outside this package (checked against Core, SDK, pragmatiqu.io), so a patch.
-Tests: a filtered set paged to exhaustion, a navigation collection, a `$batch` inner request, a
-route-composed service. Docs: drop the warning in `query-options/pagination.md` **and the transitional warning in `core/recipes/excel-power-bi.md` § *Until the next laravelui5/odata release*** with the release (both noted 2026-09-23 when the GEO/Boost continuation closed).
-
-**Why it is not only theoretical.** Excel and Power BI follow `@odata.nextLink` and fold editor steps
-into `$filter`/`$select`; any set above the default page size (200) then loads rows the filter
-excludes. The Excel/Power BI recipe (2026-09-18) carries an interim note until this ships.
-
 ## [ ] `OP06` Unsupported `$filter` constructs are silently dropped, widening the result set
 
 Surfaced 2026-08-22 (docs/code drift audit of `docs/odata/`). Both translators end their dispatch in
@@ -354,6 +304,33 @@ fixed now. What remains decides how a full regeneration has to be done:
 review the diff as a release of its own. Do it together with `OP07`, since both are the generator's
 value shapes. Minor if the defaults land, otherwise major.
 
+## [ ] `OP30` Server-driven paging reaches neither navigation collections nor `$batch` parts
+
+Found 2026-10-07 while testing `OP05`. Server-driven paging is decided in the controller
+(`resolveMaxPageSize()`: `Prefer: odata.maxpagesize`, then `odata.pagination.default`, clamped to
+`.max`) and reaches the plan in exactly one place, the top-level entity-set plan
+(`QueryPlanner:141`). Two consequences:
+
+- **A navigation collection is never paged.** `Flights(1)/passengers` with
+  `Prefer: odata.maxpagesize=2` answers all rows at once, and `pagination.max` does not cap it.
+- **A `$batch` part is never paged.** `BatchHandler::dispatchInnerRequest()` builds its
+  `ODataRequest` without `maxPageSize`. Neither a part's own `Prefer` header (now parsed, see `OP27`)
+  nor the config reaches it, so `pagination.max` is no ceiling inside a batch.
+
+The second matters most, because **UI5 sends everything through `$batch`**. The cap a host sets in
+`pagination.max` does not hold for UI5 traffic today.
+
+**To decide before building.** Does UI5's V4 `ODataListBinding` cope with a server-driven page, i.e.
+does it follow `@odata.nextLink` or fail? It pages with `$skip`/`$top` itself, and under
+`$top` the engine does not page (`EntitySetHandler`), so a UI5 list request that carries `$top` is
+safe either way. A request without `$top` (a code list, `requestContexts(0, Infinity)`) would be cut
+at the default. That is why the code-list docs require `pagination.default` unset. Check with the
+probe in `acme` before switching it on.
+
+**Fix (once settled).** Resolve the page size per inner request (its own `Prefer`, then the config)
+and pass it into the navigation plans too. Probably a Minor, since server-visible behaviour changes
+for hosts that set `pagination.default`.
+
 ---
 
 ## Done
@@ -361,6 +338,65 @@ value shapes. Minor if the defaults land, otherwise major.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP05` `@odata.nextLink` drops every query option except `$skip` — page 2 is unfiltered (v3.1.0)
+
+Surfaced 2026-08-22 (docs/code drift audit of `docs/odata/`). `EntitySetHandler.php:93` builds the
+server-driven-paging continuation as
+
+```php
+$nextLink = $serviceRoot . $setName . '?$skip=' . $skip;
+```
+
+The request's other system query options are not carried over. A client that pages through
+`Products?$filter=active eq true&$orderby=price desc&$select=name,price` gets a correct first page,
+then follows `@odata.nextLink` to `Products?$skip=200` — **unfiltered, unsorted, unprojected, and
+without `$count`**. Page 2 is a different result set than page 1 claimed to be paging through, and
+nothing in the response says so.
+
+Same silent-wrong-value family as the SQL-coercion and cache items: the response is well-formed and
+the client has no way to detect the substitution. It is arguably worse, because the client did
+exactly what the protocol told it to do — a next link stands for the remainder of *the same*
+collection query, so a conforming client (the UI5 v4 model's paged `ODataListBinding`, Excel's
+"load more") follows it without re-sending its own options.
+
+**Fix:** reconstruct the next link from the request's full query string with `$skip` replaced (and
+`$top`, where the client sent one, decremented by the rows already emitted) rather than composing it
+from the set name alone. `EntitySetHandler` already receives `$plan`, but the plan is the parsed
+form; the honest source is the original query string, so the service root/URL builder should carry
+it in. Worth covering with a protocol test that pages a filtered collection to exhaustion and
+asserts every page satisfies the filter.
+
+Until it is fixed, `docs/odata/query-options/pagination.md` carries a warning and tells clients to
+re-send their options on the follow-up request.
+
+**Same cause, second symptom (confirmed 2026-09-18, `acme`, Core 2.11.0 / odata 3.0.6).** The link
+is built from the *target set's* name, not the request's path, so a paged **navigation collection**
+(`Products(1)/Orders`) links to `Orders?$skip=…`, and page 2 is the whole target set. Live check on
+a Core app: `Users?$filter=id gt 50&$select=name&$orderby=name` with `Prefer: odata.maxpagesize=5`
+returned five matching rows, then a next link `Users?$skip=5` whose page held ids 6–10, all columns,
+ordered by id.
+
+**Blast radius (assessed 2026-09-18).** One construction site (`EntitySetHandler.php:93`). The
+request path and query have to be passed down explicitly, controller or `BatchHandler` →
+`ReadGate::execute()` → `Engine` → `EntitySetHandler`: inside `$batch` the gate holds the **outer**
+request, so the handler cannot read the inner query from it. Three source files, no use of `ReadGate`,
+`Engine` or the handlers outside this package (checked against Core, SDK, pragmatiqu.io), so a patch.
+Tests: a filtered set paged to exhaustion, a navigation collection, a `$batch` inner request, a
+route-composed service. Docs: drop the warning in `query-options/pagination.md` **and the transitional warning in `core/recipes/excel-power-bi.md` § *Until the next laravelui5/odata release*** with the release (both noted 2026-09-23 when the GEO/Boost continuation closed).
+
+**Why it is not only theoretical.** Excel and Power BI follow `@odata.nextLink` and fold editor steps
+into `$filter`/`$select`; any set above the default page size (200) then loads rows the filter
+excludes. The Excel/Power BI recipe (2026-09-18) carries an interim note until this ships.
+
+**Done 2026-10-07 (v3.1.0).** A `Protocol\Execution\RequestTarget` (path relative to the service
+root, raw `QUERY_STRING`) travels like `WireFormat`: controller or `$batch` part → `ReadGate` →
+`Engine` → `EntitySetHandler`. The next link is service root + path + the query string with only
+`$skip` replaced. `$count` stays (decided with the author), and so do custom options. Docs: the
+warnings in `query-options/pagination` and `core/recipes/excel-power-bi` are gone. Tests:
+`tests/Protocol/Execution/NextLinkTest.php`, which pages a filtered, sorted, projected collection to
+the end. Against the old link it fails. The navigation and batch cases are covered on the link
+builder only, because neither is paged at all today. That is `OP30`.
 
 ## [x] `OP21` Morph relations: is there a spec-conform way to expose them at all? — evaluation (v3.1.0)
 

@@ -62,6 +62,15 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**`@odata.nextLink` repeats the query.** The link was `<Set>?$skip=n`. A client that paged
+`Users?$filter=…&$orderby=…&$select=…` got a correct first page, then followed the link to an
+unfiltered, unsorted, unprojected second page, and a navigation collection linked into the whole
+target set. UI5's paged lists and Excel's "load more" follow the link without re-sending their
+options. The link is now built from the request: same path, same query string, carried over byte for
+byte (Symfony's normalised query string would have re-encoded it), with only `$skip` replaced. Custom
+query options and `$count` stay. `$batch` parts use their own URL. The warnings in
+`query-options/pagination` and in the Core recipe for Excel/Power BI are gone.
+
 **Polymorphic relations stay out of discovery, all of them.** `MorphTo` extends `BelongsTo` and
 `MorphToMany` extends `BelongsToMany`, so discovery wired them as ordinary navigation properties.
 With `morphTo` the target was whatever an empty model happened to resolve to, wrong for every row of
@@ -242,7 +251,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 704.
+Additive. The suite is green at 708.
 
 ## [3.0.6] – 2026-09-09
 

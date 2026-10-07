@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Http\Controller;
 
+use LaravelUi5\OData\Protocol\Execution\RequestTarget;
 use LaravelUi5\OData\Protocol\Execution\WireFormat;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -119,7 +120,15 @@ class OData extends Controller
             // Read-authorization gate: authorize the plan, then execute. A hard denial answers a
             // 403; a gated $expand is pruned + reported in a sap-messages header; else served
             // as-is. The same gate runs for each $batch inner request (see BatchHandler).
-            return $this->gate->execute($plan, $request, $schema, $service->endpoint(), WireFormat::fromAccept($request->header('Accept')));
+            return $this->gate->execute(
+                $plan,
+                $request,
+                $schema,
+                $service->endpoint(),
+                WireFormat::fromAccept($request->header('Accept')),
+                // The raw query string: Symfony's getQueryString() sorts and re-encodes it.
+                new RequestTarget($path, (string) $request->server('QUERY_STRING', '')),
+            );
         } catch (ProtocolException $e) {
             throw $e;
         } catch (Throwable $e) {
