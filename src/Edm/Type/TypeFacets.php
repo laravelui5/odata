@@ -46,4 +46,38 @@ final readonly class TypeFacets implements TypeFacetsInterface
     {
         return $this->srid;
     }
+
+    public function withNullable(bool $nullable): self
+    {
+        return new self($nullable, $this->maxLength, $this->precision, $this->scale, $this->unicode, $this->srid);
+    }
+
+    public function withMaxLength(?int $maxLength): self
+    {
+        return new self($this->nullable, $maxLength, $this->precision, $this->scale, $this->unicode, $this->srid);
+    }
+
+    public function withPrecision(?int $precision): self
+    {
+        return new self($this->nullable, $this->maxLength, $precision, $this->scale, $this->unicode, $this->srid);
+    }
+
+    public function withScale(?int $scale): self
+    {
+        return new self($this->nullable, $this->maxLength, $this->precision, $scale, $this->unicode, $this->srid);
+    }
+
+    /**
+     * True when every facet stands at the spec default (nullable, nothing else set),
+     * i.e. the facets say nothing a client could not assume.
+     */
+    public function isDefault(): bool
+    {
+        return $this->nullable
+            && $this->maxLength === null
+            && $this->precision === null
+            && $this->scale === null
+            && $this->unicode === null
+            && $this->srid === null;
+    }
 }

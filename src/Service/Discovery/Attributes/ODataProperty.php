@@ -13,5 +13,7 @@ final readonly class ODataProperty
         public ?string $name = null,
         public ?string $type = null,
         public ?bool $nullable = null,
+        public ?int $precision = null,
+        public ?int $scale = null,
     ) {}
 }

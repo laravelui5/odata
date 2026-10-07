@@ -9,7 +9,9 @@ use Illuminate\Support\ServiceProvider;
 use LaravelUi5\OData\Console\CacheCommand;
 use LaravelUi5\OData\Console\ClearCommand;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
+use LaravelUi5\OData\Service\Contracts\ColumnFacetResolverInterface;
 use LaravelUi5\OData\Service\Contracts\ReadAuthorizerInterface;
+use LaravelUi5\OData\Service\Discovery\ColumnFacetsAsDeclared;
 use LaravelUi5\OData\Service\AllowAllReadAuthorizer;
 
 class ODataServiceProvider extends ServiceProvider
@@ -31,6 +33,10 @@ class ODataServiceProvider extends ServiceProvider
             ReadAuthorizerInterface::class,
             config('odata.read_authorizer', AllowAllReadAuthorizer::class),
         );
+
+        // The facet forward-exit of model discovery. bindIf: a package that binds its own
+        // resolver (the SDK announces installation decimals) wins regardless of provider order.
+        $this->app->bindIf(ColumnFacetResolverInterface::class, ColumnFacetsAsDeclared::class);
     }
 
     public function boot(): void

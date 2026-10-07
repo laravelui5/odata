@@ -40,6 +40,28 @@ that warm and cold `$metadata` are identical.
 length-bearing string column announces its `MaxLength`. UI5's V4 types read both as constraints. A
 control bound two-way to such a property validates against them.
 
+**Facets can be overridden: on one model, or for the whole installation.** Some facets are not a
+fact of the column. A unit price stored as `decimal(19,6)` may have to be announced with the
+installation's price decimals. Two ways, both additive:
+
+- `#[ODataProperty(precision:, scale:)]` sets a literal value on one model, next to `nullable:`.
+- `ColumnFacetResolverInterface` is a new seam. Discovery calls it for every column with the model
+  class, the column name, the model's cast and the facets from the schema, and uses the facets it
+  returns. The default, `ColumnFacetsAsDeclared`, returns them unchanged and is registered with
+  `bindIf`. A package that binds its own resolver therefore wins regardless of provider order.
+  There is one binding, not a chain. `TypeFacets` gains `withNullable()`, `withMaxLength()`,
+  `withPrecision()`, `withScale()` and `isDefault()` so that a resolver changes one facet without
+  copying the others.
+
+The order per column is: schema → resolver → attribute, and a key stays non-nullable. Discovery
+throws a `LogicException` when building the schema if the resulting facets do not fit the type:
+`Scale` outside `Edm.Decimal`, `Precision` outside `Edm.Decimal` and the temporal types, `MaxLength`
+outside `Edm.String`/`Edm.Binary`, or a `Scale` above the `Precision`.
+
+The resolver runs when the schema is built. A service cached with `odata:cache` keeps the value it
+returned then, and a test asserts that this value is served warm as it was cold. When the
+installation fact changes, the cache has to be rebuilt.
+
 **`FieldControlType::Hidden` no longer kills the request.** The Common vocabulary defines `Hidden`
 as an alias of `Inapplicable`, both with value 0. The generator wrote them as two enum cases, and
 PHP refuses that. The first access to the enum ended in a fatal `Duplicate value in enum` error, so
@@ -62,7 +84,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 618.
+Additive. The suite is green at 627.
 
 ## [3.0.6] – 2026-09-09
 

@@ -465,9 +465,11 @@ above (`:470`) → `Edm.Date`. One line, plus a discovery test with an `immutabl
 > **Status 2026-10-07: level 1 built (v3.1.0).** `Nullable`, `Precision`/`Scale` and `MaxLength`
 > come from `Schema::getColumns()`, and `odata:cache` keeps them (`EdmxWriter` had dropped facets,
 > the collection flag and the default value). Tests: `tests/Service/Discovery/ColumnFacetsTest.php`,
-> including identical `$metadata` warm and cold. **Open:** points 1–3 of the extension below.
-> Point 1 is now unblocked: `OP24` settled the shape. Points 2–3 wait for the check that D50 (5)
-> names, namely how UI5's V4 model consumes code lists.
+> including identical `$metadata` warm and cold. **Point 1 of the extension built the same day
+> (v3.1.0):** `#[ODataProperty(precision:, scale:)]` and `ColumnFacetResolverInterface` (default
+> `ColumnFacetsAsDeclared`, `bindIf`), order schema → resolver → attribute, illegal facets refused
+> loud. The SDK's price/percentage resolver is SDK work. **Open:** points 2–3, which wait for the
+> check that D50 (5) names, namely how UI5's V4 model consumes code lists.
 
 Surfaced 2026-10-01 in the SDK Foundation signing (`meta/specs/sdk-foundation-v1.0.md`, OP27 / D50),
 **confirmed by reading, test still to write.** The serializer can emit every facet

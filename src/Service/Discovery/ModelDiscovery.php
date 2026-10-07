@@ -22,6 +22,7 @@ use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
 use LaravelUi5\OData\Edm\Type\TypeFacets;
+use LaravelUi5\OData\Service\Contracts\ColumnFacetResolverInterface;
 use LaravelUi5\OData\Service\Contracts\EdmBuilderInterface;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataEntity;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataIgnore;
@@ -62,9 +63,12 @@ final class ModelDiscovery
 
     private readonly AttributeReader $attributeReader;
 
-    public function __construct()
+    private readonly ColumnFacetResolverInterface $facetResolver;
+
+    public function __construct(?ColumnFacetResolverInterface $facetResolver = null)
     {
         $this->attributeReader = new AttributeReader();
+        $this->facetResolver   = $facetResolver ?? app(ColumnFacetResolverInterface::class);
     }
 
     public function add(string $modelClass): void
@@ -259,7 +263,7 @@ final class ModelDiscovery
             $property = new Property(
                 name: $propName,
                 type: new PrimitiveType($primitiveType),
-                facets: self::columnFacets($column, $primitiveType, $colName === $keyName, $propAttr?->nullable),
+                facets: $this->resolveFacets($modelClass, $column, $casts[$colName] ?? null, $primitiveType, $colName === $keyName, $propAttr),
                 annotations: $propAnnotations,
             );
 
@@ -430,28 +434,56 @@ final class ModelDiscovery
     }
 
     /**
+     * The facets of a discovered column: the schema's, then the bound
+     * {@see ColumnFacetResolverInterface}, then `#[ODataProperty]` — the attribute is local to
+     * one model and wins. A key property is never nullable, whatever any layer says.
+     *
+     * Returns null when the result says nothing beyond the spec's defaults, so an
+     * unconstrained property serializes exactly as before.
+     *
+     * @param class-string<Model>                                     $modelClass
+     * @param array{name: string, type_name: string, type: string, nullable: bool} $column
+     */
+    private function resolveFacets(
+        string           $modelClass,
+        array            $column,
+        ?string          $cast,
+        EdmPrimitiveType $type,
+        bool             $isKey,
+        ?ODataProperty   $attribute,
+    ): ?TypeFacets {
+        $facets = $this->facetResolver->resolve($modelClass, $column['name'], $cast, self::schemaFacets($column, $type));
+
+        if ($attribute?->nullable !== null) {
+            $facets = $facets->withNullable($attribute->nullable);
+        }
+        if ($attribute?->precision !== null) {
+            $facets = $facets->withPrecision($attribute->precision);
+        }
+        if ($attribute?->scale !== null) {
+            $facets = $facets->withScale($attribute->scale);
+        }
+        if ($isKey) {
+            $facets = $facets->withNullable(false);
+        }
+
+        self::assertFacetsFit($modelClass, $column['name'], $type, $facets);
+
+        return $facets->isDefault() ? null : $facets;
+    }
+
+    /**
      * Derive the type facets of a discovered column from its schema.
      *
-     * The column decides `Nullable`, `Precision`/`Scale` on a `decimal(p,s)`
-     * and `MaxLength` on a length-bearing character type. A facet is taken only
-     * when the final Edm type can carry it, so a `#[ODataProperty(type:)]`
-     * override never inherits a length or a scale that belongs to another type.
-     * `#[ODataProperty(nullable:)]` wins over the column, and a key property is
-     * never nullable — SQLite reports its integer primary key as nullable.
-     *
-     * Returns null when there is nothing to say beyond the spec's defaults, so
-     * an unconstrained property serializes exactly as before.
+     * The column decides `Nullable`, `Precision`/`Scale` on a `decimal(p,s)` and `MaxLength` on a
+     * length-bearing character type. A facet is taken only when the final Edm type can carry it,
+     * so a `#[ODataProperty(type:)]` override never inherits a length or a scale that belongs to
+     * another type.
      *
      * @param array{type_name: string, type: string, nullable: bool} $column
      */
-    private static function columnFacets(
-        array            $column,
-        EdmPrimitiveType $type,
-        bool             $isKey,
-        ?bool            $nullableOverride,
-    ): ?TypeFacets {
-        $nullable = $isKey ? false : ($nullableOverride ?? (bool) $column['nullable']);
-
+    private static function schemaFacets(array $column, EdmPrimitiveType $type): TypeFacets
+    {
         $typeName = strtolower($column['type_name']);
         $declared = strtolower($column['type']);
 
@@ -474,16 +506,49 @@ final class ModelDiscovery
             $maxLength = $m[1] === 'max' ? PHP_INT_MAX : (int) $m[1];
         }
 
-        if ($nullable && $maxLength === null && $precision === null) {
-            return null;
-        }
-
         return new TypeFacets(
-            nullable:  $nullable,
+            nullable:  (bool) $column['nullable'],
             maxLength: $maxLength,
             precision: $precision,
             scale:     $scale,
         );
+    }
+
+    /**
+     * Refuse facets the declared type cannot carry, loudly at schema build — an invalid facet
+     * would otherwise reach `$metadata` and be rejected (or misread) by every client.
+     *
+     * `Scale` belongs to `Edm.Decimal` and may not exceed `Precision`; `Precision` belongs to
+     * `Edm.Decimal` and the temporal types (fractional seconds); `MaxLength` to `Edm.String` and
+     * `Edm.Binary`.
+     */
+    private static function assertFacetsFit(string $modelClass, string $column, EdmPrimitiveType $type, TypeFacets $facets): void
+    {
+        $where = sprintf('%s::$%s (%s)', $modelClass, $column, $type->value);
+
+        if ($facets->getScale() !== null && $type !== EdmPrimitiveType::Decimal) {
+            throw new \LogicException("Scale is only valid on Edm.Decimal, not on {$where}.");
+        }
+
+        $temporal = [EdmPrimitiveType::DateTimeOffset, EdmPrimitiveType::TimeOfDay, EdmPrimitiveType::Duration];
+        if ($facets->getPrecision() !== null && $type !== EdmPrimitiveType::Decimal && !in_array($type, $temporal, true)) {
+            throw new \LogicException("Precision is only valid on Edm.Decimal and temporal types, not on {$where}.");
+        }
+
+        if ($facets->getMaxLength() !== null && !in_array($type, [EdmPrimitiveType::String, EdmPrimitiveType::Binary], true)) {
+            throw new \LogicException("MaxLength is only valid on Edm.String and Edm.Binary, not on {$where}.");
+        }
+
+        if ($facets->getScale() !== null && $facets->getScale() >= 0 && $facets->getPrecision() !== null
+            && $facets->getScale() > $facets->getPrecision()
+        ) {
+            throw new \LogicException(sprintf(
+                'Scale %d exceeds Precision %d on %s.',
+                $facets->getScale(),
+                $facets->getPrecision(),
+                $where,
+            ));
+        }
     }
 
     private static function mapColumnType(string $typeName): EdmPrimitiveType
