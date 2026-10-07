@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData;
 
+use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Container\EntitySet;
 use LaravelUi5\OData\Service\Builder\EdmBuilder;
 use LaravelUi5\OData\Service\Builder\ResolverMapBuilder;
@@ -61,6 +63,9 @@ class ODataService implements ODataServiceInterface
 
     /** @var list<class-string<CustomEntitySetInterface>> */
     private array $customEntitySets = [];
+
+    /** @var list<AnnotationInterface> */
+    private array $containerAnnotations = [];
 
     public function __construct(
         private readonly string $serviceUriValue = '',
@@ -183,11 +188,18 @@ class ODataService implements ODataServiceInterface
      */
     private function buildFromConfigure(): array
     {
-        $this->customEntitySets = [];
-        $this->discovery        = null;
+        $this->customEntitySets     = [];
+        $this->containerAnnotations = [];
+        $this->discovery            = null;
 
-        $builder = (new EdmBuilder())->version(config('odata.version', '4.0'));
-        $builder = $this->configure($builder);
+        $edmBuilder = (new EdmBuilder())->version(config('odata.version', '4.0'));
+        $builder    = $this->configure($edmBuilder);
+
+        // Applied to the concrete builder, which a decorating configure() wraps rather
+        // than replaces — the annotations land in the container either way.
+        if ($this->containerAnnotations !== []) {
+            $edmBuilder->annotateContainer(...$this->containerAnnotations);
+        }
 
         // Register custom entity types first so discovery and the builder
         // can wire virtual navigation properties.
@@ -252,6 +264,30 @@ class ODataService implements ODataServiceInterface
     protected function bindFunctions(RuntimeSchemaBuilderInterface $builder): void
     {
         // Default: no functions or singletons.
+    }
+
+    /**
+     * Annotate the service's entity container. Call this in configure().
+     *
+     * Takes generated vocabulary terms or plain annotations — the paved use is the
+     * code-list wiring UI5 reads per row:
+     *
+     *     $this->annotateContainer(
+     *         new CurrencyCodes(url: '../codelists@1.0.0/$metadata', collectionPath: 'Currencies'),
+     *         new UnitsOfMeasure(url: '../codelists@1.0.0/$metadata', collectionPath: 'Units'),
+     *     );
+     *
+     * The `Url` is resolved by the client relative to this service's URL.
+     */
+    protected function annotateContainer(AnnotationInterface|TypedAnnotationInterface ...$annotations): static
+    {
+        foreach ($annotations as $annotation) {
+            $this->containerAnnotations[] = $annotation instanceof TypedAnnotationInterface
+                ? $annotation->toAnnotation()
+                : $annotation;
+        }
+
+        return $this;
     }
 
     /**

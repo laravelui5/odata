@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Service\Builder;
 
+use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
 use LaravelUi5\OData\Edm\Container\EntityContainer;
 use LaravelUi5\OData\Edm\Container\EntitySet;
 use LaravelUi5\OData\Edm\Container\NavigationPropertyBinding;
@@ -65,6 +66,9 @@ final class EdmBuilder implements EdmBuilderInterface
 
     /** @var list<FunctionImportInterface> */
     private array $functionImports = [];
+
+    /** @var list<AnnotationInterface> */
+    private array $containerAnnotations = [];
 
     // ── Schema identity ────────────────────────────────────────────────────────
 
@@ -293,6 +297,22 @@ final class EdmBuilder implements EdmBuilderInterface
         return $this;
     }
 
+    /**
+     * Annotate the entity container — the target of service-wide terms such as
+     * `CodeList.CurrencyCodes` / `UnitsOfMeasure`, which point UI5 at a code-list service.
+     *
+     * On the concrete builder for now: adding it to {@see EdmBuilderInterface} would break
+     * every implementer, so it moves there with the next major. Service authors call
+     * {@see \LaravelUi5\OData\ODataService::annotateContainer()} instead.
+     */
+    public function annotateContainer(AnnotationInterface ...$annotations): static
+    {
+        $this->assertNotBuilt();
+        array_push($this->containerAnnotations, ...$annotations);
+
+        return $this;
+    }
+
     // ── Produce the frozen model ───────────────────────────────────────────────
 
     public function build(): EdmxInterface
@@ -315,6 +335,7 @@ final class EdmBuilder implements EdmBuilderInterface
             entitySets:      $this->entitySets,
             singletons:      $this->singletons,
             functionImports: $this->functionImports,
+            annotations:     $this->containerAnnotations,
         );
 
         return new Edmx(

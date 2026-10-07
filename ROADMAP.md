@@ -460,76 +460,6 @@ into one arm (`:471`). Laravel's `immutable_date` is a pure date and belongs wit
 above (`:470`) → `Edm.Date`. One line, plus a discovery test with an `immutable_date` cast.
 `services/model-discovery` already says `Edm.Date`.
 
-## [~] `OP19` `discoverModel()` emits no type facets — a `decimal(19,6)` column becomes a bare `Edm.Decimal`
-
-> **Status 2026-10-07: level 1 built (v3.1.0).** `Nullable`, `Precision`/`Scale` and `MaxLength`
-> come from `Schema::getColumns()`, and `odata:cache` keeps them (`EdmxWriter` had dropped facets,
-> the collection flag and the default value). Tests: `tests/Service/Discovery/ColumnFacetsTest.php`,
-> including identical `$metadata` warm and cold. **Point 1 of the extension built the same day
-> (v3.1.0):** `#[ODataProperty(precision:, scale:)]` and `ColumnFacetResolverInterface` (default
-> `ColumnFacetsAsDeclared`, `bindIf`), order schema → resolver → attribute, illegal facets refused
-> loud. The SDK's price/percentage resolver is SDK work. **Open:** level 3, reshaped by the probe
-> below.
-
-Surfaced 2026-10-01 in the SDK Foundation signing (`meta/specs/sdk-foundation-v1.0.md`, OP27 / D50),
-**confirmed by reading, test still to write.** The serializer can emit every facet
-(`Service/Serialization/CsdlSerializer.php:534-552`: `Nullable`, `MaxLength`, `Precision`, `Scale`
-incl. `variable`), and `Edm\Property\Property` accepts `TypeFacetsInterface`. But discovery builds
-each property with name, type and annotations only (`ModelDiscovery.php:258-262`); nothing in `src/`
-constructs `TypeFacets` with a precision or scale. So a model column `decimal(19,6)` reaches
-`$metadata` without `Precision`/`Scale`, a `varchar(255)` without `MaxLength`, and every property
-without `Nullable` from the schema.
-
-**Why it matters now.** The SDK stores amounts, prices, quantities and percentages with one fixed
-scale (Foundation OP27) and relies on `$metadata` to describe it; UI5's `sap.ui.model.odata.type.Decimal`
-reads `Scale` for formatting and input validation. A bare `Edm.Decimal` is formatted without a scale.
-
-**Fix:** derive the facets from the column schema discovery already reads (`$column['type_name']`, the
-type's precision/scale/length, nullability) and pass a `TypeFacets` to the `Property` constructor;
-`#[ODataProperty]` overrides win (see the `nullable:` entry above — same surface, same session).
-Additive. Test: a model with `decimal(19,6)`, `varchar(40)` and a nullable column; assert the three
-facets in `$metadata`.
-
-**Extended 2026-10-01 (Foundation D51) — three more things the SDK's code lists need from the engine:**
-
-1. **Overriding a facet.** A unit price is stored as `decimal(19,6)` but must be announced with the
-   installation's price decimals (`Scale="4"`), and a percentage likewise — UI5's `Decimal` type formats
-   and validates input by `Scale`. The schema value is the default; an override wins: a `scale:` (and
-   `precision:`) parameter on `#[ODataProperty]`, or a facet resolver the SDK binds, since the value is
-   an installation fact, not a literal. Same session as the `nullable:` entry below.
-2. **The `CodeList` vocabulary** (`com.sap.vocabularies.CodeList.v1`: `CurrencyCodes`, `UnitsOfMeasure`
-   as `CodeListSource` with `Url` and `CollectionPath`; `StandardCode`), generated with the
-   `VocabularyGenerator`. Container-level annotations are already serialized (`CsdlSerializer.php:154 ff.`);
-   `Measures` and `Common.UnitSpecificScale` already exist.
-3. **Code-list sets are never paged by the server.** UI5 loads a code list with
-   `requestContexts(0, Infinity)` through its own shared model and caches it per session. Today
-   server-driven paging applies only when a client sends `Prefer: odata.maxpagesize`
-   (`EntitySetHandler.php:37`); that must stay so for these sets, and `$select` must work on them.
-
-**Level 3 reshaped by the probe (2026-10-07).** The check D50 (5) asked for ran in `acme` with
-OpenUI5 1.136.18 against odata 3.0.6 (findings: `meta/specs/codelists-v1.0.md`, Nachtrag
-2026-10-07). The mechanism works against this engine: per-row formatting by the code's scale, texts,
-standard codes. What it changes here:
-
-- **Point 3 is no mechanism, only a guarantee.** UI5 sends `GET Set?$select=key,scale,text,standard`,
-  with no `$top`/`$skip`/`$count` and no `Prefer`, and the engine already answers unpaged. What remains
-  is a test that pins this down: no `Prefer` → no `@odata.nextLink`, `$select` honoured.
-- **Container annotations need a builder API.** The serializer writes them inline and external
-  (UI5 reads both), but `EdmBuilder` offers no way to set them. The probe needed a decorator that
-  rebuilds the frozen `EntityContainer`. Fix: something like `annotateContainer(AnnotationInterface ...)`
-  on `EdmBuilderInterface`. Additive.
-- **Path-valued annotations.** Every annotation the mechanism needs is a `Path`:
-  `Measures.ISOCurrency` / `Measures.Unit` on the business property, `Common.UnitSpecificScale` /
-  `Common.Text` / `CodeList.StandardCode` on the code-list key. The generated classes emit constants
-  only (`ISOCurrency` takes a `string` and writes `String="…"`). The probe used a generic
-  `Annotation` with `ConstantAnnotationValue('Path', …)`, which the serializer writes correctly.
-  Fix in the `VocabularyGenerator`: terms whose type allows a path get a path form.
-- **The `CodeList` vocabulary** (point 2) as planned: `CurrencyCodes`, `UnitsOfMeasure`
-  (`CodeListSource`: `Url`, `CollectionPath`), `StandardCode`. The `Url` is **static** (relative,
-  any `@version` resolves), so no facet resolver or installation value is involved.
-- **Prerequisite: `OP26`** (done 2026-10-07, v3.1.0). The warm path used to drop every annotation,
-  the container's included.
-
 ## [ ] `OP20` Morph relations are discovered as ordinary navigations — short-term cure
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
@@ -711,6 +641,32 @@ cold object, and extend `AnnotationsCacheTest`'s warm-equals-cold check (or a si
 that uses every feature. The parity test is the contract. Anything the serializer writes, the cache
 must carry. Patch.
 
+## [ ] `OP29` The vocabulary generator has drifted from the committed classes — regenerate deliberately
+
+Found 2026-10-07 while building `OP19` level 3. A full run of the generator into a scratch directory
+differs from `src/Vocabularies/` in 311 files. Most of it was the generator's stale imports, which are
+fixed now. What remains decides how a full regeneration has to be done:
+
+- **Two classes are hand-written.** `Core.Description` (with an `APPLIES_TO` over all 14 targets) and
+  `Common.Label` carry `#[Attribute(Attribute::TARGET_ALL)]`. The generator would overwrite both.
+  Either it learns the `TARGET_ALL` case, or it skips a marked hand-written class.
+- **Upstream added required parameters.** `Common.SideEffects` / `SideEffectsType` gained
+  `sourceEntitiesInserted`, `…Updated` and `…Deleted`, each a required `array`, and the generator
+  places them before the optional ones. Regenerating breaks every existing
+  `#[SideEffects(...)]`. They need defaults (or a major).
+- **Array-valued record properties are cast with `(string)`.** The same three properties come out as
+  `new ConstantAnnotationValue('String', (string) $this->sourceEntitiesInserted)`, which yields the
+  string `"Array"`. This is the record-shaped half of `OP07`.
+- **New terms upstream:** `Common.ExpandAfterConcatSupported`, `PersonalData.RelatedDataCategoryID`,
+  `UI.CardItem`, `UI.CardItemType`, plus some changed docblocks and AppliesTo targets.
+- **Path forms** reach every other vocabulary only through this regeneration. Until then,
+  `Path` works in `Measures`, `CodeList` and the three `Common` terms (`Text`, `UnitSpecificScale`,
+  `UnitSpecificPrecision`) only.
+
+**Fix.** Settle the first three, then run `php bin/generate.php` once over all vocabularies and
+review the diff as a release of its own. Do it together with `OP07`, since both are the generator's
+value shapes. Minor if the defaults land, otherwise major.
+
 ---
 
 ## Done
@@ -718,6 +674,79 @@ must carry. Patch.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP19` `discoverModel()` emits no type facets — a `decimal(19,6)` column becomes a bare `Edm.Decimal` (v3.1.0)
+
+> **Status 2026-10-07: level 1 built (v3.1.0).** `Nullable`, `Precision`/`Scale` and `MaxLength`
+> come from `Schema::getColumns()`, and `odata:cache` keeps them (`EdmxWriter` had dropped facets,
+> the collection flag and the default value). Tests: `tests/Service/Discovery/ColumnFacetsTest.php`,
+> including identical `$metadata` warm and cold. **Point 1 of the extension built the same day
+> (v3.1.0):** `#[ODataProperty(precision:, scale:)]` and `ColumnFacetResolverInterface` (default
+> `ColumnFacetsAsDeclared`, `bindIf`), order schema → resolver → attribute, illegal facets refused
+> loud. The SDK's price/percentage resolver is SDK work. **Level 3 built the same day (v3.1.0):**
+> `ODataService::annotateContainer()` (concrete `EdmBuilder::annotateContainer()`; the interface gets it
+> with the next major), the `Path` value and path forms in the generator, the `CodeList` vocabulary,
+> and the unpaged guarantee as a test (`tests/Service/CodeListHttpTest.php`, including warm = cold).
+> Only `Measures`, `CodeList` and three `Common` terms were regenerated; the rest is `OP29`.
+
+Surfaced 2026-10-01 in the SDK Foundation signing (`meta/specs/sdk-foundation-v1.0.md`, OP27 / D50),
+**confirmed by reading, test still to write.** The serializer can emit every facet
+(`Service/Serialization/CsdlSerializer.php:534-552`: `Nullable`, `MaxLength`, `Precision`, `Scale`
+incl. `variable`), and `Edm\Property\Property` accepts `TypeFacetsInterface`. But discovery builds
+each property with name, type and annotations only (`ModelDiscovery.php:258-262`); nothing in `src/`
+constructs `TypeFacets` with a precision or scale. So a model column `decimal(19,6)` reaches
+`$metadata` without `Precision`/`Scale`, a `varchar(255)` without `MaxLength`, and every property
+without `Nullable` from the schema.
+
+**Why it matters now.** The SDK stores amounts, prices, quantities and percentages with one fixed
+scale (Foundation OP27) and relies on `$metadata` to describe it; UI5's `sap.ui.model.odata.type.Decimal`
+reads `Scale` for formatting and input validation. A bare `Edm.Decimal` is formatted without a scale.
+
+**Fix:** derive the facets from the column schema discovery already reads (`$column['type_name']`, the
+type's precision/scale/length, nullability) and pass a `TypeFacets` to the `Property` constructor;
+`#[ODataProperty]` overrides win (see the `nullable:` entry above — same surface, same session).
+Additive. Test: a model with `decimal(19,6)`, `varchar(40)` and a nullable column; assert the three
+facets in `$metadata`.
+
+**Extended 2026-10-01 (Foundation D51) — three more things the SDK's code lists need from the engine:**
+
+1. **Overriding a facet.** A unit price is stored as `decimal(19,6)` but must be announced with the
+   installation's price decimals (`Scale="4"`), and a percentage likewise — UI5's `Decimal` type formats
+   and validates input by `Scale`. The schema value is the default; an override wins: a `scale:` (and
+   `precision:`) parameter on `#[ODataProperty]`, or a facet resolver the SDK binds, since the value is
+   an installation fact, not a literal. Same session as the `nullable:` entry below.
+2. **The `CodeList` vocabulary** (`com.sap.vocabularies.CodeList.v1`: `CurrencyCodes`, `UnitsOfMeasure`
+   as `CodeListSource` with `Url` and `CollectionPath`; `StandardCode`), generated with the
+   `VocabularyGenerator`. Container-level annotations are already serialized (`CsdlSerializer.php:154 ff.`);
+   `Measures` and `Common.UnitSpecificScale` already exist.
+3. **Code-list sets are never paged by the server.** UI5 loads a code list with
+   `requestContexts(0, Infinity)` through its own shared model and caches it per session. Today
+   server-driven paging applies only when a client sends `Prefer: odata.maxpagesize`
+   (`EntitySetHandler.php:37`); that must stay so for these sets, and `$select` must work on them.
+
+**Level 3 reshaped by the probe (2026-10-07).** The check D50 (5) asked for ran in `acme` with
+OpenUI5 1.136.18 against odata 3.0.6 (findings: `meta/specs/codelists-v1.0.md`, Nachtrag
+2026-10-07). The mechanism works against this engine: per-row formatting by the code's scale, texts,
+standard codes. What it changes here:
+
+- **Point 3 is no mechanism, only a guarantee.** UI5 sends `GET Set?$select=key,scale,text,standard`,
+  with no `$top`/`$skip`/`$count` and no `Prefer`, and the engine already answers unpaged. What remains
+  is a test that pins this down: no `Prefer` → no `@odata.nextLink`, `$select` honoured.
+- **Container annotations need a builder API.** The serializer writes them inline and external
+  (UI5 reads both), but `EdmBuilder` offers no way to set them. The probe needed a decorator that
+  rebuilds the frozen `EntityContainer`. Fix: something like `annotateContainer(AnnotationInterface ...)`
+  on `EdmBuilderInterface`. Additive.
+- **Path-valued annotations.** Every annotation the mechanism needs is a `Path`:
+  `Measures.ISOCurrency` / `Measures.Unit` on the business property, `Common.UnitSpecificScale` /
+  `Common.Text` / `CodeList.StandardCode` on the code-list key. The generated classes emit constants
+  only (`ISOCurrency` takes a `string` and writes `String="…"`). The probe used a generic
+  `Annotation` with `ConstantAnnotationValue('Path', …)`, which the serializer writes correctly.
+  Fix in the `VocabularyGenerator`: terms whose type allows a path get a path form.
+- **The `CodeList` vocabulary** (point 2) as planned: `CurrencyCodes`, `UnitsOfMeasure`
+  (`CodeListSource`: `Url`, `CollectionPath`), `StandardCode`. The `Url` is **static** (relative,
+  any `@version` resolves), so no facet resolver or installation value is involved.
+- **Prerequisite: `OP26`** (done 2026-10-07, v3.1.0). The warm path used to drop every annotation,
+  the container's included.
 
 ## [x] `OP26` `odata:cache` drops every vocabulary annotation — the warm `$metadata` carries none (v3.1.0)
 

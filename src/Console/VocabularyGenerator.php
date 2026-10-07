@@ -555,8 +555,8 @@ PHP;
         $uses = [
             'LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\AnnotationValueInterface',
             'LaravelUi5\\OData\\Edm\\Contracts\\AnnotationTargetInterface',
-            'LaravelUi5\\OData\\Vocabularies\\TypedAnnotationInterface',
-            'LaravelUi5\\OData\\Vocabularies\\TypedAnnotationTrait',
+            'LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\TypedAnnotationInterface',
+            'LaravelUi5\\OData\\Edm\\Annotation\\TypedAnnotationTrait',
         ];
 
         if ($attrTargets !== null) {
@@ -580,6 +580,9 @@ PHP;
         // Edm.PrimitiveType terms require EdmPrimitiveType in the constructor.
         if ($innerType === 'Edm.PrimitiveType') {
             $uses[] = 'LaravelUi5\\OData\\Edm\\EdmPrimitiveType';
+        }
+        if ($this->acceptsPath($rawType, $innerType, $isCollection, $isComplex)) {
+            $uses[] = 'LaravelUi5\\OData\\Edm\\Annotation\\Path';
         }
 
         // Enum type from a different PHP namespace needs a use import.
@@ -734,12 +737,16 @@ PHP;
             ];
         }
 
-        // Primitive type (including TypeDefinition-resolved).
+        // Primitive type (including TypeDefinition-resolved). A Path stands in for
+        // the constant when the value is read per instance (e.g. ISOCurrency → currency).
         $phpType = self::PRIMITIVE_PHP_TYPES[$resolvedInner] ?? 'mixed';
-        // `mixed` subsumes null — never write `?mixed`
-        $nullPfx = ($nullable && $phpType !== 'mixed') ? '?' : '';
         $default = $nullable ? ' = null' : '';
-        return ["        public readonly {$nullPfx}{$phpType} \$value{$default},\n", $docblock];
+        if ($phpType === 'mixed') {
+            // `mixed` subsumes null and Path — never write `?mixed`
+            return ["        public readonly mixed \$value{$default},\n", $docblock];
+        }
+        $null = $nullable ? '|null' : '';
+        return ["        public readonly {$phpType}|Path{$null} \$value{$default},\n", $docblock];
     }
 
     private function buildAnnotationValueBody(
@@ -781,7 +788,8 @@ PHP;
                 $pvLines[] = "            new PropertyValue('{$prop['name']}', new ConstantAnnotationValue('{$kind}', (string) \$this->{$propName})),";
             }
             $pvBlock = implode("\n", $pvLines);
-            return "return new RecordAnnotationValue(\n            '{$innerType}',\n{$pvBlock}\n        );";
+            $recordType = $this->qualifiedTypeName($innerType);
+            return "return new RecordAnnotationValue(\n            '{$recordType}',\n{$pvBlock}\n        );";
         }
 
         // Enum type — use the PHP enum backing value.
@@ -811,10 +819,11 @@ PHP;
                 . "            EdmPrimitiveType::Guid       => new ConstantAnnotationValue('Guid', (string) \$this->value),\n"
                 . "            default                       => new ConstantAnnotationValue('String', (string) \$this->value),\n"
                 . "        };";
+            $path = "if (\$this->value instanceof Path) {\n            return \$this->value->toAnnotationValue();\n        }\n        ";
             if ($nullable) {
-                return "if (\$this->value === null) {\n            return null;\n        }\n        " . $match;
+                return "if (\$this->value === null) {\n            return null;\n        }\n        " . $path . $match;
             }
-            return $match;
+            return $path . $match;
         }
 
         // Primitive type (including TypeDefinition-resolved).
@@ -822,10 +831,52 @@ PHP;
         if ($resolvedInner === 'Edm.Boolean') {
             return "return new ConstantAnnotationValue('{$kind}', \$this->value ? 'true' : 'false');";
         }
+        $path = "if (\$this->value instanceof Path) {\n            return \$this->value->toAnnotationValue();\n        }\n        ";
         if ($nullable) {
-            return "if (\$this->value === null) {\n            return null;\n        }\n        return new ConstantAnnotationValue('{$kind}', (string) \$this->value);";
+            return "if (\$this->value === null) {\n            return null;\n        }\n        " . $path . "return new ConstantAnnotationValue('{$kind}', (string) \$this->value);";
         }
-        return "return new ConstantAnnotationValue('{$kind}', (string) \$this->value);";
+        return $path . "return new ConstantAnnotationValue('{$kind}', (string) \$this->value);";
+    }
+
+    /**
+     * A vocabulary type name with its alias replaced by the full namespace
+     * (`CodeList.CodeListSource` → `com.sap.vocabularies.CodeList.v1.CodeListSource`).
+     * A `$metadata` that declares no `edmx:Reference` with that alias could not
+     * resolve the short form.
+     */
+    private function qualifiedTypeName(string $typeName): string
+    {
+        $dot = strrpos($typeName, '.');
+        if ($dot === false) {
+            return $typeName;
+        }
+        $prefix = substr($typeName, 0, $dot);
+        foreach (VocabularyCatalog::default()->getEntries() as $entry) {
+            if ($entry->getAlias() === $prefix) {
+                return $entry->getNamespace() . substr($typeName, $dot);
+            }
+        }
+        return $typeName;
+    }
+
+    /**
+     * Whether the generated constructor accepts a {@see \LaravelUi5\OData\Edm\Annotation\Path}:
+     * a single primitive value (TypeDefinitions resolved, booleans excluded — a marker
+     * term has no value) or an `Edm.PrimitiveType` term.
+     */
+    private function acceptsPath(string $rawType, string $innerType, bool $isCollection, bool $isComplex): bool
+    {
+        if ($isCollection || $isComplex || $rawType === '' || $rawType === 'Edm.Boolean') {
+            return false;
+        }
+        if ($innerType === 'Edm.PrimitiveType') {
+            return true;
+        }
+        if ($this->isEnumType($innerType)) {
+            return false;
+        }
+        $resolved = $this->resolveType($innerType);
+        return $resolved !== 'Edm.Boolean' && isset(self::PRIMITIVE_PHP_TYPES[$resolved]);
     }
 
     // ── Attribute candidate detection ─────────────────────────────────────────

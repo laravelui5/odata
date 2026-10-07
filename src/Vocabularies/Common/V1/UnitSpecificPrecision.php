@@ -6,12 +6,13 @@ namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
 use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\EdmPrimitiveType;
-use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 
 /**
  * The number of significant decimal digits of a currency amount or measured quantity
@@ -37,6 +38,9 @@ final readonly class UnitSpecificPrecision implements TypedAnnotationInterface
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
+        if ($this->value instanceof Path) {
+            return $this->value->toAnnotationValue();
+        }
         return match ($this->type) {
             EdmPrimitiveType::Byte,
             EdmPrimitiveType::SByte,

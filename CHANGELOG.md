@@ -62,6 +62,34 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**Code lists for currencies and units: what UI5's per-row formatting needs.** The `Currency` and
+`Unit` types of UI5 format each row with the decimals of its code, which they look up in a code list
+the service announces. A probe against OpenUI5 1.136.18 confirmed the mechanism against this engine.
+Three things were missing to declare it:
+
+- **`annotateContainer()`.** A new hook on `ODataService`, called in `configure()`, that takes
+  generated terms or plain annotations. Before, nothing could put an annotation on the entity
+  container, although the serializer writes them. `EdmBuilder` (the concrete class) carries the
+  method. It moves to `EdmBuilderInterface` with the next major, because adding it now would break
+  implementers.
+- **`Path` values.** `LaravelUi5\OData\Edm\Annotation\Path` stands in for a constant where a term's
+  value is read per entity: `#[ISOCurrency(new Path('currency'))]` writes
+  `<Annotation … Path="currency"/>`. The generator gives every single-primitive term a
+  `T|Path` value. Regenerated with it: `Measures` (all) and `Common.Text`,
+  `Common.UnitSpecificScale`, `Common.UnitSpecificPrecision`. The other vocabularies follow at their
+  next regeneration.
+- **The `CodeList` vocabulary.** `CurrencyCodes`, `UnitsOfMeasure` (`CodeListSource`: `url`,
+  `collectionPath`), `StandardCode`, `ExternalCode`, `IsConfigurationDeprecationCode`.
+
+The generator itself was repaired on the way. It imported `TypedAnnotationInterface` and
+`TypedAnnotationTrait` from a namespace that no longer exists, `bin/generate.php` pointed at a class
+that does not exist, and record types were written with the vocabulary alias
+(`CodeList.CodeListSource`), which a `$metadata` without the matching `edmx:Reference` cannot resolve.
+They are now fully qualified.
+
+A code-list set needs no paging mechanism. UI5 requests it with `$select` and without `$top` or
+`Prefer`, and the engine pages only when a client asks for it. A test now holds that.
+
 **`odata:cache` keeps every annotation.** The warm path served a `$metadata` without vocabulary
 annotations. `EdmxWriter` wrote `annotations = []` into every generated class and dropped those of
 properties, navigation properties, singletons, function imports, functions, parameters, enum types
@@ -95,7 +123,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 631.
+Additive. The suite is green at 637.
 
 ## [3.0.6] – 2026-09-09
 

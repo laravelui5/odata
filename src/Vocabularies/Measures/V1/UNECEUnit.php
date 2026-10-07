@@ -6,15 +6,16 @@ namespace LaravelUi5\OData\Vocabularies\Measures\V1;
 
 use Attribute;
 use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
- * The unit of measure for this measured quantity, according to the [UN/CEFACT Recommendation 20](http://tfig.unece.org/contents/recommendation-20.htm)
+ * The unit of measure for this measured quantity, according to the [UN/CEFACT Recommendation 20](https://unece.org/trade/documents/2021/06/uncefact-rec20-0)
  * @see TypedAnnotationInterface
  */
 #[Attribute(Attribute::TARGET_PARAMETER | Attribute::TARGET_PROPERTY)]
@@ -31,12 +32,15 @@ final readonly class UNECEUnit implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string $value,
+        public readonly string|Path $value,
         public readonly ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
+        if ($this->value instanceof Path) {
+            return $this->value->toAnnotationValue();
+        }
         return new ConstantAnnotationValue('String', (string) $this->value);
     }
 }

@@ -6,12 +6,13 @@ namespace LaravelUi5\OData\Vocabularies\Measures\V1;
 
 use Attribute;
 use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * The minimum granularity of duration values.
@@ -31,12 +32,15 @@ final readonly class DurationGranularity implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string $value,
+        public readonly string|Path $value,
         public readonly ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
+        if ($this->value instanceof Path) {
+            return $this->value->toAnnotationValue();
+        }
         return new ConstantAnnotationValue('String', (string) $this->value);
     }
 }

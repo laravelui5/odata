@@ -19,7 +19,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use LaravelUi5\OData\Vocabularies\Generator\VocabularyGenerator;
+use LaravelUi5\OData\Console\VocabularyGenerator;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

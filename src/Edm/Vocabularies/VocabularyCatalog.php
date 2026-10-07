@@ -98,6 +98,13 @@ final readonly class VocabularyCatalog implements VocabularyCatalogInterface
                 dependencies: ['Core', 'Common'],
             ),
             new VocabularyEntry(
+                namespace:    'com.sap.vocabularies.CodeList.v1',
+                alias:        'CodeList',
+                uri:          'https://sap.github.io/odata-vocabularies/vocabularies/CodeList.xml',
+                phpNamespace: 'LaravelUi5\\OData\\Vocabularies\\CodeList\\V1',
+                dependencies: ['Core'],
+            ),
+            new VocabularyEntry(
                 namespace:    'com.sap.vocabularies.PersonalData.v1',
                 alias:        'PersonalData',
                 uri:          'https://sap.github.io/odata-vocabularies/vocabularies/PersonalData.xml',

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaravelUi5\OData\Vocabularies\Measures\V1;
+namespace LaravelUi5\OData\Vocabularies\CodeList\V1;
 
 use Attribute;
 use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
@@ -11,23 +11,21 @@ use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 
 /**
- * The unit of measure for this measured quantity, e.g. cm for centimeters or % for percentages
+ * Property containing standard code values
  * @see TypedAnnotationInterface
  */
-#[Attribute(Attribute::TARGET_PARAMETER | Attribute::TARGET_PROPERTY)]
-final readonly class Unit implements TypedAnnotationInterface
+#[Attribute(Attribute::TARGET_PROPERTY)]
+final readonly class StandardCode implements TypedAnnotationInterface
 {
     use TypedAnnotationTrait;
 
-    public const string TERM = 'Org.OData.Measures.V1.Unit';
+    public const string TERM = 'com.sap.vocabularies.CodeList.v1.StandardCode';
 
     /** @var array<class-string<AnnotationTargetInterface>> */
     public const array APPLIES_TO = [
-        FunctionParameterInterface::class,
         PropertyInterface::class,
     ];
 
@@ -41,6 +39,6 @@ final readonly class Unit implements TypedAnnotationInterface
         if ($this->value instanceof Path) {
             return $this->value->toAnnotationValue();
         }
-        return new ConstantAnnotationValue('String', (string) $this->value);
+        return new ConstantAnnotationValue('PropertyPath', (string) $this->value);
     }
 }
