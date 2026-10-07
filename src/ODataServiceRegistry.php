@@ -19,7 +19,7 @@ class ODataServiceRegistry implements ODataServiceRegistryInterface
     public function resolve(string $fullPath): ODataServiceInterface
     {
         if (!$this->service) {
-            $this->service = new ODataService('', config('odata.namespace', 'com.example.odata'));
+            $this->service = new ODataService('', (string) (config('odata.namespace') ?? ODataService::DEFAULT_NAMESPACE));
         }
 
         return $this->service;

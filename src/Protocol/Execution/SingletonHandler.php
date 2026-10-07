@@ -33,7 +33,7 @@ final readonly class SingletonHandler
 
         $response = new ODataResponse(null, 200, [
             'Content-Type' => $this->format->contentType(),
-            'OData-Version' => '4.0',
+            'OData-Version' => ODataVersion::current(),
         ]);
 
         $response->setCallback(static function () use ($context, $entity, $selectKeys): void {

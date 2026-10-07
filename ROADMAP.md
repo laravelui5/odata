@@ -19,8 +19,6 @@ an entry below.
 |:---|:---|:---|
 | **Service document** | Neither `includedInServiceDocument` switch is read, and function imports are never listed | Both honoured; `FunctionImport`'s default moves to `true` |
 | **Cached `$metadata`** | `$metadata` is serialized on every request; `cachedMetadataXMLPath()` is read by nothing | `odata:cache` writes the document and the serializer streams it; the cold path is unchanged |
-| **`OData-Version` header** | The configured version reaches `$metadata` only — every handler writes the header literally | One value, both surfaces |
-| **The `namespace` default** | The published config and the in-code fallback disagree | One default, always read from config |
 
 ## Pending
 
@@ -266,29 +264,6 @@ apostrophe loses it. Harmless in practice; mentioned so the fix does not re-intr
 `query-options/search` documents the current behaviour — including the wildcard leak — since
 2026-09-21.
 
-## [ ] `OP10` `SqlQueryInterface`'s docblock promises consumers that do not exist
-
-Found 2026-09-21 while repairing `resolvers/custom-entity-sets` (Rangliste Punkt 6). The interface
-documents its consumers as:
-
-> - `AbstractEntitySet` — OData custom entity sets
-> - **Core artifact types (Report, AnalyticsSet, ValueHelp) via their own extensions**
-
-The second line is stale twice over. There is **no consumer**: a grep across `core/src` and
-`sdk-host/ui5/Sdk/src` finds the name only in `core/CHANGELOG.md`, in the April-2026 reset entry that
-listed `SqlQueryInterface` among the contracts "still in flight" and pointed at Core's `PLAN.md` — the
-plan that was **retired**, because the analytics substrate moved to the SDK and was redesigned there
-(`core/ROADMAP.md` header). And two of the three named types, `AnalyticsSet` and `ValueHelp`, are
-**SDK** artifact types, not Core's.
-
-So the interface is real and useful — it is what makes `AbstractEntitySet` self-describing — but its
-docblock advertises a shared contract that nobody shares yet.
-
-**Fix.** Name the one consumer that exists, and describe the second as intent rather than fact: the
-SDK's reporting and analytics layer is built on the same idea, and if it adopts this interface the
-docblock says so then. The doc page was corrected on 2026-09-21 and already reads that way; this entry
-is the code half.
-
 ## [ ] `OP11` The service document ignores `includedInServiceDocument` and never lists function imports
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
@@ -344,22 +319,6 @@ That keeps the interface honest, removes a per-request serialization from the wa
 Until those are settled, the two doc pages keep describing the mechanism (docs-are-the-spec); they
 must not describe the path or the command flag, because neither is decided.
 
-## [ ] `OP13` The `version` config never reaches the `OData-Version` response header
-
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
-`config.php:36` (`ODATA_VERSION`, default `'4.0'`) feeds exactly one consumer: the Edmx `Version`
-attribute, via `ODataService:189`. Every handler writes the response header literally —
-`EntitySetHandler:44`, `EntityHandler:61`, `ServiceDocumentHandler:46`, `MetadataHandler:25`,
-`BatchHandler:70,122,143`, `PropertyValueHandler:61,75`, `SingletonHandler:35`,
-`FunctionInvocationHandler:33`. `advanced/configuration:124` says the value is advertised "in
-`$metadata` **and in the `OData-Version` response header**", and that is the state to reach.
-
-**Fix.** One place that answers "which protocol version does this service speak", read from config,
-used by both the Edmx writer and every handler — not eleven string literals. The natural shape is a
-small accessor on the service (or a response helper the handlers already share), so that a future
-4.01 is one config change rather than a grep. Test: a service configured to `4.01` answers `4.01` on
-both surfaces.
-
 ## [ ] `OP14` Key literals are not validated — `Products(abc)` becomes `Products(0)`
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
@@ -414,14 +373,6 @@ never comes.
 that a consumer who hits a truncated body knows what they are looking at and that `odata.streaming =
 false` is the way around it today.
 
-## [ ] `OP17` `immutable_date` maps to `Edm.DateTimeOffset`
-
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
-`ModelDiscovery::mapCastType()` throws `'datetime', 'timestamp', 'immutable_date', 'immutable_datetime'`
-into one arm (`:471`). Laravel's `immutable_date` is a pure date and belongs with `'date'` on the line
-above (`:470`) → `Edm.Date`. One line, plus a discovery test with an `immutable_date` cast.
-`services/model-discovery` already says `Edm.Date`.
-
 ## [ ] `OP20` Morph relations are discovered as ordinary navigations — short-term cure
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
@@ -450,43 +401,6 @@ the polymorphic edge explicitly in a custom entity set.
 
 Outcome is a decision, not necessarily code: "morph relations stay out, here is why, here is what to
 do instead" is an acceptable result and would then go into `services/model-discovery` as guidance.
-
-## [ ] `OP22` `discoverCustomEntitySet()` builds resolvers with `new`, not the container
-
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
-`applyCustomEntitySets()` instantiates every registered resolver with `new $resolverClass()`
-(`ODataService.php:296`). A set with constructor dependencies dies while the schema is built.
-`resolvers/custom-entity-sets` promises container resolution.
-
-**Fix.** `app($resolverClass)` instead of `new`. Additive — a dependency-free set is built exactly as
-before — and it is the expectation Core sets with `ExecutableInvoker`. One caveat to carry into the
-fix: this is the **schema-build path**, so the dependency must be resolvable at that moment; a
-resolver that needs a request is a different bug and should stay one. Test: a custom set with a bound
-dependency.
-
-## [ ] `OP25` The shipped `namespace` default is our own house namespace — and it disagrees with the code fallback
-
-Surfaced 2026-09-18 alongside the same default in Core's `ui5:app` generator, entered 2026-09-20
-(author: record it, discuss separately). `config.php:31` ships
-`'namespace' => env('ODATA_NAMESPACE', 'io.pragmatiqu')`. A host that publishes the config and does
-not think about it serves *our* vendor namespace in its own `$metadata`: every fully-qualified type
-name, every entity-set reference, in the one document a client trusts. `ODataServiceRegistry.php:22`
-disagrees with it — its in-code fallback is `com.example.odata` — so the value a host ends up with
-depends on whether the config file was published.
-
-**Decided 2026-09-21 (author): the default stays `io.pragmatiqu`** — in the config, and as the
-in-code fallback. **Code bewegt sich; Patch.** Two things follow:
-
-- `ODataServiceRegistry:22` stops inventing `com.example.odata`. There is exactly one default value
-  in the package, and it is `io.pragmatiqu`.
-- **The value is read from config in every case.** A host that publishes the config and edits it gets
-  its own namespace; one that does not gets the same value the config file would have given it. No
-  path may bypass `config('odata.namespace')`.
-
-Note the deliberate difference to Core's `ui5:app`, which was decided the other way on the same day
-(no default, loud failure — `core/ROADMAP.md`). The generator writes source code into a customer's
-repository, where a wrong prefix is expensive to undo; the OData namespace is a runtime value a host
-changes in one line of config. Same question, two answers, on purpose.
 
 ## [ ] `OP29` The vocabulary generator has drifted from the committed classes — regenerate deliberately
 
@@ -521,6 +435,100 @@ value shapes. Minor if the defaults land, otherwise major.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP25` The shipped `namespace` default is our own house namespace — and it disagrees with the code fallback (v3.1.0)
+
+Surfaced 2026-09-18 alongside the same default in Core's `ui5:app` generator, entered 2026-09-20
+(author: record it, discuss separately). `config.php:31` ships
+`'namespace' => env('ODATA_NAMESPACE', 'io.pragmatiqu')`. A host that publishes the config and does
+not think about it serves *our* vendor namespace in its own `$metadata`: every fully-qualified type
+name, every entity-set reference, in the one document a client trusts. `ODataServiceRegistry.php:22`
+disagrees with it — its in-code fallback is `com.example.odata` — so the value a host ends up with
+depends on whether the config file was published.
+
+**Decided 2026-09-21 (author): the default stays `io.pragmatiqu`** — in the config, and as the
+in-code fallback. **Code bewegt sich; Patch.** Two things follow:
+
+- `ODataServiceRegistry:22` stops inventing `com.example.odata`. There is exactly one default value
+  in the package, and it is `io.pragmatiqu`.
+- **The value is read from config in every case.** A host that publishes the config and edits it gets
+  its own namespace; one that does not gets the same value the config file would have given it. No
+  path may bypass `config('odata.namespace')`.
+
+Note the deliberate difference to Core's `ui5:app`, which was decided the other way on the same day
+(no default, loud failure — `core/ROADMAP.md`). The generator writes source code into a customer's
+repository, where a wrong prefix is expensive to undo; the OData namespace is a runtime value a host
+changes in one line of config. Same question, two answers, on purpose.
+
+**Done 2026-10-07 (v3.1.0).** `ODataService::DEFAULT_NAMESPACE` is the one value: `config.php` uses it, and so do the default registry and `ODataService::namespace()` when a service declares none. A null config value falls back to it as well. Test: `tests/Service/NamespaceDefaultTest.php`. The two rows left the *Known gaps* table, and the two *planned* markers left `advanced/configuration`.
+
+## [x] `OP22` `discoverCustomEntitySet()` builds resolvers with `new`, not the container (v3.1.0)
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
+`applyCustomEntitySets()` instantiates every registered resolver with `new $resolverClass()`
+(`ODataService.php:296`). A set with constructor dependencies dies while the schema is built.
+`resolvers/custom-entity-sets` promises container resolution.
+
+**Fix.** `app($resolverClass)` instead of `new`. Additive — a dependency-free set is built exactly as
+before — and it is the expectation Core sets with `ExecutableInvoker`. One caveat to carry into the
+fix: this is the **schema-build path**, so the dependency must be resolvable at that moment; a
+resolver that needs a request is a different bug and should stay one. Test: a custom set with a bound
+dependency.
+
+**Done 2026-10-07 (v3.1.0).** All four instantiation sites in `ODataService` use `app()`. Found on the way: an `AbstractEntitySet` with its own constructor must call `parent::__construct()`, which wires the set as its own source. `resolvers/custom-entity-sets` says so now. Test: `tests/Service/CustomEntitySetContainerTest.php`.
+
+## [x] `OP17` `immutable_date` maps to `Edm.DateTimeOffset` (v3.1.0)
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
+`ModelDiscovery::mapCastType()` throws `'datetime', 'timestamp', 'immutable_date', 'immutable_datetime'`
+into one arm (`:471`). Laravel's `immutable_date` is a pure date and belongs with `'date'` on the line
+above (`:470`) → `Edm.Date`. One line, plus a discovery test with an `immutable_date` cast.
+`services/model-discovery` already says `Edm.Date`.
+
+**Done 2026-10-07 (v3.1.0).** Test: `tests/Service/Discovery/CastMappingTest.php`.
+
+## [x] `OP13` The `version` config never reaches the `OData-Version` response header (v3.1.0)
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
+`config.php:36` (`ODATA_VERSION`, default `'4.0'`) feeds exactly one consumer: the Edmx `Version`
+attribute, via `ODataService:189`. Every handler writes the response header literally —
+`EntitySetHandler:44`, `EntityHandler:61`, `ServiceDocumentHandler:46`, `MetadataHandler:25`,
+`BatchHandler:70,122,143`, `PropertyValueHandler:61,75`, `SingletonHandler:35`,
+`FunctionInvocationHandler:33`. `advanced/configuration:124` says the value is advertised "in
+`$metadata` **and in the `OData-Version` response header**", and that is the state to reach.
+
+**Fix.** One place that answers "which protocol version does this service speak", read from config,
+used by both the Edmx writer and every handler — not eleven string literals. The natural shape is a
+small accessor on the service (or a response helper the handlers already share), so that a future
+4.01 is one config change rather than a grep. Test: a service configured to `4.01` answers `4.01` on
+both surfaces.
+
+**Done 2026-10-07 (v3.1.0).** `Protocol\Execution\ODataVersion::current()` is the one source, used by the Edmx builder and every handler's header, `$batch` parts included. Test: `tests/Protocol/Execution/ODataVersionTest.php`.
+
+## [x] `OP10` `SqlQueryInterface`'s docblock promises consumers that do not exist (v3.1.0)
+
+Found 2026-09-21 while repairing `resolvers/custom-entity-sets` (Rangliste Punkt 6). The interface
+documents its consumers as:
+
+> - `AbstractEntitySet` — OData custom entity sets
+> - **Core artifact types (Report, AnalyticsSet, ValueHelp) via their own extensions**
+
+The second line is stale twice over. There is **no consumer**: a grep across `core/src` and
+`sdk-host/ui5/Sdk/src` finds the name only in `core/CHANGELOG.md`, in the April-2026 reset entry that
+listed `SqlQueryInterface` among the contracts "still in flight" and pointed at Core's `PLAN.md` — the
+plan that was **retired**, because the analytics substrate moved to the SDK and was redesigned there
+(`core/ROADMAP.md` header). And two of the three named types, `AnalyticsSet` and `ValueHelp`, are
+**SDK** artifact types, not Core's.
+
+So the interface is real and useful — it is what makes `AbstractEntitySet` self-describing — but its
+docblock advertises a shared contract that nobody shares yet.
+
+**Fix.** Name the one consumer that exists, and describe the second as intent rather than fact: the
+SDK's reporting and analytics layer is built on the same idea, and if it adopts this interface the
+docblock says so then. The doc page was corrected on 2026-09-21 and already reads that way; this entry
+is the code half.
+
+**Done 2026-10-07 (v3.1.0).** Checked again: neither `core/src` nor the SDK uses the interface. The docblock names `AbstractEntitySet` and describes other layers as possible, not existing.
 
 ## [x] `OP24` Property-level discovery attributes require a declared PHP property — which shadows Eloquent's attribute bag (v3.1.0)
 

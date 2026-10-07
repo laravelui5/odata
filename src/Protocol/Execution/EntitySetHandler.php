@@ -42,7 +42,7 @@ final readonly class EntitySetHandler
 
         $headers = [
             'Content-Type' => $this->format->contentType(),
-            'OData-Version' => '4.0',
+            'OData-Version' => ODataVersion::current(),
         ];
 
         if ($plan->maxPageSize !== null) {

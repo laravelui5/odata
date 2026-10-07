@@ -28,7 +28,7 @@ return [
     /*
      * The default XML namespace for the $metadata document.
      */
-    'namespace' => env('ODATA_NAMESPACE', 'io.pragmatiqu'),
+    'namespace' => env('ODATA_NAMESPACE', LaravelUi5\OData\ODataService::DEFAULT_NAMESPACE),
 
     /*
      * The OData protocol version advertised in $metadata.

@@ -22,7 +22,7 @@ final readonly class MetadataHandler
 
         $response = new ODataResponse(null, 200, [
             'Content-Type' => 'application/xml;charset=utf-8',
-            'OData-Version' => '4.0',
+            'OData-Version' => ODataVersion::current(),
         ]);
 
         $response->setCallback(static function () use ($xml): void {

@@ -67,7 +67,7 @@ final readonly class BatchHandler
 
         $response = new ODataResponse(null, 200, [
             'Content-Type' => 'application/json;odata.metadata=minimal;charset=utf-8',
-            'OData-Version' => '4.0',
+            'OData-Version' => ODataVersion::current(),
         ]);
 
         $schema  = $this->schema;
@@ -119,7 +119,7 @@ final readonly class BatchHandler
 
         $response = new ODataResponse(null, 200, [
             'Content-Type' => 'multipart/mixed; boundary=' . $responseBoundary,
-            'OData-Version' => '4.0',
+            'OData-Version' => ODataVersion::current(),
         ]);
 
         $response->setCallback(static function () use ($requests, $schema, $service, $gate, $request, $responseBoundary): void {
@@ -140,7 +140,7 @@ final readonly class BatchHandler
 
                 if ($bodyJson !== '') {
                     echo 'Content-Type: ' . ($innerResult['headers']['content-type'] ?? (new WireFormat())->contentType()) . "\r\n";
-                    echo "OData-Version: 4.0\r\n";
+                    echo 'OData-Version: ' . ODataVersion::current() . "\r\n";
                     echo "\r\n";
                     echo $bodyJson;
                 } else {

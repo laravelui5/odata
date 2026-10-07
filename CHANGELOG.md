@@ -62,6 +62,20 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**Small corrections.**
+- **`OData-Version` follows the config.** `odata.version` reached `$metadata` only, and eleven
+  handlers wrote `4.0` literally. Both now read `ODataVersion::current()`, so a 4.01 service says so
+  on every response, `$batch` parts included.
+- **One `namespace` default.** The published config said `io.pragmatiqu`, the in-code fallback
+  `com.example.odata`, so a host's namespace depended on whether it had published the config. Both
+  read `ODataService::DEFAULT_NAMESPACE` now, a null config value falls back to it too, and a
+  service without a namespace of its own takes the configured one instead of an empty string.
+- **`immutable_date` maps to `Edm.Date`**, like `date`. It was a `DateTimeOffset`.
+- **Custom entity sets are built by the container.** `discoverCustomEntitySet()` used `new`, so a
+  set with constructor dependencies died while the schema was built. An `AbstractEntitySet` with its
+  own constructor calls `parent::__construct()`. The docs say so now.
+- **`SqlQueryInterface`'s docblock** no longer names Core consumers that do not exist.
+
 **`Edm.Binary` goes out base64url-encoded.** Discovery maps `blob`/`binary`/`varbinary` to
 `Edm.Binary`, but the raw bytes went to `json_encode`, which fails on anything that is not UTF-8. The
 response did not come out wrong, it did not come out at all. Binary values are now written as
@@ -202,7 +216,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 667.
+Additive. The suite is green at 675.
 
 ## [3.0.6] – 2026-09-09
 

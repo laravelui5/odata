@@ -58,6 +58,13 @@ use LaravelUi5\OData\Service\Resolver\ResolverMap;
  */
 class ODataService implements ODataServiceInterface
 {
+    /**
+     * The one default for `odata.namespace` — the published config and every code
+     * fallback read this, so a host gets the same namespace whether or not it
+     * published the config file.
+     */
+    public const string DEFAULT_NAMESPACE = 'io.pragmatiqu';
+
     private ?RuntimeSchemaInterface $cachedSchema = null;
     private ?ModelDiscovery $discovery = null;
 
@@ -81,7 +88,9 @@ class ODataService implements ODataServiceInterface
 
     public function namespace(): string
     {
-        return $this->namespaceValue;
+        return $this->namespaceValue !== ''
+            ? $this->namespaceValue
+            : (string) (config('odata.namespace') ?? self::DEFAULT_NAMESPACE);
     }
 
     public function cachedMetadataXMLPath(): ?string
@@ -192,7 +201,7 @@ class ODataService implements ODataServiceInterface
         $this->containerAnnotations = [];
         $this->discovery            = null;
 
-        $edmBuilder = (new EdmBuilder())->version(config('odata.version', '4.0'));
+        $edmBuilder = (new EdmBuilder())->version(\LaravelUi5\OData\Protocol\Execution\ODataVersion::current());
         $builder    = $this->configure($edmBuilder);
 
         // Applied to the concrete builder, which a decorating configure() wraps rather
@@ -329,7 +338,7 @@ class ODataService implements ODataServiceInterface
         $namespace = $this->namespace();
 
         foreach ($this->customEntitySets as $resolverClass) {
-            $instance   = new $resolverClass();
+            $instance   = app($resolverClass);   // container-built: a set may have constructor dependencies
             $entityType = $instance->entityType($namespace);
             $setName    = $instance->entitySetName();
 
@@ -347,7 +356,7 @@ class ODataService implements ODataServiceInterface
         $namespace = $this->namespace();
 
         foreach ($this->customEntitySets as $resolverClass) {
-            $instance = new $resolverClass();
+            $instance = app($resolverClass);
 
             if (!($instance instanceof VirtualExpandResolverInterface)) {
                 continue;
@@ -381,7 +390,7 @@ class ODataService implements ODataServiceInterface
         $discoveredTypes = $this->discovery?->getDiscoveredTypeNames() ?? [];
 
         foreach ($this->customEntitySets as $resolverClass) {
-            $instance = new $resolverClass();
+            $instance = app($resolverClass);
 
             if (!($instance instanceof VirtualExpandResolverInterface)) {
                 continue;
@@ -417,7 +426,7 @@ class ODataService implements ODataServiceInterface
         $container = $map->getEdmx()->getEntityContainer();
 
         foreach ($this->customEntitySets as $resolverClass) {
-            $instance = new $resolverClass();
+            $instance = app($resolverClass);
             $setName  = $instance->entitySetName();
             $set      = $container->getEntitySet($setName);
 

@@ -43,7 +43,7 @@ final readonly class ServiceDocumentHandler
 
         $response = new ODataResponse(null, 200, [
             'Content-Type' => 'application/json;odata.metadata=minimal;charset=utf-8',
-            'OData-Version' => '4.0',
+            'OData-Version' => ODataVersion::current(),
         ]);
 
         $response->setCallback(static function () use ($context, $entries): void {

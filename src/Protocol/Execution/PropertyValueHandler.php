@@ -64,7 +64,7 @@ final readonly class PropertyValueHandler
 
             $response = new ODataResponse(null, 200, [
                 'Content-Type' => $isBinary ? 'application/octet-stream' : 'text/plain;charset=utf-8',
-                'OData-Version' => '4.0',
+                'OData-Version' => ODataVersion::current(),
             ]);
             $response->setCallback(static function () use ($value): void {
                 echo is_bool($value) ? ($value ? 'true' : 'false') : (string) $value;
@@ -81,7 +81,7 @@ final readonly class PropertyValueHandler
 
         $response = new ODataResponse(null, 200, [
             'Content-Type' => $this->format->contentType(),
-            'OData-Version' => '4.0',
+            'OData-Version' => ODataVersion::current(),
         ]);
 
         $response->setCallback(static function () use ($context, $value): void {

@@ -602,8 +602,8 @@ final class ModelDiscovery
             'float', 'double' => EdmPrimitiveType::Double,
             'decimal' => EdmPrimitiveType::Decimal,
             'boolean', 'bool' => EdmPrimitiveType::Boolean,
-            'date' => EdmPrimitiveType::Date,
-            'datetime', 'timestamp', 'immutable_date', 'immutable_datetime'
+            'date', 'immutable_date' => EdmPrimitiveType::Date,
+            'datetime', 'timestamp', 'immutable_datetime'
                 => EdmPrimitiveType::DateTimeOffset,
             'string' => EdmPrimitiveType::String,
             'array', 'json', 'collection', 'object'
