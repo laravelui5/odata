@@ -62,6 +62,46 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**`IEEE754Compatible=true` is honoured.** UI5's V4 model sends it on every request, in the `Accept`
+header of the request or of each `$batch` part. It asks for `Edm.Int64` and `Edm.Decimal` as JSON
+strings, because a JavaScript number cannot hold them exactly: a `decimal(19,6)` has more digits
+than a double, and an Int64 above 2^53 gets corrupted. The engine ignored the parameter. It now
+writes both as strings when asked and echoes the parameter in the `Content-Type`. Without the
+parameter nothing changes. Floats are written in their shortest exact form and never in exponent
+notation. Driver strings (MySQL, PostgreSQL hand decimals over as strings) pass untouched.
+
+Along the way:
+- **Expanded rows are coerced too.** Until now `RowCoercion` only reached the top-level row.
+  Dates, enums and now numbers inside `$expand` are coerced with their target type's rules, at
+  any depth.
+- **Singletons and property values are coerced as well.** `/Set(1)/prop` and singletons skipped
+  the coercion entirely.
+- **`$batch` reads each part's headers.** A multipart part's own headers and a JSON batch
+  request's `headers` object were ignored. Their `Accept` now decides that part's format, and each
+  inner response reports its own `Content-Type`.
+
+**`odata:cache` reproduces the whole Edmx.** Beyond the annotations, the warm path had lost or
+broken:
+- **Complex types:** the cache did not load at all (`Call to undefined method …::instance()`).
+- **Type definitions:** dropped; a property typed by one fell back to `Edm.String`.
+- **Base types:** dropped, together with `IsAbstract` and `OpenType`.
+- **Keys:** referenced by position instead of by name. A key that was not the first column
+  pointed at the wrong property.
+- **Functions:** the bound, composable, collection-return, return-nullable and `EntitySetPath`
+  flags were lost, as were the collection, nullable and facets of parameters. Non-primitive
+  parameter and return types became `Edm.String`.
+- **Function imports:** lost their entity set and their service-document flag.
+- **Singletons:** lost their navigation bindings.
+- **Navigation properties:** lost containment and `OnDelete`.
+
+The generated types now resolve their base type and fall back to it for key, properties and
+navigation properties, as the cold types do. Complex types are singletons with deferred
+navigation wiring, like entity types. A test asserts identical `$metadata` warm and cold for a
+model that uses every one of these.
+
+**`$metadata` no longer writes `Nullable` where it does not belong.** A function parameter with
+facets got `Nullable` twice. A `TypeDefinition` got one at all, which CSDL does not allow.
+
 **Code lists for currencies and units: what UI5's per-row formatting needs.** The `Currency` and
 `Unit` types of UI5 format each row with the decimals of its code, which they look up in a code list
 the service announces. A probe against OpenUI5 1.136.18 confirmed the mechanism against this engine.
@@ -123,7 +163,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 637.
+Additive. The suite is green at 650.
 
 ## [3.0.6] – 2026-09-09
 

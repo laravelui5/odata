@@ -139,7 +139,7 @@ final readonly class BatchHandler
                 echo "HTTP/1.1 {$status} {$statusText}\r\n";
 
                 if ($bodyJson !== '') {
-                    echo "Content-Type: application/json;odata.metadata=minimal;charset=utf-8\r\n";
+                    echo 'Content-Type: ' . ($innerResult['headers']['content-type'] ?? (new WireFormat())->contentType()) . "\r\n";
                     echo "OData-Version: 4.0\r\n";
                     echo "\r\n";
                     echo $bodyJson;
@@ -210,10 +210,24 @@ final readonly class BatchHandler
                 continue;
             }
 
+            // The inner request's own headers follow the request line, up to a blank line.
+            // UI5 puts `Accept: …;IEEE754Compatible=true` here, not on the $batch envelope.
+            $headers = [];
+            foreach (array_slice($lines, 1) as $headerLine) {
+                if (trim($headerLine) === '') {
+                    break;
+                }
+                if (str_contains($headerLine, ':')) {
+                    [$headerName, $headerValue] = explode(':', $headerLine, 2);
+                    $headers[strtolower(trim($headerName))] = trim($headerValue);
+                }
+            }
+
             $requests[] = [
-                'id'     => (string) $id,
-                'method' => strtoupper($m[1]),
-                'url'    => trim($m[2]),
+                'id'      => (string) $id,
+                'method'  => strtoupper($m[1]),
+                'url'     => trim($m[2]),
+                'headers' => $headers,
             ];
 
             $id++;
@@ -324,15 +338,16 @@ final readonly class BatchHandler
             // Same read-authz gate as the direct path: a hard denial throws ForbiddenException
             // (caught below → a per-inner 403 entry); a gated $expand is pruned + reported.
             $plan     = (new QueryPlanner)->plan($planRequest, $schema);
-            $response = $gate->execute($plan, $request, $schema, $service->endpoint());
+            $response = $gate->execute($plan, $request, $schema, $service->endpoint(), self::innerWireFormat($requestData, $request));
 
             ob_start();
             $response->sendContent();
             $responseBody = ob_get_clean();
 
             $result = [
-                'id'     => $requestData['id'],
-                'status' => $response->getStatusCode(),
+                'id'      => $requestData['id'],
+                'status'  => $response->getStatusCode(),
+                'headers' => ['content-type' => (string) $response->headers->get('Content-Type')],
             ];
 
             $decoded = json_decode($responseBody, true);
@@ -351,6 +366,23 @@ final readonly class BatchHandler
                 'body'   => ['error' => $e->toError()],
             ];
         }
+    }
+
+    /**
+     * The format an inner request asked for: its own `Accept` (a multipart part's header,
+     * or the `headers` object of a JSON batch request), else the envelope's.
+     *
+     * @param array{headers?: array<string, string>} $requestData
+     */
+    private static function innerWireFormat(array $requestData, Request $request): WireFormat
+    {
+        foreach ($requestData['headers'] ?? [] as $name => $value) {
+            if (strtolower((string) $name) === 'accept') {
+                return WireFormat::fromAccept((string) $value);
+            }
+        }
+
+        return WireFormat::fromAccept($request->header('Accept'));
     }
 
     private static function httpStatusText(int $status): string

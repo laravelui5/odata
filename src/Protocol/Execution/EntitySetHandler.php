@@ -25,6 +25,7 @@ final readonly class EntitySetHandler
     public function __construct(
         private RuntimeSchemaInterface $schema,
         private string $serviceRoot,
+        private WireFormat $format = new WireFormat(),
     ) {}
 
     public function handle(EntitySetQueryPlan $plan): ODataResponse
@@ -40,7 +41,7 @@ final readonly class EntitySetHandler
             : null;
 
         $headers = [
-            'Content-Type' => 'application/json;odata.metadata=minimal;charset=utf-8',
+            'Content-Type' => $this->format->contentType(),
             'OData-Version' => '4.0',
         ];
 
@@ -53,7 +54,7 @@ final readonly class EntitySetHandler
         $count       = $plan->count ? $resolver->count($plan) : null;
         $serviceRoot = $this->serviceRoot;
         $setName     = $plan->target->getName();
-        $coercion    = new RowCoercion($plan->target->getEntityType());
+        $coercion    = new RowCoercion($plan->target->getEntityType(), $this->format);
 
         $response->setCallback(static function () use ($context, $resolver, $plan, $selectKeys, $count, $pageSize, $serviceRoot, $setName, $coercion): void {
             $generator = $resolver->resolve($plan);

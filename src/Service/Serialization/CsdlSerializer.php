@@ -303,7 +303,7 @@ final readonly class CsdlSerializer
 
         $facets = $typeDef->getFacets();
         if ($facets !== null) {
-            $this->appendFacetAttributes($el, $facets);
+            $this->appendFacetAttributes($el, $facets, withNullable: false);
         }
 
         $this->appendAnnotations($el, $typeDef);
@@ -514,7 +514,7 @@ final readonly class CsdlSerializer
 
         $facets = $parameter->getFacets();
         if ($facets !== null) {
-            $this->appendFacetAttributes($el, $facets);
+            $this->appendFacetAttributes($el, $facets, withNullable: false);
         }
 
         $this->appendAnnotations($el, $parameter);
@@ -531,8 +531,13 @@ final readonly class CsdlSerializer
     private function appendFacetAttributes(
         SimpleXMLElement $el,
         \LaravelUi5\OData\Edm\Contracts\Type\TypeFacetsInterface $facets,
+        bool $withNullable = true,
     ): void {
-        $el->addAttribute('Nullable', $facets->isNullable() ? 'true' : 'false');
+        // A parameter carries its own Nullable; a TypeDefinition may not carry one at all
+        // (CSDL §11). Only a property takes it from its facets.
+        if ($withNullable) {
+            $el->addAttribute('Nullable', $facets->isNullable() ? 'true' : 'false');
+        }
 
         if ($facets->getMaxLength() !== null) {
             $el->addAttribute(

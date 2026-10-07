@@ -26,6 +26,7 @@ final readonly class EntityHandler
     public function __construct(
         private RuntimeSchemaInterface $schema,
         private string $serviceRoot,
+        private WireFormat $format = new WireFormat(),
     ) {}
 
     public function handle(EntityQueryPlan $plan): ODataResponse
@@ -54,10 +55,10 @@ final readonly class EntityHandler
         }
 
         $selectKeys = SelectHelper::allowedKeys($plan->select, $plan->expand);
-        $entity     = (new RowCoercion($plan->target->getEntityType()))->apply($entity);
+        $entity     = (new RowCoercion($plan->target->getEntityType(), $this->format))->apply($entity);
 
         $response = new ODataResponse(null, 200, [
-            'Content-Type' => 'application/json;odata.metadata=minimal;charset=utf-8',
+            'Content-Type' => $this->format->contentType(),
             'OData-Version' => '4.0',
         ]);
 

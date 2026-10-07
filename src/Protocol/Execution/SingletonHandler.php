@@ -20,18 +20,19 @@ final readonly class SingletonHandler
     public function __construct(
         private RuntimeSchemaInterface $schema,
         private string $serviceRoot,
+        private WireFormat $format = new WireFormat(),
     ) {}
 
     public function handle(SingletonInterface $singleton, SelectList $select): ODataResponse
     {
         $resolver = $this->schema->getSingletonResolver($singleton);
-        $entity   = $resolver->resolve();
+        $entity   = (new RowCoercion($singleton->getEntityType(), $this->format))->apply($resolver->resolve());
         $context  = $this->serviceRoot . '$metadata#' . $singleton->getName();
 
         $selectKeys = SelectHelper::allowedKeys($select);
 
         $response = new ODataResponse(null, 200, [
-            'Content-Type' => 'application/json;odata.metadata=minimal;charset=utf-8',
+            'Content-Type' => $this->format->contentType(),
             'OData-Version' => '4.0',
         ]);
 

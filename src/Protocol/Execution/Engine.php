@@ -27,6 +27,7 @@ final readonly class Engine
     public function __construct(
         private RuntimeSchemaInterface $schema,
         private string $serviceRoot,
+        private WireFormat $format = new WireFormat(),
     ) {}
 
     public function execute(QueryPlan $plan): ODataResponse
@@ -34,11 +35,11 @@ final readonly class Engine
         return match (true) {
             $plan instanceof MetadataQueryPlan        => (new MetadataHandler)->handle($plan),
             $plan instanceof ServiceDocumentQueryPlan => (new ServiceDocumentHandler($this->serviceRoot))->handle($plan),
-            $plan instanceof EntitySetQueryPlan       => (new EntitySetHandler($this->schema, $this->serviceRoot))->handle($plan),
-            $plan instanceof EntityQueryPlan          => (new EntityHandler($this->schema, $this->serviceRoot))->handle($plan),
+            $plan instanceof EntitySetQueryPlan       => (new EntitySetHandler($this->schema, $this->serviceRoot, $this->format))->handle($plan),
+            $plan instanceof EntityQueryPlan          => (new EntityHandler($this->schema, $this->serviceRoot, $this->format))->handle($plan),
             $plan instanceof FunctionInvocationPlan   => (new FunctionInvocationHandler($this->schema, $this->serviceRoot))->handle($plan),
-            $plan instanceof SingletonQueryPlan       => (new SingletonHandler($this->schema, $this->serviceRoot))->handle($plan->singleton, $plan->select),
-            $plan instanceof PropertyValuePlan       => (new PropertyValueHandler($this->schema, $this->serviceRoot))->handle($plan),
+            $plan instanceof SingletonQueryPlan       => (new SingletonHandler($this->schema, $this->serviceRoot, $this->format))->handle($plan->singleton, $plan->select),
+            $plan instanceof PropertyValuePlan       => (new PropertyValueHandler($this->schema, $this->serviceRoot, $this->format))->handle($plan),
 
             default => throw new BadRequestException(
                 'unsupported_plan',

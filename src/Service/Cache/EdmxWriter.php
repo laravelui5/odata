@@ -26,6 +26,7 @@ use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeFacetsInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeInterface;
 
 /**
@@ -109,13 +110,53 @@ final class EdmxWriter
 
     private function writeEntityType(EntityTypeInterface $type, array $typeMap): void
     {
-        $className = $type->getName();
-        $ns = $this->namespace . '\\Types';
+        $this->writeStructuredType($type, $typeMap, isEntity: true);
+    }
 
-        $props = $this->generateProperties($type->getDeclaredProperties(), $typeMap);
-        $navProps = $this->generateNavigationProperties($type->getDeclaredNavigationProperties(), $typeMap);
-        $key = $this->generateKeyReferences($type->getKey());
+    private function writeComplexType(ComplexTypeInterface $type, array $typeMap): void
+    {
+        $this->writeStructuredType($type, $typeMap, isEntity: false);
+    }
+
+    /**
+     * Entity and complex types share one shape: a singleton (so circular
+     * references between types resolve), navigation properties wired after all
+     * types exist, and the base type resolved lazily — the same lookups the cold
+     * `EntityType` / `ComplexType` answer, including the fall-back to the base
+     * type for key, properties and navigation properties.
+     */
+    private function writeStructuredType(EntityTypeInterface|ComplexTypeInterface $type, array $typeMap, bool $isEntity): void
+    {
+        $className = $type->getName();
+        $ns        = $this->namespace . '\\Types';
+        $interface = $isEntity ? 'EntityTypeInterface' : 'ComplexTypeInterface';
+
+        $props       = $this->generateProperties($type->getDeclaredProperties(), $typeMap);
+        $navProps    = $this->generateNavigationProperties($type->getDeclaredNavigationProperties(), $typeMap);
         $annotations = $this->generateAnnotationsCode($type->getAnnotations());
+        $baseType    = $type->getBaseType() !== null
+            ? '\\' . $this->namespace . '\\Types\\' . ($typeMap[$type->getBaseType()->getQualifiedName()] ?? $type->getBaseType()->getName()) . '::instance()'
+            : 'null';
+
+        $entityMembers = '';
+        $keyInit       = '';
+        if ($isEntity) {
+            /** @var EntityTypeInterface $type */
+            $keyInit = "        \$this->key = [{$this->generateKeyReferences($type)}];";
+            $entityMembers = <<<PHP
+
+                    /** @var list<PropertyInterface> */
+                    private array \$key;
+
+                    public function hasStream(): bool { return {$this->bool($type->hasStream())}; }
+
+                    public function getKey(): array
+                    {
+                        return \$this->key !== [] ? \$this->key : (\$this->getBaseType()?->getKey() ?? []);
+                    }
+
+        PHP;
+        }
 
         $code = <<<PHP
         <?php
@@ -127,20 +168,17 @@ final class EdmxWriter
         use LaravelUi5\OData\Edm\EdmPrimitiveType;
         use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
         use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-        use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+        use LaravelUi5\OData\Edm\Contracts\Type\\{$interface};
         use LaravelUi5\OData\Edm\HasAnnotations;
         use LaravelUi5\OData\Edm\Property\NavigationProperty;
         use LaravelUi5\OData\Edm\Property\Property;
         use LaravelUi5\OData\Edm\Type\PrimitiveType;
 
-        final class {$className} implements EntityTypeInterface
+        final class {$className} implements {$interface}
         {
             use HasAnnotations;
 
             private static ?self \$instance = null;
-
-            /** @var list<PropertyInterface> */
-            private array \$key;
 
             /** @var list<PropertyInterface> */
             private array \$declaredProperties;
@@ -149,13 +187,13 @@ final class EdmxWriter
             private array \$declaredNavigationProperties;
 
             private bool \$initialized = false;
-
+        {$entityMembers}
             public function __construct()
             {
                 \$this->annotations = {$annotations};
         {$props}
                 \$this->declaredNavigationProperties = [];
-                \$this->key = [{$key}];
+        {$keyInit}
             }
 
             public static function instance(): self
@@ -173,11 +211,9 @@ final class EdmxWriter
 
             public function getName(): string { return '{$this->e($type->getName())}'; }
             public function getQualifiedName(): string { return '{$this->e($type->getQualifiedName())}'; }
-            public function getBaseType(): ?EntityTypeInterface { return null; }
-            public function isAbstract(): bool { return false; }
-            public function isOpen(): bool { return false; }
-            public function hasStream(): bool { return {$this->bool($type->hasStream())}; }
-            public function getKey(): array { return \$this->key; }
+            public function getBaseType(): ?{$interface} { return {$baseType}; }
+            public function isAbstract(): bool { return {$this->bool($type->isAbstract())}; }
+            public function isOpen(): bool { return {$this->bool($type->isOpen())}; }
             public function getDeclaredProperties(): array { return \$this->declaredProperties; }
 
             public function getProperty(string \$name): ?PropertyInterface
@@ -185,7 +221,7 @@ final class EdmxWriter
                 foreach (\$this->declaredProperties as \$p) {
                     if (\$p->getName() === \$name) return \$p;
                 }
-                return null;
+                return \$this->getBaseType()?->getProperty(\$name);
             }
 
             public function getDeclaredNavigationProperties(): array { return \$this->declaredNavigationProperties; }
@@ -195,73 +231,9 @@ final class EdmxWriter
                 foreach (\$this->declaredNavigationProperties as \$p) {
                     if (\$p->getName() === \$name) return \$p;
                 }
-                return null;
+                return \$this->getBaseType()?->getNavigationProperty(\$name);
             }
 
-            public function getAnnotations(): array { return \$this->annotations; }
-        }
-
-        PHP;
-
-        $this->writeFile($this->outputDir . '/Types/' . $className . '.php', $this->dedent($code));
-        $this->emit("  Types/{$className}.php");
-    }
-
-    // ── Complex type generation ─────────────────────────────────────────────
-
-    private function writeComplexType(ComplexTypeInterface $type, array $typeMap): void
-    {
-        $className = $type->getName();
-        $ns = $this->namespace . '\\Types';
-
-        $props = $this->generateProperties($type->getDeclaredProperties(), $typeMap);
-        $annotations = $this->generateAnnotationsCode($type->getAnnotations());
-
-        $code = <<<PHP
-        <?php
-
-        declare(strict_types=1);
-
-        namespace {$ns};
-
-        use LaravelUi5\OData\Edm\EdmPrimitiveType;
-        use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
-        use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-        use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
-        use LaravelUi5\OData\Edm\HasAnnotations;
-        use LaravelUi5\OData\Edm\Property\Property;
-        use LaravelUi5\OData\Edm\Type\PrimitiveType;
-
-        final readonly class {$className} implements ComplexTypeInterface
-        {
-            use HasAnnotations;
-
-            /** @var list<PropertyInterface> */
-            private array \$declaredProperties;
-
-            public function __construct()
-            {
-                \$this->annotations = {$annotations};
-        {$props}
-            }
-
-            public function getName(): string { return '{$this->e($type->getName())}'; }
-            public function getQualifiedName(): string { return '{$this->e($type->getQualifiedName())}'; }
-            public function getBaseType(): ?ComplexTypeInterface { return null; }
-            public function isAbstract(): bool { return false; }
-            public function isOpen(): bool { return false; }
-            public function getDeclaredProperties(): array { return \$this->declaredProperties; }
-
-            public function getProperty(string \$name): ?PropertyInterface
-            {
-                foreach (\$this->declaredProperties as \$p) {
-                    if (\$p->getName() === \$name) return \$p;
-                }
-                return null;
-            }
-
-            public function getDeclaredNavigationProperties(): array { return []; }
-            public function getNavigationProperty(string \$name): ?NavigationPropertyInterface { return null; }
             public function getAnnotations(): array { return \$this->annotations; }
         }
 
@@ -355,14 +327,29 @@ final class EdmxWriter
         foreach ($container->getSingletons() as $singleton) {
             $typeClass = $typeMap[$singleton->getEntityType()->getQualifiedName()] ?? $singleton->getEntityType()->getName();
             $typeFqcn = $this->namespace . '\\Types\\' . $typeClass;
-            $singletonInits[] = "            new \\LaravelUi5\\OData\\Edm\\Container\\Singleton('{$this->e($singleton->getName())}', \\{$typeFqcn}::instance(), annotations: {$this->generateAnnotationsCode($singleton->getAnnotations())}),";
+            $singletonBindings = implode(', ', array_map(
+                fn ($b) => sprintf(
+                    'new \\LaravelUi5\\OData\\Edm\\Container\\NavigationPropertyBinding(%s, %s)',
+                    $this->literal($b->getPath()),
+                    $this->literal($b->getTarget()),
+                ),
+                $singleton->getNavigationPropertyBindings(),
+            ));
+            $singletonInits[] = "            new \\LaravelUi5\\OData\\Edm\\Container\\Singleton({$this->literal($singleton->getName())}, \\{$typeFqcn}::instance(), [{$singletonBindings}], {$this->generateAnnotationsCode($singleton->getAnnotations())}),";
         }
 
         // Build function import instantiations
         $funcImportInits = [];
         foreach ($container->getFunctionImports() as $import) {
-            $funcCode = $this->generateFunctionCode($import->getFunction());
-            $funcImportInits[] = "            new \\LaravelUi5\\OData\\Edm\\Container\\FunctionImport('{$this->e($import->getName())}', {$funcCode}, annotations: {$this->generateAnnotationsCode($import->getAnnotations())}),";
+            $funcCode = $this->generateFunctionCode($import->getFunction(), $typeMap);
+            $funcImportInits[] = sprintf(
+                '            new \\LaravelUi5\\OData\\Edm\\Container\\FunctionImport(%s, %s, %s, %s, %s),',
+                $this->literal($import->getName()),
+                $funcCode,
+                $this->literal($import->getEntitySet()),
+                $this->bool($import->isIncludedInServiceDocument()),
+                $this->generateAnnotationsCode($import->getAnnotations()),
+            );
         }
 
         // Build entity type instantiations for schema
@@ -387,19 +374,25 @@ final class EdmxWriter
             $enumTypeInits[] = '            ' . $this->generateEnumTypeCode($type) . ',';
         }
 
+        // Build type definition instantiations for schema
+        $typeDefInits = [];
+        foreach ($schema?->getTypeDefinitions() ?? [] as $typeDef) {
+            $typeDefInits[] = '            ' . $this->generateTypeDefinitionCode($typeDef) . ',';
+        }
+
         // Build function instantiations for schema
         $funcInits = [];
         if ($schema) {
             foreach ($schema->getFunctions() as $name => $overloads) {
                 foreach ($overloads as $func) {
-                    $funcInits[] = '            ' . $this->generateFunctionCode($func) . ',';
+                    $funcInits[] = '            ' . $this->generateFunctionCode($func, $typeMap) . ',';
                 }
             }
         }
 
         // Build initNavigationProperties calls for all entity types
         $navInitCalls = [];
-        foreach ($this->allEntityTypes() as $type) {
+        foreach ([...$this->allEntityTypes(), ...$this->allComplexTypes()] as $type) {
             $typeClass = $this->namespace . '\\Types\\' . $type->getName();
             if ($type->getDeclaredNavigationProperties() !== []) {
                 $navInitCalls[] = "            \\{$typeClass}::instance()->initNavigationProperties();";
@@ -422,6 +415,7 @@ final class EdmxWriter
         $complexTypeBlock = implode("\n", $complexTypeInits);
         $enumTypeBlock = implode("\n", $enumTypeInits);
         $funcBlock = implode("\n", $funcInits);
+        $typeDefBlock = implode("\n", $typeDefInits);
         $navInitBlock = implode("\n", $navInitCalls);
 
         $code = <<<PHP
@@ -478,6 +472,9 @@ final class EdmxWriter
                         ],
                         enumTypes: [
         {$enumTypeBlock}
+                        ],
+                        typeDefinitions: [
+        {$typeDefBlock}
                         ],
                         functions: [
         {$funcBlock}
@@ -598,6 +595,12 @@ final class EdmxWriter
                 $constraints = $this->generateArrayLiteral($nav->getReferentialConstraints());
                 $args[] = "referentialConstraints: {$constraints}";
             }
+            if ($nav->isContainmentTarget()) {
+                $args[] = 'isContainmentTarget: true';
+            }
+            if ($nav->getOnDeleteAction() !== null) {
+                $args[] = "onDeleteAction: {$this->literal($nav->getOnDeleteAction())}";
+            }
             if ($nav->getAnnotations() !== []) {
                 $args[] = 'annotations: ' . $this->generateAnnotationsCode($nav->getAnnotations());
             }
@@ -611,19 +614,21 @@ final class EdmxWriter
     }
 
     /**
-     * Generate key property references (indexes into declaredProperties).
-     *
-     * @param list<PropertyInterface> $keyProps
+     * Key property references by name — indexes into declaredProperties, wherever
+     * the key columns sit among them.
      */
-    private function generateKeyReferences(array $keyProps): string
+    private function generateKeyReferences(EntityTypeInterface $type): string
     {
-        if ($keyProps === []) {
-            return '';
-        }
-
-        $refs = [];
-        foreach ($keyProps as $i => $kp) {
-            $refs[] = "\$this->declaredProperties[{$i}]";
+        // Only the type's own key; a derived type with none falls back to its base at runtime.
+        $declared = $type->getDeclaredProperties();
+        $refs     = [];
+        foreach ($type->getKey() as $keyProp) {
+            foreach ($declared as $i => $prop) {
+                if ($prop->getName() === $keyProp->getName()) {
+                    $refs[] = "\$this->declaredProperties[{$i}]";
+                    continue 2;
+                }
+            }
         }
 
         return implode(', ', $refs);
@@ -656,21 +661,46 @@ final class EdmxWriter
     {
         if ($type instanceof \LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface) {
             $enumCase = $type->getPrimitiveType()->name;
-            return "new PrimitiveType(EdmPrimitiveType::{$enumCase})";
+            return "new \\LaravelUi5\\OData\\Edm\\Type\\PrimitiveType(\\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::{$enumCase})";
         }
 
         if ($type instanceof EnumTypeInterface) {
             return $this->generateEnumTypeCode($type);
         }
 
+        if ($type instanceof TypeDefinitionInterface) {
+            return $this->generateTypeDefinitionCode($type);
+        }
+
         if ($type instanceof EntityTypeInterface || $type instanceof ComplexTypeInterface) {
             $className = $typeMap[$type->getQualifiedName()] ?? $type->getName();
             $fqcn = $this->namespace . '\\Types\\' . $className;
-            return "new \\{$fqcn}()";
+            return "\\{$fqcn}::instance()";
         }
 
-        // Fallback for unknown types
-        return "new PrimitiveType(EdmPrimitiveType::String)";
+        throw new \LogicException(sprintf(
+            'odata:cache cannot write a type of class %s (%s).',
+            get_debug_type($type),
+            $type->getQualifiedName(),
+        ));
+    }
+
+    /**
+     * A TypeDefinition inline, like an enum type: a value object without circular
+     * references. Property sites and the schema hold equal, distinct instances.
+     */
+    private function generateTypeDefinitionCode(TypeDefinitionInterface $type): string
+    {
+        $namespace = substr($type->getQualifiedName(), 0, -(strlen($type->getName()) + 1));
+
+        return sprintf(
+            'new \\LaravelUi5\\OData\\Edm\\Type\\TypeDefinition(%s, %s, \\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::%s, %s, %s)',
+            $this->literal($namespace),
+            $this->literal($type->getName()),
+            $type->getUnderlyingType()->name,
+            $type->getFacets() !== null ? $this->generateFacetsCode($type->getFacets()) : 'null',
+            $this->generateAnnotationsCode($type->getAnnotations()),
+        );
     }
 
     /**
@@ -731,46 +761,61 @@ final class EdmxWriter
     /**
      * Generate PHP code for a FunctionInterface.
      */
-    private function generateFunctionCode(FunctionInterface $func): string
+    private function generateFunctionCode(FunctionInterface $func, array $typeMap = []): string
     {
         $params = [];
         foreach ($func->getParameters() as $param) {
-            $typeCode = $this->generateParamTypeCode($param->getType());
-            $paramAnnotations = $param->getAnnotations() !== []
-                ? ', annotations: ' . $this->generateAnnotationsCode($param->getAnnotations())
-                : '';
-            $params[] = "new \\LaravelUi5\\OData\\Edm\\FunctionParameter('{$this->e($param->getName())}', {$typeCode}{$paramAnnotations})";
+            $args = [
+                $this->literal($param->getName()),
+                $this->generateTypeCode($param->getType(), $typeMap),
+            ];
+            if ($param->isCollection()) {
+                $args[] = 'isCollection: true';
+            }
+            if (!$param->isNullable()) {
+                $args[] = 'isNullable: false';
+            }
+            if ($param->getFacets() !== null) {
+                $args[] = 'facets: ' . $this->generateFacetsCode($param->getFacets());
+            }
+            if ($param->getAnnotations() !== []) {
+                $args[] = 'annotations: ' . $this->generateAnnotationsCode($param->getAnnotations());
+            }
+            $params[] = 'new \\LaravelUi5\\OData\\Edm\\FunctionParameter(' . implode(', ', $args) . ')';
         }
 
-        $args = ["name: '{$this->e($func->getName())}'"];
+        $args = ["name: {$this->literal($func->getName())}"];
 
+        if ($func->isBound()) {
+            $args[] = 'isBound: true';
+        }
+        if ($func->isComposable()) {
+            $args[] = 'isComposable: true';
+        }
         if ($func->getReturnType() !== null) {
-            $args[] = "returnType: {$this->generateParamTypeCode($func->getReturnType())}";
+            $args[] = "returnType: {$this->generateTypeCode($func->getReturnType(), $typeMap)}";
         }
-
+        if ($func->returnsCollection()) {
+            $args[] = 'returnsCollection: true';
+        }
+        if (!$func->isReturnTypeNullable()) {
+            $args[] = 'isReturnTypeNullable: false';
+        }
         if ($params !== []) {
-            $paramStr = implode(', ', $params);
-            $args[] = "parameters: [{$paramStr}]";
+            $args[] = 'parameters: [' . implode(', ', $params) . ']';
         }
-
+        if ($func->getEntitySetPath() !== null) {
+            $args[] = sprintf(
+                'entitySetPath: new \\LaravelUi5\\OData\\Edm\\EntitySetPath(%s, %s)',
+                $this->literal($func->getEntitySetPath()->getBindingParameterName()),
+                $this->literal($func->getEntitySetPath()->getNavigationPropertyName()),
+            );
+        }
         if ($func->getAnnotations() !== []) {
             $args[] = 'annotations: ' . $this->generateAnnotationsCode($func->getAnnotations());
         }
 
         return 'new \\LaravelUi5\\OData\\Edm\\EdmFunction(' . implode(', ', $args) . ')';
-    }
-
-    /**
-     * Generate type code for function parameters (always uses FQCN).
-     */
-    private function generateParamTypeCode(TypeInterface $type): string
-    {
-        if ($type instanceof \LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface) {
-            $enumCase = $type->getPrimitiveType()->name;
-            return "new \\LaravelUi5\\OData\\Edm\\Type\\PrimitiveType(\\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::{$enumCase})";
-        }
-
-        return "new \\LaravelUi5\\OData\\Edm\\Type\\PrimitiveType(\\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::String)";
     }
 
     // ── Annotation generation ───────────────────────────────────────────────

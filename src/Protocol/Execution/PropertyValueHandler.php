@@ -21,6 +21,7 @@ final readonly class PropertyValueHandler
     public function __construct(
         private RuntimeSchemaInterface $schema,
         private string $serviceRoot,
+        private WireFormat $format = new WireFormat(),
     ) {}
 
     public function handle(PropertyValuePlan $plan): ODataResponse
@@ -51,6 +52,7 @@ final readonly class PropertyValueHandler
             );
         }
 
+        $entity   = (new RowCoercion($plan->target->getEntityType(), $this->format))->apply($entity);
         $propName = $plan->property->getName();
         $value    = $entity[$propName] ?? null;
 
@@ -71,7 +73,7 @@ final readonly class PropertyValueHandler
                  . '(' . $propName . ')/$entity';
 
         $response = new ODataResponse(null, 200, [
-            'Content-Type' => 'application/json;odata.metadata=minimal;charset=utf-8',
+            'Content-Type' => $this->format->contentType(),
             'OData-Version' => '4.0',
         ]);
 

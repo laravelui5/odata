@@ -596,51 +596,6 @@ Note the deliberate difference to Core's `ui5:app`, which was decided the other 
 repository, where a wrong prefix is expensive to undo; the OData namespace is a runtime value a host
 changes in one line of config. Same question, two answers, on purpose.
 
-## [ ] `OP27` `IEEE754Compatible=true` is ignored — `Edm.Decimal` and `Edm.Int64` go out as JSON numbers
-
-Found 2026-10-07 by the code-list probe (`meta/specs/codelists-v1.0.md`, Nachtrag 2026-10-07). UI5's
-V4 model sends `Accept: application/json;odata.metadata=minimal;IEEE754Compatible=true` on every
-request. The format parameter asks the service to write `Edm.Int64` and `Edm.Decimal` as JSON
-**strings**, because a JavaScript number cannot hold them exactly. The engine ignores the parameter:
-`"amount":1234.5`, not `"amount":"1234.5"`, with or without it.
-
-UI5 accepted the numbers in the probe, so nothing breaks visibly. The problem is precision. A
-`decimal(19,6)` (the SDK's amounts, prices and quantities, Foundation D161) holds up to 19 significant
-digits, and a JavaScript number about 15–17. Large amounts get rounded in the client without any
-error. An `Int64` key above 2^53 is corrupted the same way.
-
-**Fix.** Honour `IEEE754Compatible=true` from the `Accept` header (or `$format`): `Edm.Decimal` and
-`Edm.Int64` are written as strings, `null` stays `null`. Without the parameter the output stays as it
-is. The natural seat is the row coercion (`RowCoercion`), the same place as `OP02` and `OP23`; do all
-three in one session. The response's `Content-Type` echoes `IEEE754Compatible=true` when it was
-applied. Test: one decimal and one Int64 column, with and without the parameter; a decimal with 19
-significant digits round-trips exactly.
-
-## [ ] `OP28` `odata:cache` is still lossy beyond annotations — complex types do not even load
-
-Found 2026-10-07 while fixing `OP26`, **confirmed for complex types, the rest by reading.** The
-warm path must reproduce the cold Edmx, and in these places it does not:
-
-- **Complex types break the cache.** `writeEdmx()` registers them as `Types\X::instance()`, but the
-  complex-type template has no `instance()`. A cached service with a complex type dies with
-  `Call to undefined method …::instance()`. Discovery never produces complex types, so only
-  hand-configured services are affected.
-- **Type definitions are dropped.** The generated `Schema` gets no `typeDefinitions`, and a property
-  typed by one falls back to `Edm.String` (`generateTypeCode()`).
-- **Functions lose their shape.** `generateFunctionCode()` keeps name, return type and parameters
-  only: `isBound`, `isComposable`, `returnsCollection`, `isReturnTypeNullable` and `entitySetPath` are
-  lost, and parameters lose `isCollection`, `isNullable` and their facets. A non-primitive parameter
-  or return type becomes `Edm.String` (`generateParamTypeCode()`).
-- **Function imports** lose `entitySet` and `includedInServiceDocument` (this matters with `OP11`).
-- **Singletons** lose their navigation property bindings.
-- **Entity and complex types** lose `baseType`, `isAbstract` and `isOpen`. The templates return
-  `null`/`false`.
-
-**Fix.** One session that does for these what `OP26` did for annotations: generate each from the
-cold object, and extend `AnnotationsCacheTest`'s warm-equals-cold check (or a sibling) with a model
-that uses every feature. The parity test is the contract. Anything the serializer writes, the cache
-must carry. Patch.
-
 ## [ ] `OP29` The vocabulary generator has drifted from the committed classes — regenerate deliberately
 
 Found 2026-10-07 while building `OP19` level 3. A full run of the generator into a scratch directory
@@ -674,6 +629,63 @@ value shapes. Minor if the defaults land, otherwise major.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP28` `odata:cache` is still lossy beyond annotations — complex types do not even load (v3.1.0)
+
+Found 2026-10-07 while fixing `OP26`, **confirmed for complex types, the rest by reading.** The
+warm path must reproduce the cold Edmx, and in these places it does not:
+
+- **Complex types break the cache.** `writeEdmx()` registers them as `Types\X::instance()`, but the
+  complex-type template has no `instance()`. A cached service with a complex type dies with
+  `Call to undefined method …::instance()`. Discovery never produces complex types, so only
+  hand-configured services are affected.
+- **Type definitions are dropped.** The generated `Schema` gets no `typeDefinitions`, and a property
+  typed by one falls back to `Edm.String` (`generateTypeCode()`).
+- **Functions lose their shape.** `generateFunctionCode()` keeps name, return type and parameters
+  only: `isBound`, `isComposable`, `returnsCollection`, `isReturnTypeNullable` and `entitySetPath` are
+  lost, and parameters lose `isCollection`, `isNullable` and their facets. A non-primitive parameter
+  or return type becomes `Edm.String` (`generateParamTypeCode()`).
+- **Function imports** lose `entitySet` and `includedInServiceDocument` (this matters with `OP11`).
+- **Singletons** lose their navigation property bindings.
+- **Entity and complex types** lose `baseType`, `isAbstract` and `isOpen`. The templates return
+  `null`/`false`.
+
+**Fix.** One session that does for these what `OP26` did for annotations: generate each from the
+cold object, and extend `AnnotationsCacheTest`'s warm-equals-cold check (or a sibling) with a model
+that uses every feature. The parity test is the contract. Anything the serializer writes, the cache
+must carry. Patch.
+
+**Done 2026-10-07 (v3.1.0).** Every point above was fixed. On top of them, keys were referenced by
+position instead of by name, and navigation properties lost containment and `OnDelete`. The serializer
+also wrote `Nullable` twice on a parameter with facets and at all on a `TypeDefinition`. Tests:
+`tests/Service/Cache/EdmxShapeCacheTest.php`. Against the previous writer, four of the five fail.
+
+## [x] `OP27` `IEEE754Compatible=true` is ignored — `Edm.Decimal` and `Edm.Int64` go out as JSON numbers (v3.1.0)
+
+Found 2026-10-07 by the code-list probe (`meta/specs/codelists-v1.0.md`, Nachtrag 2026-10-07). UI5's
+V4 model sends `Accept: application/json;odata.metadata=minimal;IEEE754Compatible=true` on every
+request. The format parameter asks the service to write `Edm.Int64` and `Edm.Decimal` as JSON
+**strings**, because a JavaScript number cannot hold them exactly. The engine ignores the parameter:
+`"amount":1234.5`, not `"amount":"1234.5"`, with or without it.
+
+UI5 accepted the numbers in the probe, so nothing breaks visibly. The problem is precision. A
+`decimal(19,6)` (the SDK's amounts, prices and quantities, Foundation D161) holds up to 19 significant
+digits, and a JavaScript number about 15–17. Large amounts get rounded in the client without any
+error. An `Int64` key above 2^53 is corrupted the same way.
+
+**Fix.** Honour `IEEE754Compatible=true` from the `Accept` header (or `$format`): `Edm.Decimal` and
+`Edm.Int64` are written as strings, `null` stays `null`. Without the parameter the output stays as it
+is. The natural seat is the row coercion (`RowCoercion`), the same place as `OP02` and `OP23`; do all
+three in one session. The response's `Content-Type` echoes `IEEE754Compatible=true` when it was
+applied. Test: one decimal and one Int64 column, with and without the parameter; a decimal with 19
+significant digits round-trips exactly.
+
+**Done 2026-10-07 (v3.1.0).** `WireFormat::fromAccept()` reads the parameter from the request's
+`Accept`, or from each `$batch` part's own headers, which the batch handler now parses. `RowCoercion`
+writes Int64 and Decimal as exact strings and recurses into `$expand`. Singletons and property values
+are coerced too, and the `Content-Type` echoes the parameter. `OP02` (Boolean and numbers on the SQL
+path without the parameter) and `OP23` (`Edm.Binary`) sit in the same class and are still open. Tests:
+`tests/Protocol/Execution/Ieee754CompatibleTest.php`.
 
 ## [x] `OP19` `discoverModel()` emits no type facets — a `decimal(19,6)` column becomes a bare `Edm.Decimal` (v3.1.0)
 
