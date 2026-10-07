@@ -120,6 +120,10 @@ foreach (['Items' => 'Eloquent', 'SqlItems' => 'SQL'] as $set => $path) {
             expect(filterResult($this, $set, $filter))->toBe([200, $ids]);
         })->with([
             'eq'                     => ["origin eq 'lax'", [2]],
+            'in'                     => ['id in (1,3)', [1, 3]],
+            'in, spaced'             => ["origin in ( 'lax' , 'jfk' )", [2, 4]],
+            'parens, spaced'         => ['( id eq 1 ) or ( id eq 2 )', [1, 2]],
+            'function, spaced'       => ["contains( label , 'a_b' )", [3]],
             'mirrored'               => ['2 lt id', [3, 4]],
             'eq null'                => ['is_big eq null', [4]],
             'ne null'                => ['is_big ne null', [1, 2, 3]],
@@ -148,7 +152,15 @@ foreach (['Items' => 'Eloquent', 'SqlItems' => 'SQL'] as $set => $path) {
     });
 }
 
-// `in` and `any`/`all` do not parse today (OP31), so the translators are driven directly here.
+it('translates any() and all() over HTTP on the Eloquent path', function (string $filter, array $ids) {
+    expect(filterResult($this, 'Items', $filter))->toBe([200, $ids]);
+})->with([
+    'any'         => ["parts/any(p:p/name eq 'p2')", [3]],
+    'any, spaced' => ["parts/any(p: p/name eq 'p2')", [3]],
+    'all'         => ["parts/all(p: p/name eq 'p1')", [1, 2, 4]],   // no parts satisfies all()
+]);
+
+// The translators driven directly, independent of the parser.
 
 function filterIds(Illuminate\Database\Query\Builder|Illuminate\Database\Eloquent\Builder $query): array
 {

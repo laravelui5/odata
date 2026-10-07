@@ -76,8 +76,13 @@ translators now share one `AbstractFilterTranslator`, so they cannot drift apart
 - `contains`/`startswith`/`endswith` match literally, with wildcards escaped as for `$search`.
 - `3 lt id` is mirrored, a Boolean property on its own filters, and `$filter=false` returns nothing
   (it returned everything).
-- `in` read its list through a path that yielded `[]`. It is translated correctly now, but the
-  parser does not accept `in` yet (see the ROADMAP).
+- `in` read its list through a path that yielded `[]`. It is translated correctly now.
+
+**The filter parser accepts `in` and spaced lambdas.** `id in (1,3)` and
+`nav/any(p: p/name eq 'x')` answered `400 parse_error`. `in` was matched without the whitespace
+before it, and a lambda only parsed without a space after its variable. The parser now treats `in`
+as the ABNF writes it (`RWS "in" RWS`) and skips the optional whitespace allowed after `(`, before
+`)`, around `,` and after a lambda's `:`. `( id eq 1 )` and `contains( name , 'x' )` parse as well.
 
 **Errors before the first row keep their status code.** `EntitySetHandler` ran the query lazily,
 inside the stream callback, so a refused filter or a SQL error arrived after `200` had been sent.
@@ -272,7 +277,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 750.
+Additive. The suite is green at 761.
 
 ## [3.0.6] – 2026-09-09
 

@@ -144,6 +144,17 @@ final class ExpressionLexer
     }
 
     /**
+     * Skip optional whitespace — OData's BWS, allowed after `(`, before `)`, around `,` and
+     * after a lambda's `:`.
+     */
+    public function skipWhitespace(): void
+    {
+        while ($this->pos < $this->len && ($this->text[$this->pos] === ' ' || $this->text[$this->pos] === "\t")) {
+            $this->pos++;
+        }
+    }
+
+    /**
      * Check if the next non-whitespace character matches, without consuming it.
      */
     public function peekChar(string $char): bool

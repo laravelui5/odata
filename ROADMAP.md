@@ -18,7 +18,6 @@ an entry below.
 | Gap | Today | Queued |
 |:---|:---|:---|
 | **Service document** | Neither `includedInServiceDocument` switch is read, and function imports are never listed | Both honoured; `FunctionImport`'s default moves to `true` |
-| **`$filter` with `in` and lambdas** | The parser rejects `in (…)` and `nav/any(x:…)` with `400 parse_error` | Both parse; the translators already handle them (`OP31`) |
 | **Cached `$metadata`** | `$metadata` is serialized on every request; `cachedMetadataXMLPath()` is read by nothing | `odata:cache` writes the document and the serializer streams it; the cold path is unchanged |
 
 ## Pending
@@ -306,7 +305,15 @@ probe in `acme` before switching it on.
 and pass it into the navigation plans too. Probably a Minor, since server-visible behaviour changes
 for hosts that set `pagination.default`.
 
-## [ ] `OP31` The filter parser rejects `in (…)` and lambdas — `400 parse_error` for valid filters
+---
+
+## Done
+
+Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
+section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
+that passed through Pending.
+
+## [x] `OP31` The filter parser rejects `in (…)` and lambdas — `400 parse_error` for valid filters (v3.1.0)
 
 Found 2026-10-07 while building `OP06`. `FilterParser::parse()` fails on both, with any spacing:
 
@@ -326,13 +333,14 @@ documents both as supported and carries a *planned* marker until this lands.
 (`p:`) breaks. Then test both through HTTP on both paths (`FilterTranslationTest` has the fixtures).
 A Patch.
 
----
-
-## Done
-
-Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
-section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
-that passed through Pending.
+**Done 2026-10-07 (v3.1.0).** Two causes, both in how the lexer treats whitespace. `in` is listed as a
+*unary* operator and was matched as `in\s`, without the whitespace before it, so after `id` nothing
+matched. It is now matched as `\sin\s`, like a binary operator; the ABNF requires `RWS "in" RWS`.
+Lambdas parsed only without a space after the variable (`any(p:p/name …)`). The parser now skips the
+optional whitespace (BWS) the ABNF allows after `(`, before `)`, around `,` and after a lambda's `:`,
+so `( id eq 1 )` and `contains( name , 'x' )` parse too. Tests: the parse trees checked by hand, then
+`FilterTranslationTest` over HTTP on both paths (`in`, spaced `in`, `any`/`all` spaced and not,
+spaced parentheses and arguments). The *planned* marker and the *Known gaps* row are gone.
 
 ## [x] `OP06` Unsupported `$filter` constructs are silently dropped, widening the result set (v3.1.0)
 

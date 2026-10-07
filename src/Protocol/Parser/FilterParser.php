@@ -326,6 +326,7 @@ final class FilterParser
         if ($this->lexer->maybeChar('(') === null) {
             return false;
         }
+        $this->lexer->skipWhitespace();   // `( id eq 1 )`, `contains( name, 'x')`
 
         // Create group entry on operator stack
         $group = [
@@ -350,7 +351,8 @@ final class FilterParser
 
     private function tokenizeRightParen(): bool
     {
-        if ($this->lexer->maybeChar(')') === null) {
+        // Optional whitespace before the paren: `( id eq 1 )`.
+        if ($this->lexer->with(fn() => $this->lexer->expression('\s*\)')) === null) {
             return false;
         }
 
@@ -404,7 +406,7 @@ final class FilterParser
 
     private function tokenizeSeparator(): bool
     {
-        $token = $this->lexer->with(fn() => $this->lexer->expression(',\s?'));
+        $token = $this->lexer->with(fn() => $this->lexer->expression('\s*,\s*'));
         if ($token === null) {
             return false;
         }
@@ -435,12 +437,13 @@ final class FilterParser
 
     private function tokenizeLambdaVariable(): bool
     {
-        $token = $this->lexer->with(fn() => $this->lexer->expression(ExpressionLexer::LAMBDA_VARIABLE));
+        // `any(p:p/name …)` and `any(p: p/name …)` alike.
+        $token = $this->lexer->with(fn() => $this->lexer->expression(ExpressionLexer::LAMBDA_VARIABLE . '\s*'));
         if ($token === null) {
             return false;
         }
 
-        $varName = rtrim($token, ':');
+        $varName = rtrim(trim($token), ':');
         $this->pushOperand(new LambdaVariableExpression($varName));
         $this->tokens[] = ['type' => 'lambda_variable', 'value' => $varName];
 
@@ -556,6 +559,10 @@ final class FilterParser
 
             if ($isFunc || $isLambda) {
                 $matched = $this->lexer->func($symbol);
+            } elseif ($symbol === 'in') {
+                // `id in (1,2)`: whitespace on both sides (RWS "in" RWS), like a binary operator,
+                // although the list is collected by the following parenthesis.
+                $matched = $this->lexer->operator($symbol);
             } elseif ($isUnary && !$isBinary) {
                 $matched = $this->lexer->unaryOperator($symbol);
             } else {
