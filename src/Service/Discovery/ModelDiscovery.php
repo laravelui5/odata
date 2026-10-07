@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphOneOrMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -345,6 +348,16 @@ final class ModelDiscovery
             }
 
             if (!$result instanceof Relation) {
+                continue;
+            }
+
+            // Polymorphic relations stay out, the whole family, before the regular arms:
+            // MorphTo extends BelongsTo and MorphToMany extends BelongsToMany, so the
+            // instanceof checks below would wire them. Their join runs over a type
+            // discriminator plus an id, which no CSDL ReferentialConstraint can state —
+            // even where the target is fixed, $metadata would describe half a relation.
+            // Model the edge explicitly instead (custom entity set, virtual expand).
+            if ($result instanceof MorphTo || $result instanceof MorphToMany || $result instanceof MorphOneOrMany) {
                 continue;
             }
 

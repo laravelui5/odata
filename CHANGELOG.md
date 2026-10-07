@@ -62,6 +62,24 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**Polymorphic relations stay out of discovery, all of them.** `MorphTo` extends `BelongsTo` and
+`MorphToMany` extends `BelongsToMany`, so discovery wired them as ordinary navigation properties.
+With `morphTo` the target was whatever an empty model happened to resolve to, wrong for every row of
+another type. Discovery now checks the whole family (`MorphTo`, `MorphToMany`, `MorphOneOrMany`)
+before the regular arms and skips it, even where the target is fixed: a polymorphic join runs over a
+type column plus an id, which no `ReferentialConstraint` can state. `services/model-discovery`
+explains why and shows the explicit alternatives.
+
+**Key literals are checked against the key's type.** The planner cast blindly. `Products(abc)`
+became `Products(0)`, a valid query for the wrong key, which returned the wrong row wherever one with
+`id = 0` existed. A Boolean key was `false` for anything but `true`, and a Guid passed unchecked. Each
+type family is now validated (integers within their type's range, decimals, doubles, `true`/`false`,
+Guid, `Date`, `DateTimeOffset`, `TimeOfDay`, `Duration`), and a misfit answers `400 invalid_key`.
+Decimal, temporal and Guid keys stay strings, so they are exact. **String keys must be quoted.**
+`Airports(LHR)` is now a `400`, and `'O''Brien'` is unescaped to `O'Brien` (it was searched with both
+quotes). A named composite key must name every part exactly once: before, a missing part silently
+widened the match.
+
 **`$search` matches the term literally.** `%` and `_` reached SQL as `LIKE` wildcards: `$search=50%`
 found every row starting with `50`, and `a_b` found `axb`. Both resolvers now go through one
 `Driver\Sql\SearchClause`, which escapes the wildcards with `!` (`LIKE ? ESCAPE '!'`). A backslash
@@ -224,7 +242,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 687.
+Additive. The suite is green at 704.
 
 ## [3.0.6] – 2026-09-09
 

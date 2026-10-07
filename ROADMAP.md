@@ -290,22 +290,6 @@ That keeps the interface honest, removes a per-request serialization from the wa
 Until those are settled, the two doc pages keep describing the mechanism (docs-are-the-spec); they
 must not describe the path or the command flag, because neither is decided.
 
-## [ ] `OP14` Key literals are not validated — `Products(abc)` becomes `Products(0)`
-
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
-`QueryPlanner::parseLiteralForEdmType()` (`:459`) casts raw: `(int) 'abc'` is `0`, `(float) 'abc'` is
-`0.0`, and for `Edm.Boolean` everything that is not `'true'` is `false`. A nonsense key therefore
-becomes a **valid query for the wrong key** — usually `404 entity_not_found`, and where a row with
-`id = 0` exists, the wrong row. `query-options/resource-paths` promises `400 invalid_key`.
-
-Same family as *Unsupported `$filter` constructs are silently dropped*: quietly wrong is worse than
-loudly wrong.
-
-**Fix.** Validate per type family before constructing the literal (`filter_var` for int/float/bool,
-the existing guid handling for `Edm.Guid`) and throw `BadRequestException('invalid_key', …)` on
-failure — the code the page names, in the same tone as `unknown_key_property` two methods above. One
-test per family, plus the composite-key path.
-
 ## [ ] `OP15` Nested `$count` inside `$expand` is parsed and never emitted
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
@@ -344,35 +328,6 @@ never comes.
 that a consumer who hits a truncated body knows what they are looking at and that `odata.streaming =
 false` is the way around it today.
 
-## [ ] `OP20` Morph relations are discovered as ordinary navigations — short-term cure
-
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
-Relation discovery decides by `instanceof` (`ModelDiscovery.php:336-337`). In Laravel `MorphTo`
-extends `BelongsTo` and `MorphToMany` extends `BelongsToMany` (likewise `MorphOne`/`MorphMany` against
-`HasOne`/`HasMany`), so a polymorphic relation falls into the regular arm and is wired as a plain
-navigation property. Its target is `get_class($result->getRelated())` — true for the instance it was
-called on, not for the type. The only brake is that the target model must itself be discovered; where
-it is, the schema is **silently wrong** for every row of a different morph type.
-
-**Fix.** Explicit morph arms **before** the regular ones, skipping them — which is what
-`services/model-discovery` says happens. One discovery test per morph shape.
-
-## [ ] `OP21` Morph relations: is there a spec-conform way to expose them at all? — evaluation
-
-Opened 2026-09-21 (author), the medium-term half of the entry above. The short-term cure skips morph
-relations; that is correct and not satisfying. A polymorphic relation is a legitimate modelling tool,
-and OData v4 has shapes that might carry it — a navigation property whose target is a **base entity
-type** with derived types per morph target, or a derived-type cast in the path
-(`/Comments(1)/Namespace.Post/…`), or simply an exposed morph key pair with no navigation at all.
-
-**To evaluate:** whether any of these can be produced from an Eloquent `MorphTo` **without** asking
-the developer to hand-write the entity type; what a UI5 v4 client actually does with a base-type
-navigation; and whether the cost is worth it against the honest alternative — the developer models
-the polymorphic edge explicitly in a custom entity set.
-
-Outcome is a decision, not necessarily code: "morph relations stay out, here is why, here is what to
-do instead" is an acceptable result and would then go into `services/model-discovery` as guidance.
-
 ## [ ] `OP29` The vocabulary generator has drifted from the committed classes — regenerate deliberately
 
 Found 2026-10-07 while building `OP19` level 3. A full run of the generator into a scratch directory
@@ -406,6 +361,73 @@ value shapes. Minor if the defaults land, otherwise major.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP21` Morph relations: is there a spec-conform way to expose them at all? — evaluation (v3.1.0)
+
+Opened 2026-09-21 (author), the medium-term half of the entry above. The short-term cure skips morph
+relations; that is correct and not satisfying. A polymorphic relation is a legitimate modelling tool,
+and OData v4 has shapes that might carry it — a navigation property whose target is a **base entity
+type** with derived types per morph target, or a derived-type cast in the path
+(`/Comments(1)/Namespace.Post/…`), or simply an exposed morph key pair with no navigation at all.
+
+**To evaluate:** whether any of these can be produced from an Eloquent `MorphTo` **without** asking
+the developer to hand-write the entity type; what a UI5 v4 client actually does with a base-type
+navigation; and whether the cost is worth it against the honest alternative — the developer models
+the polymorphic edge explicitly in a custom entity set.
+
+Outcome is a decision, not necessarily code: "morph relations stay out, here is why, here is what to
+do instead" is an acceptable result and would then go into `services/model-discovery` as guidance.
+
+**Closed 2026-10-07 by decision (author): polymorphic relations stay out, all of them.** That
+includes those with a fixed target (`morphMany`, `morphOne`, `morphToMany`, `morphedByMany`). A
+polymorphic join runs over a type discriminator plus an id, and a CSDL `ReferentialConstraint` only
+pairs properties, so `$metadata` would describe half a relation. Ambiguity at the level of the
+contract works against what OData is for. One rule is also easier to teach than an exception for
+fixed targets. The alternatives, now in `services/model-discovery`: a custom entity set for one type,
+a virtual expand, or a regular relation on a non-polymorphic table.
+
+## [x] `OP20` Morph relations are discovered as ordinary navigations — short-term cure (v3.1.0)
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
+Relation discovery decides by `instanceof` (`ModelDiscovery.php:336-337`). In Laravel `MorphTo`
+extends `BelongsTo` and `MorphToMany` extends `BelongsToMany` (likewise `MorphOne`/`MorphMany` against
+`HasOne`/`HasMany`), so a polymorphic relation falls into the regular arm and is wired as a plain
+navigation property. Its target is `get_class($result->getRelated())` — true for the instance it was
+called on, not for the type. The only brake is that the target model must itself be discovered; where
+it is, the schema is **silently wrong** for every row of a different morph type.
+
+**Fix.** Explicit morph arms **before** the regular ones, skipping them — which is what
+`services/model-discovery` says happens. One discovery test per morph shape.
+
+**Done 2026-10-07 (v3.1.0)**, as the author decided with `OP21`. Checked against the class
+hierarchy: only `MorphTo` (extends `BelongsTo`) and `MorphToMany` (extends `BelongsToMany`) slipped
+through. `MorphOne` and `MorphMany` extend `MorphOneOrMany` → `HasOneOrMany` and were skipped already,
+but by accident, not by rule. Discovery now skips `MorphTo`, `MorphToMany` and `MorphOneOrMany`
+explicitly, before the regular arms, so future morph subclasses are covered too. Test:
+`tests/Service/Discovery/MorphRelationsTest.php`. Without the arm, `tags` comes back.
+
+## [x] `OP14` Key literals are not validated — `Products(abc)` becomes `Products(0)` (v3.1.0)
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
+`QueryPlanner::parseLiteralForEdmType()` (`:459`) casts raw: `(int) 'abc'` is `0`, `(float) 'abc'` is
+`0.0`, and for `Edm.Boolean` everything that is not `'true'` is `false`. A nonsense key therefore
+becomes a **valid query for the wrong key** — usually `404 entity_not_found`, and where a row with
+`id = 0` exists, the wrong row. `query-options/resource-paths` promises `400 invalid_key`.
+
+Same family as *Unsupported `$filter` constructs are silently dropped*: quietly wrong is worse than
+loudly wrong.
+
+**Fix.** Validate per type family before constructing the literal (`filter_var` for int/float/bool,
+the existing guid handling for `Edm.Guid`) and throw `BadRequestException('invalid_key', …)` on
+failure — the code the page names, in the same tone as `unknown_key_property` two methods above. One
+test per family, plus the composite-key path.
+
+**Done 2026-10-07 (v3.1.0)**, decided with the author the same day. Each type family is validated.
+Decimal, temporal and Guid keys stay exact strings, with a format check for Date, DateTimeOffset,
+TimeOfDay and Duration. **String keys must be quoted**, and `''` is unescaped. A named composite key
+needs every part exactly once. Found on the way: there was no Guid handling in the planner, despite
+the entry above. Tests: `tests/Protocol/Planning/KeyLiteralTest.php`. Not part of this: a string
+key containing `,` or `=` still breaks the named-key split.
 
 ## [x] `OP09` `$search` passes `%` and `_` through to `LIKE` — a search term is a wildcard pattern (v3.1.0)
 

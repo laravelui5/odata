@@ -420,11 +420,24 @@ final readonly class QueryPlanner
             foreach (array_filter(array_map('trim', explode(',', $keyString))) as $pair) {
                 [$name, $rawValue] = array_map('trim', explode('=', $pair, 2));
                 $keyProp = $this->findKeyProperty($name, $keyProperties);
+                if (array_key_exists($name, $values)) {
+                    throw new BadRequestException('invalid_key', "Key property {$name} is given twice.");
+                }
                 $values[$name] = $this->parseLiteralForEdmType(
                     $rawValue,
                     $keyProp->getType()->getQualifiedName()
                 );
             }
+
+            // Every key property, exactly once — a missing part must not silently widen the match.
+            $missing = array_diff(array_map(static fn ($kp) => $kp->getName(), $keyProperties), array_keys($values));
+            if ($missing !== []) {
+                throw new BadRequestException(
+                    'invalid_key',
+                    'The key is incomplete; missing: ' . implode(', ', $missing) . '.'
+                );
+            }
+
             return new KeyExpression($values);
         }
 
@@ -456,20 +469,83 @@ final readonly class QueryPlanner
         throw new BadRequestException('unknown_key_property', "Unknown key property: {$name}");
     }
 
+    /**
+     * A key literal, validated against its declared type. Casting blindly turned
+     * `Products(abc)` into `Products(0)` — a valid query for the wrong key. A literal
+     * that is not of the key's type is a `400 invalid_key`.
+     *
+     * Decimal, temporal and Guid keys stay strings: exact, and compared by the
+     * database. A string key must be quoted (`'A'`), with `''` for a quote inside.
+     *
+     * @see OData ABNF (primitiveLiteral), URL Conventions §5.1.1
+     */
     private function parseLiteralForEdmType(string $raw, string $edmType): LiteralExpression
     {
-        return match (true) {
-            in_array($edmType, ['Edm.Int16', 'Edm.Int32', 'Edm.Int64', 'Edm.Byte', 'Edm.SByte'], true)
-                => new LiteralExpression((int) $raw, $edmType),
-            in_array($edmType, ['Edm.Double', 'Edm.Decimal', 'Edm.Single'], true)
-                => new LiteralExpression((float) $raw, $edmType),
-            $edmType === 'Edm.Boolean'
-                => new LiteralExpression(strtolower($raw) === 'true', $edmType),
-            $edmType === 'Edm.String'
-                => new LiteralExpression(trim($raw, "'"), $edmType),
-            default
-                => new LiteralExpression($raw, $edmType),
+        $raw = trim($raw);
+
+        $int = static function (string $raw, int $min, int $max) use ($edmType): int {
+            if (preg_match('/^[+-]?\d+$/', $raw) !== 1
+                || ($value = filter_var($raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => $min, 'max_range' => $max]])) === false
+            ) {
+                throw self::invalidKey($raw, $edmType);
+            }
+            return $value;
         };
+
+        $matching = function (string $pattern) use ($raw, $edmType): string {
+            if (preg_match($pattern, $raw) !== 1) {
+                throw self::invalidKey($raw, $edmType);
+            }
+            return $raw;
+        };
+
+        $value = match ($edmType) {
+            'Edm.Byte'           => $int($raw, 0, 255),
+            'Edm.SByte'          => $int($raw, -128, 127),
+            'Edm.Int16'          => $int($raw, -32768, 32767),
+            'Edm.Int32'          => $int($raw, -2147483648, 2147483647),
+            'Edm.Int64'          => $int($raw, PHP_INT_MIN, PHP_INT_MAX),
+            'Edm.Decimal'        => $matching('/^[+-]?\d+(\.\d+)?$/'),
+            'Edm.Double',
+            'Edm.Single'         => filter_var($raw, FILTER_VALIDATE_FLOAT) !== false
+                                        ? (float) $raw
+                                        : throw self::invalidKey($raw, $edmType),
+            'Edm.Boolean'        => match ($raw) {
+                                        'true'  => true,
+                                        'false' => false,
+                                        default => throw self::invalidKey($raw, $edmType),
+                                    },
+            'Edm.Guid'           => $matching('/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/'),
+            'Edm.Date'           => $matching('/^\d{4}-\d{2}-\d{2}$/'),
+            'Edm.DateTimeOffset' => $matching('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/'),
+            'Edm.TimeOfDay'      => $matching('/^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/'),
+            'Edm.Duration'       => $matching('/^-?P(?=\d|T\d)(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/'),
+            'Edm.String'         => self::stringKey($raw, $edmType),
+            default              => $raw,
+        };
+
+        return new LiteralExpression($value, $edmType);
+    }
+
+    /** `'O''Brien'` → `O'Brien`. An unquoted string key is not a string literal. */
+    private static function stringKey(string $raw, string $edmType): string
+    {
+        if (strlen($raw) < 2 || $raw[0] !== "'" || $raw[strlen($raw) - 1] !== "'") {
+            throw self::invalidKey($raw, $edmType, 'a string key must be quoted');
+        }
+        $inner = substr($raw, 1, -1);
+        if (preg_match("/(?<!')'(?!')/", str_replace("''", '', $inner)) === 1) {
+            throw self::invalidKey($raw, $edmType, "a quote inside a string key is written ''");
+        }
+        return str_replace("''", "'", $inner);
+    }
+
+    private static function invalidKey(string $raw, string $edmType, ?string $why = null): BadRequestException
+    {
+        return new BadRequestException(
+            'invalid_key',
+            sprintf('"%s" is not a valid %s key%s.', $raw, $edmType, $why !== null ? " ({$why})" : '')
+        );
     }
 
     // -------------------------------------------------------------------------
