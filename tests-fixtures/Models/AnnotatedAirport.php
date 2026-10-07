@@ -29,20 +29,20 @@ class AnnotatedAirport extends Model
 
     #[Label('IATA Code')]
     #[Description('The IATA airport code')]
-    public string $code {
+    public ?string $code {
         get => $this->getAttribute('code');
-        set(string $value) => $this->setAttribute('code', $value);
+        set(?string $value) { $this->setAttribute('code', $value); }
     }
 
     #[Label('Airport Name')]
-    public string $name {
+    public ?string $name {
         get => $this->getAttribute('name');
-        set(string $value) => $this->setAttribute('name', $value);
+        set(?string $value) { $this->setAttribute('name', $value); }
     }
 
     #[Hidden]
     public ?int $country_id {
         get => $this->getAttribute('country_id');
-        set(?int $value) => $this->setAttribute('country_id', $value);
+        set(?int $value) { $this->setAttribute('country_id', $value); }
     }
 }

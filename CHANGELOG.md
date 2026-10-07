@@ -62,6 +62,45 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**`Edm.Binary` goes out base64url-encoded.** Discovery maps `blob`/`binary`/`varbinary` to
+`Edm.Binary`, but the raw bytes went to `json_encode`, which fails on anything that is not UTF-8. The
+response did not come out wrong, it did not come out at all. Binary values are now written as
+base64url without padding, as the JSON format prescribes. `/$value` still answers the raw bytes, now
+as `application/octet-stream`. That path also no longer runs the JSON coercion, which would otherwise
+have handed out the encoded string.
+
+**Column attributes live on hooked properties, and `useHidden` keeps `$hidden` out of the schema.**
+`#[ODataProperty]`, `#[ODataIgnore]` and the vocabulary annotations are read from a declared PHP
+property. A plain `public $col;` shadows Eloquent's attribute bag: reads return `null`, writes are
+lost on `save()`. The supported form is a PHP 8.4 property with hooks that delegate to the bag. A
+test now checks it against mass assignment, `fill()`/`update()`, `toArray()`, `isset()`, dirty
+tracking and `save()`.
+
+That check found a trap in our own samples and fixture. **The `set` hook must be a block.**
+`set($value) => $this->setAttribute('col', $value)` assigns the returned model to the property, so
+`$model->col = …` failed with a `TypeError` (mass assignment bypasses the hook and hid it). The
+docs, the `AnnotatedAirport` fixture and the tests now use
+`set(?string $value) { $this->setAttribute('col', $value); }`, with nullable types.
+
+`#[ODataEntity(useHidden: true)]` is new. The model's `$hidden` columns and relations are then left
+out of the entity type, so they are neither declared in `$metadata` nor filterable (before,
+`$filter=startswith(password,'$2y')` reached SQL). The key stays. The switch is off by default.
+
+**The wire carries the declared type, not the driver's scalar.** A custom (SQL) entity set passed
+each row through as the driver returned it. A `case when … then 1 else 0 end` declared `Edm.Boolean`
+went out as `1`, and UI5's V4 model refused it (`"1" is of type number, expected boolean`). A MySQL
+decimal went out as the string `"1234.500000"`. `RowCoercion` now coerces every property to the type
+`$metadata` declares:
+- `Edm.Boolean` becomes `true`/`false`, also from `"1"`/`"0"` and PostgreSQL's `"t"`/`"f"`.
+- Integer types become JSON integers.
+- `Decimal`, `Double` and `Single` become JSON numbers.
+
+A value that cannot be read as its type passes unchanged, so schema drift stays visible. Without
+`IEEE754Compatible` the format requires a number, so a decimal beyond a double's precision is rounded
+there. A client that needs every digit asks for strings, as UI5 does. The Eloquent path already
+produced correct types through model casts, and nothing changes for it. Hosts that cast in their own
+row maps (`(bool) $row->is_primary`) can drop the cast; it is redundant now, not wrong.
+
 **`IEEE754Compatible=true` is honoured.** UI5's V4 model sends it on every request, in the `Accept`
 header of the request or of each `$batch` part. It asks for `Edm.Int64` and `Edm.Decimal` as JSON
 strings, because a JavaScript number cannot hold them exactly: a `decimal(19,6)` has more digits
@@ -163,7 +202,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 650.
+Additive. The suite is green at 667.
 
 ## [3.0.6] – 2026-09-09
 

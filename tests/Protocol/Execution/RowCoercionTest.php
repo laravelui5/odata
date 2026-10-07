@@ -159,7 +159,7 @@ describe('RowCoercion', function () {
             expect($row)->toBe($input);
         });
 
-        it('leaves non-temporal columns untouched in mixed schemas', function () {
+        it('coerces each column to its declared type in mixed schemas', function () {
             $type = buildEntityType([
                 'id'         => EdmPrimitiveType::Int64,
                 'name'       => EdmPrimitiveType::String,
@@ -176,8 +176,56 @@ describe('RowCoercion', function () {
 
             expect($row['id'])->toBe(7);
             expect($row['name'])->toBe('alice');
-            expect($row['amount'])->toBe('3.14');
+            // A driver's decimal string becomes the JSON number $metadata promises (OP02).
+            expect($row['amount'])->toBe(3.14);
             expect($row['created_at'])->toMatch('/^2026-05-05T12:34:56[+\-]\d{2}:\d{2}$/');
+        });
+    });
+
+    describe('declared type over driver scalar (OP02)', function () {
+        it('turns driver flags into booleans', function () {
+            $type = buildEntityType(['id' => EdmPrimitiveType::Int32, 'flag' => EdmPrimitiveType::Boolean]);
+            $c    = new RowCoercion($type);
+
+            expect($c->apply(['flag' => 1])['flag'])->toBeTrue()
+                ->and($c->apply(['flag' => 0])['flag'])->toBeFalse()
+                ->and($c->apply(['flag' => '1'])['flag'])->toBeTrue()
+                ->and($c->apply(['flag' => '0'])['flag'])->toBeFalse()
+                ->and($c->apply(['flag' => 't'])['flag'])->toBeTrue()
+                ->and($c->apply(['flag' => 'f'])['flag'])->toBeFalse()
+                ->and($c->apply(['flag' => true])['flag'])->toBeTrue()
+                ->and($c->apply(['flag' => null])['flag'])->toBeNull()
+                ->and($c->apply(['flag' => 'maybe'])['flag'])->toBe('maybe');   // drift stays visible
+        });
+
+        it('turns driver strings into integers and numbers', function () {
+            $type = buildEntityType([
+                'id'     => EdmPrimitiveType::Int32,
+                'small'  => EdmPrimitiveType::Int16,
+                'big'    => EdmPrimitiveType::Int64,
+                'amount' => EdmPrimitiveType::Decimal,
+                'ratio'  => EdmPrimitiveType::Double,
+            ]);
+            $row = (new RowCoercion($type))->apply([
+                'id' => '7', 'small' => 3.0, 'big' => '9007199254740993', 'amount' => '1234.500000', 'ratio' => '0.25',
+            ]);
+
+            expect($row)->toBe(['id' => 7, 'small' => 3, 'big' => 9007199254740993, 'amount' => 1234.5, 'ratio' => 0.25]);
+        });
+
+        it('keeps a value it cannot read as the declared type', function () {
+            $type = buildEntityType(['id' => EdmPrimitiveType::Int32, 'amount' => EdmPrimitiveType::Decimal]);
+            $row  = (new RowCoercion($type))->apply(['id' => 'abc', 'amount' => 'n/a']);
+
+            expect($row)->toBe(['id' => 'abc', 'amount' => 'n/a']);
+        });
+
+        it('keeps Int64 and Decimal as exact strings under IEEE754Compatible', function () {
+            $type = buildEntityType(['big' => EdmPrimitiveType::Int64, 'amount' => EdmPrimitiveType::Decimal]);
+            $row  = (new RowCoercion($type, new LaravelUi5\OData\Protocol\Execution\WireFormat(true)))
+                ->apply(['big' => 9007199254740993, 'amount' => '1234.500000']);
+
+            expect($row)->toBe(['big' => '9007199254740993', 'amount' => '1234.500000']);
         });
     });
 

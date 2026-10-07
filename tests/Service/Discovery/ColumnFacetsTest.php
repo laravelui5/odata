@@ -41,7 +41,7 @@ class ColumnFacetsOverride extends Model
     #[ODataProperty(nullable: false)]
     public ?string $note {
         get => $this->getAttribute('note');
-        set(?string $value) => $this->setAttribute('note', $value);
+        set(?string $value) { $this->setAttribute('note', $value); }
     }
 }
 
@@ -78,7 +78,7 @@ class ColumnFacetsCastPriceWithAttribute extends ColumnFacetsCastPrice
     #[ODataProperty(scale: 2)]
     public ?string $amount {
         get => $this->getAttribute('amount');
-        set(?string $value) => $this->setAttribute('amount', $value);
+        set(?string $value) { $this->setAttribute('amount', $value); }
     }
 }
 
@@ -92,7 +92,7 @@ class ColumnFacetsLiteralScale extends Model
     #[ODataProperty(precision: 15, scale: 3)]
     public ?string $amount {
         get => $this->getAttribute('amount');
-        set(?string $value) => $this->setAttribute('amount', $value);
+        set(?string $value) { $this->setAttribute('amount', $value); }
     }
 }
 
@@ -106,7 +106,7 @@ class ColumnFacetsScaleTooLarge extends Model
     #[ODataProperty(precision: 4, scale: 6)]
     public ?string $amount {
         get => $this->getAttribute('amount');
-        set(?string $value) => $this->setAttribute('amount', $value);
+        set(?string $value) { $this->setAttribute('amount', $value); }
     }
 }
 
@@ -120,7 +120,7 @@ class ColumnFacetsScaleOnString extends Model
     #[ODataProperty(scale: 2)]
     public ?string $code {
         get => $this->getAttribute('code');
-        set(?string $value) => $this->setAttribute('code', $value);
+        set(?string $value) { $this->setAttribute('code', $value); }
     }
 }
 

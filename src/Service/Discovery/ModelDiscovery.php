@@ -227,9 +227,15 @@ final class ModelDiscovery
 
         $properties = [];
         $keyProps = [];
+        $hidden = self::hiddenNames($model, $entityAttr);
 
         foreach ($columns as $column) {
             $colName = $column['name'];
+
+            // #[ODataEntity(useHidden: true)]: what the model never serializes is not declared either.
+            if (isset($hidden[$colName]) && $colName !== $keyName) {
+                continue;
+            }
 
             // Check for #[ODataIgnore] on the model property (if it exists)
             if ($ref->hasProperty($colName) && $this->hasIgnoreAttribute($ref->getProperty($colName))) {
@@ -298,6 +304,7 @@ final class ModelDiscovery
     private function discoverRelationships(Model $model, ReflectionClass $ref, string $namespace): array
     {
         $navProps = [];
+        $hidden   = self::hiddenNames($model, $this->readEntityAttribute($ref));
 
         foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
             // Only own methods, no magic, no parameters
@@ -313,6 +320,10 @@ final class ModelDiscovery
 
             // Check for #[ODataIgnore]
             if ($method->getAttributes(ODataIgnore::class) !== []) {
+                continue;
+            }
+
+            if (isset($hidden[$method->getName()])) {
                 continue;
             }
 
@@ -611,6 +622,16 @@ final class ModelDiscovery
     {
         $attrs = $prop->getAttributes(ODataProperty::class);
         return $attrs !== [] ? $attrs[0]->newInstance() : null;
+    }
+
+    /**
+     * The model's `$hidden` as a lookup, when `#[ODataEntity(useHidden: true)]` asks for it.
+     *
+     * @return array<string, true>
+     */
+    private static function hiddenNames(Model $model, ?ODataEntity $entityAttr): array
+    {
+        return ($entityAttr?->useHidden ?? false) ? array_fill_keys($model->getHidden(), true) : [];
     }
 
     private function hasIgnoreAttribute(\ReflectionProperty $prop): bool

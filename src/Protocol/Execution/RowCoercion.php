@@ -31,6 +31,13 @@ use LaravelUi5\OData\Edm\EdmPrimitiveType;
  *   that `sap.ui.model.odata.type.Enum` parses by default. Unknown ints
  *   pass through unchanged so schema drift is visible rather than masked.
 
+ *   Booleans and numbers — drivers return what the column stores, not what the
+ *   property declares: `1` for a flag on MySQL/SQLite, `"1234.500000"` for a
+ *   MySQL decimal. Booleans become `true`/`false`, integers and numbers JSON
+ *   numbers, so the wire matches `$metadata` whatever the driver.
+ *
+ *   Edm.Binary — base64url without padding, as the JSON format prescribes.
+ *
  *   Int64 and Decimal under `IEEE754Compatible=true` — written as JSON strings
  *   so a JavaScript client keeps every digit (a `decimal(19,6)` exceeds what a
  *   double holds). Without the parameter they stay numbers.
@@ -125,8 +132,82 @@ final readonly class RowCoercion
             $type === EdmPrimitiveType::TimeOfDay      => static fn (mixed $v): string => Carbon::parse($v)->format('H:i:s'),
             $format->ieee754Compatible && ($type === EdmPrimitiveType::Int64 || $type === EdmPrimitiveType::Decimal)
                                                        => self::numberAsString(...),
+            $type === EdmPrimitiveType::Boolean        => self::toBoolean(...),
+            $type === EdmPrimitiveType::Binary         => self::toBase64Url(...),
+            in_array($type, [
+                EdmPrimitiveType::Byte, EdmPrimitiveType::SByte, EdmPrimitiveType::Int16,
+                EdmPrimitiveType::Int32, EdmPrimitiveType::Int64,
+            ], true)                                   => self::toInteger(...),
+            in_array($type, [
+                EdmPrimitiveType::Decimal, EdmPrimitiveType::Double, EdmPrimitiveType::Single,
+            ], true)                                   => self::toNumber(...),
             default                                    => null,
         };
+    }
+
+    /**
+     * MySQL and SQLite have no boolean: a flag arrives as `1`/`0` or `"1"`/`"0"`, PostgreSQL may
+     * hand over `"t"`/`"f"`. A value that is none of these passes unchanged, so drift stays visible.
+     */
+    private static function toBoolean(mixed $v): mixed
+    {
+        if (is_bool($v)) {
+            return $v;
+        }
+        if (is_int($v) || is_float($v)) {
+            return $v != 0;
+        }
+        if (is_string($v)) {
+            return match (strtolower(trim($v))) {
+                '1', 'true', 't'  => true,
+                '0', 'false', 'f' => false,
+                default           => $v,
+            };
+        }
+        return $v;
+    }
+
+    /**
+     * Raw bytes as base64url without padding — what the OData JSON format prescribes for
+     * `Edm.Binary` (RFC 4648 §5). Raw bytes are rarely valid UTF-8, so without this the
+     * whole response failed to encode.
+     */
+    private static function toBase64Url(mixed $v): mixed
+    {
+        if (!is_string($v)) {
+            return $v;
+        }
+        return rtrim(strtr(base64_encode($v), '+/', '-_'), '=');
+    }
+
+    /** An integral value from a driver string or float; anything else passes unchanged. */
+    private static function toInteger(mixed $v): mixed
+    {
+        if (is_int($v)) {
+            return $v;
+        }
+        if (is_string($v) && preg_match('/^-?\d+$/', trim($v)) === 1) {
+            $int = (int) $v;
+            return (string) $int === ltrim(trim($v), '+') ? $int : $v;   // beyond PHP_INT_MAX: keep the string
+        }
+        if (is_float($v) && floor($v) === $v && abs($v) < PHP_INT_MAX) {
+            return (int) $v;
+        }
+        return $v;
+    }
+
+    /**
+     * A JSON number from a driver string (MySQL and PostgreSQL hand decimals over as strings).
+     * Without `IEEE754Compatible` the format requires a number, so a decimal beyond a double's
+     * precision is rounded here. A client that needs every digit asks for strings, as UI5 does.
+     */
+    private static function toNumber(mixed $v): mixed
+    {
+        if (is_int($v) || is_float($v) || !is_string($v) || !is_numeric($v)) {
+            return $v;
+        }
+        $integer = self::toInteger($v);
+        return is_int($integer) ? $integer : (float) $v;
     }
 
     /**

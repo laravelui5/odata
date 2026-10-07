@@ -47,9 +47,9 @@ class CodeListCurrency extends Model
     #[UnitSpecificScale(EdmPrimitiveType::Int16, new Path('decimals'))]
     #[Text(new Path('name'))]
     #[StandardCode(new Path('iso'))]
-    public string $code {
+    public ?string $code {
         get => $this->getAttribute('code');
-        set(string $value) => $this->setAttribute('code', $value);
+        set(?string $value) { $this->setAttribute('code', $value); }
     }
 }
 
@@ -64,13 +64,13 @@ class CodeListOrder extends Model
     #[ISOCurrency(new Path('currency'))]
     public ?string $amount {
         get => $this->getAttribute('amount');
-        set(?string $value) => $this->setAttribute('amount', $value);
+        set(?string $value) { $this->setAttribute('amount', $value); }
     }
 
     #[Unit(new Path('unit'))]
     public ?string $quantity {
         get => $this->getAttribute('quantity');
-        set(?string $value) => $this->setAttribute('quantity', $value);
+        set(?string $value) { $this->setAttribute('quantity', $value); }
     }
 }
 

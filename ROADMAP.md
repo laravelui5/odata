@@ -45,44 +45,6 @@ Silent-wrong-schema is the worst failure mode — same family as the 1.0.5 colli
 Reasoned through in the internal route-composition notes.
 <!-- Atom [[ODATA_ALTERNATIVE_CLIENT_DEDICATED_SERVICE]] · spec docs/meta/specs/odata-route-composition.md OP5. -->
 
-## [ ] `OP02` SQL-driver serialization emits raw DB scalars, not values coerced to the declared Edm type
-
-Surfaced 2026-07-06 (`laravelui5/sdk` — `sdk-host` Partners `PartnerParametersEntitySet`) adding a
-computed `writable_by_actor` column declared `EdmPrimitiveType::Boolean`. A custom entity set's rows
-flow `AbstractEntitySet::query()` → `SqlEntitySetResolver` → `->get()` → `EntitySetHandler` (`:84`),
-which echoes `json_encode($row)` on the **raw DB row**. Nothing coerces each property to its declared
-Edm type, so the wire value is whatever the driver returned. MySQL/SQLite have no native boolean
-(`TRUE`/`FALSE` are literals for `1`/`0`), so a `case when … then 1 else 0 end` column declared
-`Edm.Boolean` serializes as JSON `1`, not `true`. The `columns()` Edm map drives the `$metadata`
-schema (the contract the client reads) but **not** the runtime values — a declared-type-vs-emitted-value
-split. A strict client (the UI5 v4 model) trusts the metadata, sees `1` for an `Edm.Boolean` property,
-and rejects it (`"1" is of type number, expected boolean`). Same silent-wrong-value family as the cache
-items — the schema promises one thing, the value delivers another.
-
-The Eloquent path (`EloquentEntitySetResolver` + a model `'col' => 'boolean'` cast) already yields a
-real PHP bool before encoding, so it serializes correctly; the raw `fromSub`/query-builder SQL path has
-no such lever.
-
-**Fix:** the SQL driver should coerce each selected property to its declared `EdmPrimitiveType` before
-`json_encode` — `Boolean → (bool)`, `Int16/Int32/… → (int)`, `Decimal/Double/Single → (float)`,
-preserving null. PHP-side, so it's cross-DB-safe (independent of the driver's return type) and closes the
-gap for every SQL-backed custom set (boolean flags, numeric fidelity), not just this one column.
-
-Workaround (in place downstream): model 0/1 flags as `EdmPrimitiveType::Int32` and coerce at the client
-boundary (`{= !!${…} }` when binding to a boolean control property).
-
-**Two more occurrences, 2026-09-14** — the same error text, reported from the browser against
-`sdk-host`: `PartnerContactsExpand.is_primary` and `PartnerRelationshipsExpand.is_primary`. Both pass
-their rows through untouched (`->map(fn ($row) => (array) $row)`), and the Details view binds
-`visible="{is_primary}"` on a `sap.m.ObjectStatus` — which refuses the number for a boolean property
-and logs once per row. Fixed there with the **other** workaround shape: keep the honest `Edm.Boolean`
-declaration and cast in the row map (`'is_primary' => (bool) $row->is_primary`). That is the shape to
-prefer downstream — it keeps `$metadata` truthful and leaves nothing for a client to un-lie — and it is
-already the house style in the same folder (`PartnerGrantableAbilitiesExpand` casts every scalar).
-**When this entry is fixed, those casts become redundant rather than wrong**, so they are safe to leave
-until then. The count matters for the fix's case: three sets in one app were already affected, and the
-cast is only ever remembered by whoever last hit the error.
-
 ## [ ] `OP03` Virtual `$expand` is resolved only on Eloquent-backed sets — custom (SQL) entity sets ignore it
 
 Surfaced 2026-07-08 (`laravelui5/sdk` — `sdk-host` Partners, building the ui5-partners **object-page
@@ -502,76 +464,6 @@ fix: this is the **schema-build path**, so the dependency must be resolvable at 
 resolver that needs a request is a different bug and should stay one. Test: a custom set with a bound
 dependency.
 
-## [ ] `OP23` `Edm.Binary` goes onto the wire unencoded
-
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
-`RowCoercion` coerces two property kinds — temporal primitives and enums. `Edm.Binary` is not among
-them, and discovery does produce it (`ModelDiscovery.php:451`: `blob`, `binary`, `varbinary`). Raw
-bytes therefore reach `json_encode`, which fails on invalid UTF-8: the response does not come out
-wrong, it does not come out at all. `getting-started/concepts` says base64.
-
-**Fix.** A coercer for `Edm.Binary` in `RowCoercion::buildCoercers()` — **base64url without padding**,
-which is what the OData v4 JSON format prescribes, not a plain `base64_encode`. Test with a blob
-column carrying non-UTF-8 bytes.
-
-## [ ] `OP24` Property-level discovery attributes require a declared PHP property — which shadows Eloquent's attribute bag
-
-> **Decided 2026-10-07 (author): option three plus `useHidden`.** Column attributes
-> (`#[ODataProperty]`, `#[ODataIgnore]`, vocabulary annotations) are written on a **hooked
-> property** that delegates to the attribute bag, as `AnnotatedAirport` already does. On the class,
-> `useHidden: true` takes the model's `$hidden` out of the entity type, which also removes the
-> `$filter` question on hidden columns. Still to build: `useHidden`, the docs samples, and the
-> idiom checked against mass assignment, `toArray()` and `isset()`.
-
-Surfaced 2026-09-18 in the docs pass over `/odata/`, entered 2026-09-20 (author: record it, decide
-separately). `ModelDiscovery` reads `#[ODataIgnore]`, `#[ODataProperty]` and every vocabulary
-annotation off a **`ReflectionProperty`** — `$ref->hasProperty($colName)` gates all three
-(`ModelDiscovery.php:230`, `:240`, `:254`, `:494`). For the attribute to be findable, the model must
-declare a real PHP property named like the column. And that is exactly what an Eloquent model must
-never do: a declared `public $internal_notes` shadows `__get`/`__set`, so the attribute bag is
-bypassed — reads answer `null` instead of the column value, and writes land on the object property
-and are dropped on `save()`. The documented usage teaches the breakage:
-`services/model-discovery` shows `#[ODataIgnore] public $internal_notes;` and
-`#[ODataProperty(name: 'FlightCode')] public $flight_number;`.
-
-So the property-level half of the discovery API is unusable as written. The method-level half
-(`#[ODataIgnore]` on a relation method, `#[ODataNavigation]`) is fine — methods shadow nothing.
-
-**A dedicated session (author, 2026-09-21), and it settles `#[ODataProperty(nullable:)]` with it** —
-both are defects of the same attribute surface, and the shape chosen here decides where `nullable`
-is written. **Target: Minor or Patch**, depending on which shape wins.
-
-**Not decided (author, 2026-09-20).** The shape is a class-level attribute; the open question is what
-it carries:
-
-- `useHidden: true` — everything in the model's `$hidden` stays out of the entity type. Reuses a list
-  the model already keeps, and it closes a second hole the docs name on the same page: `$hidden`
-  protects the *answer* but not the *question*, because a hidden column is still declared in
-  `$metadata` and therefore filterable (`$filter=startswith(password,'$2y')`). Sourcing the ignore
-  list from `$hidden` removes the column from the schema, and the question with it.
-- `properties: ['internal_notes', …]` — an explicit list at the class, independent of `$hidden`.
-- Both, or `$hidden` alone with no attribute at all.
-
-There is a **third option the repository already runs**, and it keeps the attributes where they are:
-declare the property with **PHP 8.4 property hooks** that delegate to the attribute bag —
-`public string $code { get => $this->getAttribute('code'); set(string $v) => $this->setAttribute('code', $v); }`.
-The property is virtual, so nothing is shadowed and the round-trip is intact. That is exactly how the
-test fixture `tests-fixtures/Models/AnnotatedAirport.php` carries `#[Label]`, `#[Description]` and
-`#[Hidden]`, and the package floor is PHP 8.4, so it is available everywhere. The docs show it
-nowhere. If this is the answer, the fix is a documentation fix plus a check of the idiom against mass
-assignment, `toArray()` and `isset()`.
-
-Whatever is chosen, `#[ODataProperty]` and the annotation reader need the same treatment, or they
-stay unusable for the same reason. The docs page must change with the code (two samples, plus the
-`$hidden` note that currently ends in "mark it `#[ODataIgnore]`") — and **until the session has run,
-`services/model-discovery` cannot state a target state for this half of the API**, because none is
-decided. It is the one page in the tree that is knowingly left standing on an unresolved fork.
-
-**Test coverage: none.** `#[ODataIgnore]`, `#[ODataProperty]` and `#[ODataNavigation]` have no test
-at all — `ModelDiscoveryTest` covers only the class-level `#[ODataEntity]` override (`:240`). The
-annotation tests use the hooked fixture, which is why the shadowing has never shown up in a run. A
-test that writes and re-reads an ignored column *through the model* would catch it.
-
 ## [ ] `OP25` The shipped `namespace` default is our own house namespace — and it disagrees with the code fallback
 
 Surfaced 2026-09-18 alongside the same default in Core's `ui5:app` generator, entered 2026-09-20
@@ -630,6 +522,138 @@ Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
 
+## [x] `OP24` Property-level discovery attributes require a declared PHP property — which shadows Eloquent's attribute bag (v3.1.0)
+
+> **Decided 2026-10-07 (author): option three plus `useHidden`.** Column attributes
+> (`#[ODataProperty]`, `#[ODataIgnore]`, vocabulary annotations) are written on a **hooked
+> property** that delegates to the attribute bag, as `AnnotatedAirport` already does. On the class,
+> `useHidden: true` takes the model's `$hidden` out of the entity type, which also removes the
+> `$filter` question on hidden columns. Still to build: `useHidden`, the docs samples, and the
+> idiom checked against mass assignment, `toArray()` and `isset()`.
+
+Surfaced 2026-09-18 in the docs pass over `/odata/`, entered 2026-09-20 (author: record it, decide
+separately). `ModelDiscovery` reads `#[ODataIgnore]`, `#[ODataProperty]` and every vocabulary
+annotation off a **`ReflectionProperty`** — `$ref->hasProperty($colName)` gates all three
+(`ModelDiscovery.php:230`, `:240`, `:254`, `:494`). For the attribute to be findable, the model must
+declare a real PHP property named like the column. And that is exactly what an Eloquent model must
+never do: a declared `public $internal_notes` shadows `__get`/`__set`, so the attribute bag is
+bypassed — reads answer `null` instead of the column value, and writes land on the object property
+and are dropped on `save()`. The documented usage teaches the breakage:
+`services/model-discovery` shows `#[ODataIgnore] public $internal_notes;` and
+`#[ODataProperty(name: 'FlightCode')] public $flight_number;`.
+
+So the property-level half of the discovery API is unusable as written. The method-level half
+(`#[ODataIgnore]` on a relation method, `#[ODataNavigation]`) is fine — methods shadow nothing.
+
+**A dedicated session (author, 2026-09-21), and it settles `#[ODataProperty(nullable:)]` with it** —
+both are defects of the same attribute surface, and the shape chosen here decides where `nullable`
+is written. **Target: Minor or Patch**, depending on which shape wins.
+
+**Not decided (author, 2026-09-20).** The shape is a class-level attribute; the open question is what
+it carries:
+
+- `useHidden: true` — everything in the model's `$hidden` stays out of the entity type. Reuses a list
+  the model already keeps, and it closes a second hole the docs name on the same page: `$hidden`
+  protects the *answer* but not the *question*, because a hidden column is still declared in
+  `$metadata` and therefore filterable (`$filter=startswith(password,'$2y')`). Sourcing the ignore
+  list from `$hidden` removes the column from the schema, and the question with it.
+- `properties: ['internal_notes', …]` — an explicit list at the class, independent of `$hidden`.
+- Both, or `$hidden` alone with no attribute at all.
+
+There is a **third option the repository already runs**, and it keeps the attributes where they are:
+declare the property with **PHP 8.4 property hooks** that delegate to the attribute bag —
+`public string $code { get => $this->getAttribute('code'); set(string $v) => $this->setAttribute('code', $v); }`.
+The property is virtual, so nothing is shadowed and the round-trip is intact. That is exactly how the
+test fixture `tests-fixtures/Models/AnnotatedAirport.php` carries `#[Label]`, `#[Description]` and
+`#[Hidden]`, and the package floor is PHP 8.4, so it is available everywhere. The docs show it
+nowhere. If this is the answer, the fix is a documentation fix plus a check of the idiom against mass
+assignment, `toArray()` and `isset()`.
+
+Whatever is chosen, `#[ODataProperty]` and the annotation reader need the same treatment, or they
+stay unusable for the same reason. The docs page must change with the code (two samples, plus the
+`$hidden` note that currently ends in "mark it `#[ODataIgnore]`") — and **until the session has run,
+`services/model-discovery` cannot state a target state for this half of the API**, because none is
+decided. It is the one page in the tree that is knowingly left standing on an unresolved fork.
+
+**Test coverage: none.** `#[ODataIgnore]`, `#[ODataProperty]` and `#[ODataNavigation]` have no test
+at all — `ModelDiscoveryTest` covers only the class-level `#[ODataEntity]` override (`:240`). The
+annotation tests use the hooked fixture, which is why the shadowing has never shown up in a run. A
+test that writes and re-reads an ignored column *through the model* would catch it.
+
+**Done 2026-10-07 (v3.1.0)** as decided. `#[ODataEntity(useHidden: true)]` leaves `$hidden` columns and
+relations out (the key excepted), and is off by default. The hook idiom was checked against mass
+assignment, `fill()`/`update()`, `toArray()`, `isset()`, dirty tracking and `save()`
+(`tests/Service/Discovery/PropertyHooksAndHiddenTest.php`), and the check found a defect in the idiom
+as we wrote it. The short form `set($v) => $this->setAttribute(…)` assigns the returned model to the
+property, so a direct assignment throws a `TypeError`. Fixture, tests and docs now use the block form
+with nullable types. The docs samples (`#[ODataIgnore]`, `#[ODataProperty]`, the `$hidden` warning)
+state the target. `nullable:` was settled with `OP18` and `precision:`/`scale:` with `OP19`.
+
+## [x] `OP23` `Edm.Binary` goes onto the wire unencoded (v3.1.0)
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
+`RowCoercion` coerces two property kinds — temporal primitives and enums. `Edm.Binary` is not among
+them, and discovery does produce it (`ModelDiscovery.php:451`: `blob`, `binary`, `varbinary`). Raw
+bytes therefore reach `json_encode`, which fails on invalid UTF-8: the response does not come out
+wrong, it does not come out at all. `getting-started/concepts` says base64.
+
+**Fix.** A coercer for `Edm.Binary` in `RowCoercion::buildCoercers()` — **base64url without padding**,
+which is what the OData v4 JSON format prescribes, not a plain `base64_encode`. Test with a blob
+column carrying non-UTF-8 bytes.
+
+**Done 2026-10-07 (v3.1.0).** Base64url without padding in `RowCoercion`, so on every path that
+emits an entity. `/$value` answers the raw bytes as `application/octet-stream` and skips the JSON
+coercion. Tests: `tests/Protocol/Execution/BinaryOnWireTest.php`, with non-UTF-8 bytes. Without the
+coercer, two of the four fail.
+
+## [x] `OP02` SQL-driver serialization emits raw DB scalars, not values coerced to the declared Edm type (v3.1.0)
+
+Surfaced 2026-07-06 (`laravelui5/sdk` — `sdk-host` Partners `PartnerParametersEntitySet`) adding a
+computed `writable_by_actor` column declared `EdmPrimitiveType::Boolean`. A custom entity set's rows
+flow `AbstractEntitySet::query()` → `SqlEntitySetResolver` → `->get()` → `EntitySetHandler` (`:84`),
+which echoes `json_encode($row)` on the **raw DB row**. Nothing coerces each property to its declared
+Edm type, so the wire value is whatever the driver returned. MySQL/SQLite have no native boolean
+(`TRUE`/`FALSE` are literals for `1`/`0`), so a `case when … then 1 else 0 end` column declared
+`Edm.Boolean` serializes as JSON `1`, not `true`. The `columns()` Edm map drives the `$metadata`
+schema (the contract the client reads) but **not** the runtime values — a declared-type-vs-emitted-value
+split. A strict client (the UI5 v4 model) trusts the metadata, sees `1` for an `Edm.Boolean` property,
+and rejects it (`"1" is of type number, expected boolean`). Same silent-wrong-value family as the cache
+items — the schema promises one thing, the value delivers another.
+
+The Eloquent path (`EloquentEntitySetResolver` + a model `'col' => 'boolean'` cast) already yields a
+real PHP bool before encoding, so it serializes correctly; the raw `fromSub`/query-builder SQL path has
+no such lever.
+
+**Fix:** the SQL driver should coerce each selected property to its declared `EdmPrimitiveType` before
+`json_encode` — `Boolean → (bool)`, `Int16/Int32/… → (int)`, `Decimal/Double/Single → (float)`,
+preserving null. PHP-side, so it's cross-DB-safe (independent of the driver's return type) and closes the
+gap for every SQL-backed custom set (boolean flags, numeric fidelity), not just this one column.
+
+Workaround (in place downstream): model 0/1 flags as `EdmPrimitiveType::Int32` and coerce at the client
+boundary (`{= !!${…} }` when binding to a boolean control property).
+
+**Two more occurrences, 2026-09-14** — the same error text, reported from the browser against
+`sdk-host`: `PartnerContactsExpand.is_primary` and `PartnerRelationshipsExpand.is_primary`. Both pass
+their rows through untouched (`->map(fn ($row) => (array) $row)`), and the Details view binds
+`visible="{is_primary}"` on a `sap.m.ObjectStatus` — which refuses the number for a boolean property
+and logs once per row. Fixed there with the **other** workaround shape: keep the honest `Edm.Boolean`
+declaration and cast in the row map (`'is_primary' => (bool) $row->is_primary`). That is the shape to
+prefer downstream — it keeps `$metadata` truthful and leaves nothing for a client to un-lie — and it is
+already the house style in the same folder (`PartnerGrantableAbilitiesExpand` casts every scalar).
+**When this entry is fixed, those casts become redundant rather than wrong**, so they are safe to leave
+until then. The count matters for the fix's case: three sets in one app were already affected, and the
+cast is only ever remembered by whoever last hit the error.
+
+**Done 2026-10-07 (v3.1.0).** In `RowCoercion`, so it holds on every path that emits an entity:
+set, single entity, singleton, property value and `$expand`, on the SQL and the Eloquent driver
+alike. Booleans from `1`/`0`/`"t"`/`"f"`, integers and numbers from driver strings. Unreadable values
+pass unchanged. Under `IEEE754Compatible=true`, Int64 and Decimal stay strings (`OP27`). One existing
+test had pinned the old pass-through (`'3.14'` for a Decimal) and now expects `3.14`. Tests:
+`tests/Driver/Sql/DeclaredTypeOnWireTest.php` (the computed-flag case over HTTP) and the
+`declared type over driver scalar` block in `RowCoercionTest`. The downstream casts in `sdk-host`
+(`PartnerContactsExpand`, `PartnerRelationshipsExpand`, `PartnerGrantableAbilitiesExpand`) are
+redundant now and can go when convenient.
+
 ## [x] `OP28` `odata:cache` is still lossy beyond annotations — complex types do not even load (v3.1.0)
 
 Found 2026-10-07 while fixing `OP26`, **confirmed for complex types, the rest by reading.** The
@@ -683,8 +707,7 @@ significant digits round-trips exactly.
 **Done 2026-10-07 (v3.1.0).** `WireFormat::fromAccept()` reads the parameter from the request's
 `Accept`, or from each `$batch` part's own headers, which the batch handler now parses. `RowCoercion`
 writes Int64 and Decimal as exact strings and recurses into `$expand`. Singletons and property values
-are coerced too, and the `Content-Type` echoes the parameter. `OP02` (Boolean and numbers on the SQL
-path without the parameter) and `OP23` (`Edm.Binary`) sit in the same class and are still open. Tests:
+are coerced too, and the `Content-Type` echoes the parameter. `OP02` and `OP23` were done the same day. Tests:
 `tests/Protocol/Execution/Ieee754CompatibleTest.php`.
 
 ## [x] `OP19` `discoverModel()` emits no type facets — a `decimal(19,6)` column becomes a bare `Edm.Decimal` (v3.1.0)

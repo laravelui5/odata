@@ -52,21 +52,28 @@ final readonly class PropertyValueHandler
             );
         }
 
-        $entity   = (new RowCoercion($plan->target->getEntityType(), $this->format))->apply($entity);
         $propName = $plan->property->getName();
-        $value    = $entity[$propName] ?? null;
 
         if ($plan->rawValue) {
-            // /$value — return raw value with text/plain
+            // /$value — the raw value: bytes for a binary property, text otherwise. No JSON
+            // coercion here; a base64url-encoded blob would be the wrong answer.
+            $value    = $entity[$propName] ?? null;
+            $type     = $plan->property->getType();
+            $isBinary = $type instanceof \LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface
+                && $type->getPrimitiveType() === \LaravelUi5\OData\Edm\EdmPrimitiveType::Binary;
+
             $response = new ODataResponse(null, 200, [
-                'Content-Type' => 'text/plain;charset=utf-8',
+                'Content-Type' => $isBinary ? 'application/octet-stream' : 'text/plain;charset=utf-8',
                 'OData-Version' => '4.0',
             ]);
             $response->setCallback(static function () use ($value): void {
-                echo (string) $value;
+                echo is_bool($value) ? ($value ? 'true' : 'false') : (string) $value;
             });
             return $response;
         }
+
+        $entity = (new RowCoercion($plan->target->getEntityType(), $this->format))->apply($entity);
+        $value  = $entity[$propName] ?? null;
 
         // Property wrapped in JSON context
         $context = $this->serviceRoot . '$metadata#' . $plan->target->getName()
