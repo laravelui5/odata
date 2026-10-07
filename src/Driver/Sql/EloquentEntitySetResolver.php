@@ -413,33 +413,7 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
 
     private function applySearch(Builder $query, EntitySetQueryPlan $plan): void
     {
-        if ($plan->search === null || $plan->search === '') {
-            return;
-        }
-
-        // Simple search: LIKE '%term%' on all string properties.
-        $term = trim($plan->search, '"\'');
-        $entityType = $plan->target->getEntityType();
-        $stringColumns = [];
-
-        foreach ($entityType->getDeclaredProperties() as $prop) {
-            $type = $prop->getType();
-            if ($type instanceof \LaravelUi5\OData\Edm\Type\PrimitiveType) {
-                if ($type->getPrimitiveType() === \LaravelUi5\OData\Edm\EdmPrimitiveType::String) {
-                    $stringColumns[] = $prop->getName();
-                }
-            }
-        }
-
-        if ($stringColumns === []) {
-            return;
-        }
-
-        $query->where(function (Builder $q) use ($stringColumns, $term) {
-            foreach ($stringColumns as $col) {
-                $q->orWhere($col, 'LIKE', '%' . $term . '%');
-            }
-        });
+        SearchClause::apply($query, $plan->target->getEntityType(), $plan->search);
     }
 
     /**

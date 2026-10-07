@@ -235,35 +235,6 @@ and its value is the refusal as much as the extraction.
 trait, and whether the real answer is simply "document the walk" — which is what the page does today,
 and may be enough. An acceptable outcome is "no helper, and here is why".
 
-## [ ] `OP09` `$search` passes `%` and `_` through to `LIKE` — a search term is a wildcard pattern
-
-Found 2026-09-21 while documenting `query-options/search` (Rangliste Punkt 6). Both resolvers build the
-clause the same way — `SqlEntitySetResolver::applySearch()` (`:116`) and
-`EloquentEntitySetResolver::applySearch()` (`:414`), identical bodies:
-
-```php
-$term = trim($plan->search, '"\'');
-$q->orWhere($col, 'LIKE', '%' . $term . '%');
-```
-
-The term is parameter-bound, so this is **not** an injection. It is a matching surprise: `%` and `_`
-are `LIKE` metacharacters, so `$search=50%` matches every row whose text begins with `50`, and
-`$search=a_b` matches `axb`. A user searching for a percentage or a snake_case identifier gets
-silently wrong results — the worst shape, because the response looks successful.
-
-**Fix.** Escape the metacharacters in the term before interpolating — `\`, `%` and `_` — and declare
-the escape character on the clause (`LIKE ? ESCAPE '\\'`), which SQLite, MySQL and Postgres all
-accept. One private helper, called from both resolvers; they are duplicates today and should stay in
-step, so extracting the search clause into one shared place is the better shape than fixing it twice.
-
-**Test.** Three cases per resolver: a term with `%`, one with `_`, one with a backslash.
-
-**Adjacent, not part of this.** `trim($plan->search, '"\'')` strips *any* number of leading and
-trailing quotes of either kind, so `"'foo'"` becomes `foo` and a term that legitimately ends in an
-apostrophe loses it. Harmless in practice; mentioned so the fix does not re-introduce it.
-`query-options/search` documents the current behaviour — including the wildcard leak — since
-2026-09-21.
-
 ## [ ] `OP11` The service document ignores `includedInServiceDocument` and never lists function imports
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
@@ -435,6 +406,41 @@ value shapes. Minor if the defaults land, otherwise major.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP09` `$search` passes `%` and `_` through to `LIKE` — a search term is a wildcard pattern (v3.1.0)
+
+Found 2026-09-21 while documenting `query-options/search` (Rangliste Punkt 6). Both resolvers build the
+clause the same way — `SqlEntitySetResolver::applySearch()` (`:116`) and
+`EloquentEntitySetResolver::applySearch()` (`:414`), identical bodies:
+
+```php
+$term = trim($plan->search, '"\'');
+$q->orWhere($col, 'LIKE', '%' . $term . '%');
+```
+
+The term is parameter-bound, so this is **not** an injection. It is a matching surprise: `%` and `_`
+are `LIKE` metacharacters, so `$search=50%` matches every row whose text begins with `50`, and
+`$search=a_b` matches `axb`. A user searching for a percentage or a snake_case identifier gets
+silently wrong results — the worst shape, because the response looks successful.
+
+**Fix.** Escape the metacharacters in the term before interpolating — `\`, `%` and `_` — and declare
+the escape character on the clause (`LIKE ? ESCAPE '\\'`), which SQLite, MySQL and Postgres all
+accept. One private helper, called from both resolvers; they are duplicates today and should stay in
+step, so extracting the search clause into one shared place is the better shape than fixing it twice.
+
+**Test.** Three cases per resolver: a term with `%`, one with `_`, one with a backslash.
+
+**Adjacent, not part of this.** `trim($plan->search, '"\'')` strips *any* number of leading and
+trailing quotes of either kind, so `"'foo'"` becomes `foo` and a term that legitimately ends in an
+apostrophe loses it. Harmless in practice; mentioned so the fix does not re-introduce it.
+`query-options/search` documents the current behaviour — including the wildcard leak — since
+2026-09-21.
+
+**Done 2026-10-07 (v3.1.0).** One `Driver\Sql\SearchClause` for both resolvers. The escape character
+is `!`, not `\` as sketched above, because a backslash in a SQL literal is read differently across
+databases. The trailing-quote nuance from *Adjacent* was taken along: only a matching surrounding
+pair is removed. Tests: `tests/Driver/Sql/SearchClauseTest.php`, the same cases on both paths.
+`query-options/search` describes the new behaviour.
 
 ## [x] `OP25` The shipped `namespace` default is our own house namespace — and it disagrees with the code fallback (v3.1.0)
 

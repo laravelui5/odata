@@ -62,6 +62,14 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**`$search` matches the term literally.** `%` and `_` reached SQL as `LIKE` wildcards: `$search=50%`
+found every row starting with `50`, and `a_b` found `axb`. Both resolvers now go through one
+`Driver\Sql\SearchClause`, which escapes the wildcards with `!` (`LIKE ? ESCAPE '!'`). A backslash
+in a SQL literal means one character to MySQL and two to SQLite and PostgreSQL, so it could not be
+the escape character. The quote handling changed with it. Only one surrounding pair of matching
+quotes is removed now, where the old `trim` stripped any number of either kind at both ends and so
+ate a trailing apostrophe (`rolls'` searched for `rolls`).
+
 **Small corrections.**
 - **`OData-Version` follows the config.** `odata.version` reached `$metadata` only, and eleven
   handlers wrote `4.0` literally. Both now read `ODataVersion::current()`, so a 4.01 service says so
@@ -216,7 +224,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 675.
+Additive. The suite is green at 687.
 
 ## [3.0.6] – 2026-09-09
 

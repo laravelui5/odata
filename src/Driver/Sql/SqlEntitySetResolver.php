@@ -115,32 +115,7 @@ readonly class SqlEntitySetResolver implements EntitySetResolverInterface, Entit
 
     private function applySearch(Builder $query, EntitySetQueryPlan $plan): void
     {
-        if ($plan->search === null || $plan->search === '') {
-            return;
-        }
-
-        $term = trim($plan->search, '"\'');
-        $entityType = $plan->target->getEntityType();
-        $stringColumns = [];
-
-        foreach ($entityType->getDeclaredProperties() as $prop) {
-            $type = $prop->getType();
-            if ($type instanceof PrimitiveType) {
-                if ($type->getPrimitiveType() === EdmPrimitiveType::String) {
-                    $stringColumns[] = $prop->getName();
-                }
-            }
-        }
-
-        if ($stringColumns === []) {
-            return;
-        }
-
-        $query->where(function (Builder $q) use ($stringColumns, $term) {
-            foreach ($stringColumns as $col) {
-                $q->orWhere($col, 'LIKE', '%' . $term . '%');
-            }
-        });
+        SearchClause::apply($query, $plan->target->getEntityType(), $plan->search);
     }
 
     private function applySelect(Builder $query, EntitySetQueryPlan $plan): void
