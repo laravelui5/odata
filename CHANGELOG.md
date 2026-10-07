@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
-## [3.1.0] – unreleased
+## [3.1.0] – 2026-10-07
 
 `discoverModel()` describes its columns in `$metadata`: `Nullable`, `Precision`/`Scale` and
 `MaxLength` come from the column schema, and `odata:cache` keeps them.
