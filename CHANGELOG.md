@@ -62,6 +62,13 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**`$count` inside `$expand` is answered.** `$expand=lines($count=true)` was parsed and dropped. The
+Eloquent path now emits `lines@odata.count` before `lines`: the size of the collection under the
+expand's `$filter`, not limited by its `$top`/`$skip`. It is computed with one `withCount` sub-select
+per counted navigation, at any nesting depth, and survives `$select`. A single-valued navigation
+answers `400 invalid_expand`. A virtual navigation answers `501 unsupported_expand`, because its
+resolver decides which rows it returns.
+
 **`$filter` refuses what it cannot translate.** An unsupported construct answered `200` with the
 wrong rows, and in both directions. A function or arithmetic as an operand (`length(x) eq 3`,
 `id add 1 eq 2`) compared against an empty column name and returned **nothing**. An ordering
@@ -277,7 +284,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 761.
+Additive. The suite is green at 767.
 
 ## [3.0.6] – 2026-09-09
 

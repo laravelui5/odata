@@ -232,6 +232,42 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
 
         $withs = $this->collectEagerLoads($expand, '', $this->modelClass);
         $query->with($withs);
+        self::applyExpandCounts($query, $expand, $this->modelClass);
+    }
+
+    /**
+     * `$expand=nav($count=true)`: count each counted collection with one sub-select
+     * (`withCount`), under the expand's own `$filter` but not its `$top`/`$skip` —
+     * `@odata.count` is the size of the collection, not of the page.
+     *
+     * @param class-string<Model> $modelClass the model the expanded relations hang on
+     */
+    private static function applyExpandCounts(mixed $query, ExpandList $expand, string $modelClass): void
+    {
+        foreach ($expand->items as $item) {
+            if (!$item->count) {
+                continue;
+            }
+            $navName = $item->property->getName();
+            if (!method_exists($modelClass, $navName)) {
+                throw new \LaravelUi5\OData\Exception\NotImplementedException(
+                    'unsupported_expand',
+                    sprintf('$count is not supported on the virtual navigation property "%s": its resolver decides which rows it returns.', $navName)
+                );
+            }
+            $query->withCount([
+                $navName . ' as ' . self::countAlias($navName) => function ($q) use ($item): void {
+                    if ($item->filter !== null) {
+                        (new FilterToEloquent($q))->apply($item->filter);
+                    }
+                },
+            ]);
+        }
+    }
+
+    private static function countAlias(string $navName): string
+    {
+        return '__odata_count_' . $navName;
     }
 
     /**
@@ -252,11 +288,17 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
 
             // Skip virtual navigation properties — they're handled in attachExpandedRelations()
             if (!method_exists($modelClass, $navName)) {
+                if ($item->count) {
+                    self::applyExpandCounts(null, new ExpandList([$item]), $modelClass);   // refuses
+                }
                 continue;
             }
 
+            $childCounts = array_filter($item->expand->items, static fn ($child) => $child->count);
+
             $hasConstraints = $item->filter !== null || !$item->select->isSelectAll()
-                || $item->orderBy !== null || $item->top !== null || $item->skip !== null;
+                || $item->orderBy !== null || $item->top !== null || $item->skip !== null
+                || $childCounts !== [];
 
             if (!$hasConstraints) {
                 $withs[] = $fullPath;
@@ -328,6 +370,11 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
                             $relQuery->limit(PHP_INT_MAX);
                         }
                     }
+
+                    // Counts of the next level hang on this level's query (after any select).
+                    if ($item->expand->items !== []) {
+                        self::applyExpandCounts($relQuery, $item->expand, get_class($relQuery->getModel()));
+                    }
                 };
             }
 
@@ -368,6 +415,12 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
             }
 
             $relation = $model->getRelation($navName);
+
+            if ($item->count) {
+                // The annotation goes before its property; the withCount helper column goes.
+                unset($row[$navName], $row[self::countAlias($navName)]);
+                $row[$navName . '@odata.count'] = (int) $model->getAttribute(self::countAlias($navName));
+            }
 
             if ($item->property->isCollection()) {
                 if ($item->expand->isEmpty()) {

@@ -210,23 +210,6 @@ That keeps the interface honest, removes a per-request serialization from the wa
 Until those are settled, the two doc pages keep describing the mechanism (docs-are-the-spec); they
 must not describe the path or the command flag, because neither is decided.
 
-## [ ] `OP15` Nested `$count` inside `$expand` is parsed and never emitted
-
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
-`$expand=Items($count=true)` parses cleanly and reaches the plan — `QueryPlanner:617` sets
-`count: $nestedOpts['count']` on the `ExpandItem` — and nothing ever reads that field.
-`EloquentEntitySetResolver` implements `count()` for the top level only (`:167`). The response carries
-no `Items@odata.count`, and the client is never told its question was dropped. Silent-drop family,
-like the `$filter` entry above.
-
-**Fix.** On the Eloquent path the lever exists and is cheap: `withCount()` on the relation, emitted as
-`Nav@odata.count` beside the expanded collection. For SQL-backed custom entity sets there is no such
-lever — there the honest answer is a loud `400`, not silence. Tests: one Eloquent expand with
-`$count=true`, one custom set that refuses.
-
-`query-options/select-and-expand` describes the target state; it must show nested `$count` as
-supported once this lands, and must not be trimmed back in the meantime.
-
 ## [ ] `OP16` The announced `odata-error` trailer is not an HTTP trailer — it corrupts the body instead
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Minor**).
@@ -312,6 +295,32 @@ for hosts that set `pagination.default`.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP15` Nested `$count` inside `$expand` is parsed and never emitted (v3.1.0)
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
+`$expand=Items($count=true)` parses cleanly and reaches the plan — `QueryPlanner:617` sets
+`count: $nestedOpts['count']` on the `ExpandItem` — and nothing ever reads that field.
+`EloquentEntitySetResolver` implements `count()` for the top level only (`:167`). The response carries
+no `Items@odata.count`, and the client is never told its question was dropped. Silent-drop family,
+like the `$filter` entry above.
+
+**Fix.** On the Eloquent path the lever exists and is cheap: `withCount()` on the relation, emitted as
+`Nav@odata.count` beside the expanded collection. For SQL-backed custom entity sets there is no such
+lever — there the honest answer is a loud `400`, not silence. Tests: one Eloquent expand with
+`$count=true`, one custom set that refuses.
+
+`query-options/select-and-expand` describes the target state; it must show nested `$count` as
+supported once this lands, and must not be trimmed back in the meantime.
+
+**Done 2026-10-07 (v3.1.0)** on the Eloquent path, decided with the author. `withCount` with the
+expand's `$filter` and without its `$top`/`$skip`, aliased so the helper column never reaches the
+wire. Top level on the query; nested levels in the parent's eager-load closure, which is forced when a
+child counts. `nav@odata.count` is placed before `nav` and kept under `$select`. Refusals: a
+single-valued navigation answers `400 invalid_expand` at plan time, and a virtual navigation answers
+`501 unsupported_expand` before the query runs (author: more honest than counting the returned rows).
+The SQL path has no expands to count until `OP03`. Tests: `tests/Driver/Sql/ExpandCountTest.php`.
+`query-options/select-and-expand` gained a *Nested $count* section.
 
 ## [x] `OP31` The filter parser rejects `in (…)` and lambdas — `400 parse_error` for valid filters (v3.1.0)
 

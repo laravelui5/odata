@@ -681,6 +681,14 @@ final readonly class QueryPlanner
             // Parse nested options if present.
             $nestedOpts = $this->parseNestedExpandOptions($nestedString, $targetSet, $schema);
 
+            // $count counts a collection; a single-valued navigation has nothing to count.
+            if ($nestedOpts['count'] && !$navProp->isCollection()) {
+                throw new BadRequestException(
+                    'invalid_expand',
+                    sprintf('$count is only valid on a collection; "%s" is single-valued', $navName)
+                );
+            }
+
             $items[] = new ExpandItem(
                 property:  $navProp,
                 targetSet: $targetSet,

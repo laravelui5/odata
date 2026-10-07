@@ -41,9 +41,12 @@ final class SelectHelper
             }
         }
 
-        // Expanded navigation properties are always present in the response.
+        // Expanded navigation properties are always present in the response, with their count.
         foreach ($expand->items as $item) {
             $keys[$item->property->getName()] = true;
+            if ($item->count) {
+                $keys[$item->property->getName() . '@odata.count'] = true;
+            }
         }
 
         // Computed properties are always present in the response.
