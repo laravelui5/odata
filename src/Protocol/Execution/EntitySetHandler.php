@@ -58,8 +58,13 @@ final readonly class EntitySetHandler
         $coercion    = new RowCoercion($plan->target->getEntityType(), $this->format);
         $target      = $this->target;
 
-        $response->setCallback(static function () use ($context, $resolver, $plan, $selectKeys, $count, $pageSize, $serviceRoot, $setName, $coercion, $target): void {
-            $generator = $resolver->resolve($plan);
+        // Run the query up to the first row *before* the response is committed. The generator
+        // builds and executes it lazily; started inside the stream callback, a refused $filter
+        // (501) or a SQL error would arrive after a 200 had been sent. Rows still stream.
+        $generator = $resolver->resolve($plan);
+        $generator->current();
+
+        $response->setCallback(static function () use ($context, $generator, $plan, $selectKeys, $count, $pageSize, $serviceRoot, $setName, $coercion, $target): void {
 
             echo '{"@odata.context":' . json_encode($context);
 
@@ -73,7 +78,9 @@ final readonly class EntitySetHandler
             $emitted  = 0;
             $hasMore  = false;
 
-            foreach ($generator as $row) {
+            // The generator was started before the response (current()), so continue it
+            // rather than foreach, which would try to rewind it.
+            for (; $generator->valid(); $generator->next()) {
                 if ($pageSize !== null && $emitted >= $pageSize) {
                     $hasMore = true;
                     break;
@@ -82,6 +89,7 @@ final readonly class EntitySetHandler
                 if (!$first) {
                     echo ',';
                 }
+                $row = $generator->current();
                 $row = $selectKeys !== null ? array_intersect_key($row, $selectKeys) : $row;
                 $row = $coercion->apply($row);
                 echo json_encode($row, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

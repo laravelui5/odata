@@ -18,6 +18,7 @@ an entry below.
 | Gap | Today | Queued |
 |:---|:---|:---|
 | **Service document** | Neither `includedInServiceDocument` switch is read, and function imports are never listed | Both honoured; `FunctionImport`'s default moves to `true` |
+| **`$filter` with `in` and lambdas** | The parser rejects `in (…)` and `nav/any(x:…)` with `400 parse_error` | Both parse; the translators already handle them (`OP31`) |
 | **Cached `$metadata`** | `$metadata` is serialized on every request; `cachedMetadataXMLPath()` is read by nothing | `odata:cache` writes the document and the serializer streams it; the cold path is unchanged |
 
 ## Pending
@@ -104,36 +105,6 @@ need the relations). This would let one discovered set serve a **fast lean list*
 **rich detail** (keyed, `$expand`) — unifying master/detail on Eloquent without the hydration tax.
 
 In the spirit of the engine: the fast path should be the default, hydration the opt-in that expands require.
-
-## [ ] `OP06` Unsupported `$filter` constructs are silently dropped, widening the result set
-
-Surfaced 2026-08-22 (docs/code drift audit of `docs/odata/`). Both translators end their dispatch in
-a no-op default:
-
-- `FilterToQuery::visitBinary` — arithmetic (`add`/`sub`/`mul`/`div`/`mod`) and `has` fall to
-  `default => null`
-- `FilterToQuery::visitFunctionCall` / `FilterToEloquent::visitFunctionCall` — every function except
-  `contains`/`startswith`/`endswith` falls to `default => null`
-- `FilterToQuery::visitLambda` — `any`/`all` return `null` (the Eloquent translator implements both)
-
-The parser accepts all of them (`FilterParser::OPERATORS` carries 27 functions plus the arithmetic
-and lambda operators), so the expression is valid, planned, and then **contributes no WHERE clause**.
-`Products?$filter=year(created_at) eq 2026` answers `200 OK` with the whole collection.
-
-A filter that silently doesn't filter is a data-exposure shape, not a missing feature: a caller who
-believes they scoped a read gets rows they meant to exclude, and the honest-partial channel the read
-authorizer uses (`sap-messages`) is not involved. It is also the one failure mode a client cannot
-detect — an empty predicate looks exactly like a permissive one.
-
-**Fix:** the translators should refuse what they cannot translate — throw `NotImplementedException`
-(501) naming the construct, rather than returning `null`. That turns an invisible wrong answer into
-a legible error, and it makes the supported set self-documenting: whatever 501s is what the docs
-must list. If a softer landing is wanted for lambdas on the SQL path, `FilterToQuery` could record a
-`sap-messages` warning through `ReadContext` instead — but never a bare drop.
-
-Note the asymmetry to resolve alongside it: `FilterToEloquent` supports `any`/`all` (`whereHas` /
-`whereDoesntHave`) and `FilterToQuery` does not, so the same URL behaves differently depending on
-which resolver backs the set.
 
 ## [ ] `OP07` Generated vocabulary attributes emit invalid CSDL — `#[LineItem]` gives no columns, `Boolean="1"`
 
@@ -278,6 +249,10 @@ never comes.
 that a consumer who hits a truncated body knows what they are looking at and that `odata.streaming =
 false` is the way around it today.
 
+**Narrowed 2026-10-07 (`OP06`).** `EntitySetHandler` now runs the query to the first row before the
+response is committed. An error *before* the first row (a refused filter, a SQL error) gets its own
+status code. What remains is an error *after* rows have gone out.
+
 ## [ ] `OP29` The vocabulary generator has drifted from the committed classes — regenerate deliberately
 
 Found 2026-10-07 while building `OP19` level 3. A full run of the generator into a scratch directory
@@ -331,6 +306,26 @@ probe in `acme` before switching it on.
 and pass it into the navigation plans too. Probably a Minor, since server-visible behaviour changes
 for hosts that set `pagination.default`.
 
+## [ ] `OP31` The filter parser rejects `in (…)` and lambdas — `400 parse_error` for valid filters
+
+Found 2026-10-07 while building `OP06`. `FilterParser::parse()` fails on both, with any spacing:
+
+```
+id in (1,3)                          → Unexpected token at: id> <in (1,3)
+origin in ('a','b')                  → Unexpected token at: origin> <in ('a','b')
+passengers/any(p: p/name eq 'p1')    → Unexpected token at: passengers/any(p:> <p/name eq 'p1')
+```
+
+The operator table lists both (`'in'`, `'any'`, `'all'`), and the parser has code for an attached `in`
+list and for lambdas, so this is a defect in the tokenizer or in the shunting-yard loop, not a
+missing feature. The translators are ready: `AbstractFilterTranslator::in()` and
+`FilterToEloquent::visitLambda()` are tested with built expressions. `query-options/filter`
+documents both as supported and carries a *planned* marker until this lands.
+
+**Fix.** Find where the tokenizer loses `in` after a property path, and where the lambda variable
+(`p:`) breaks. Then test both through HTTP on both paths (`FilterTranslationTest` has the fixtures).
+A Patch.
+
 ---
 
 ## Done
@@ -338,6 +333,51 @@ for hosts that set `pagination.default`.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP06` Unsupported `$filter` constructs are silently dropped, widening the result set (v3.1.0)
+
+Surfaced 2026-08-22 (docs/code drift audit of `docs/odata/`). Both translators end their dispatch in
+a no-op default:
+
+- `FilterToQuery::visitBinary` — arithmetic (`add`/`sub`/`mul`/`div`/`mod`) and `has` fall to
+  `default => null`
+- `FilterToQuery::visitFunctionCall` / `FilterToEloquent::visitFunctionCall` — every function except
+  `contains`/`startswith`/`endswith` falls to `default => null`
+- `FilterToQuery::visitLambda` — `any`/`all` return `null` (the Eloquent translator implements both)
+
+The parser accepts all of them (`FilterParser::OPERATORS` carries 27 functions plus the arithmetic
+and lambda operators), so the expression is valid, planned, and then **contributes no WHERE clause**.
+`Products?$filter=year(created_at) eq 2026` answers `200 OK` with the whole collection.
+
+A filter that silently doesn't filter is a data-exposure shape, not a missing feature: a caller who
+believes they scoped a read gets rows they meant to exclude, and the honest-partial channel the read
+authorizer uses (`sap-messages`) is not involved. It is also the one failure mode a client cannot
+detect — an empty predicate looks exactly like a permissive one.
+
+**Fix:** the translators should refuse what they cannot translate — throw `NotImplementedException`
+(501) naming the construct, rather than returning `null`. That turns an invisible wrong answer into
+a legible error, and it makes the supported set self-documenting: whatever 501s is what the docs
+must list. If a softer landing is wanted for lambdas on the SQL path, `FilterToQuery` could record a
+`sap-messages` warning through `ReadContext` instead — but never a bare drop.
+
+Note the asymmetry to resolve alongside it: `FilterToEloquent` supports `any`/`all` (`whereHas` /
+`whereDoesntHave`) and `FilterToQuery` does not, so the same URL behaves differently depending on
+which resolver backs the set.
+
+**Done 2026-10-07 (v3.1.0)**, decided with the author: `501` rather than a soft `sap-messages`
+landing, and `tolower`/`toupper` as operands taken along. Measured first, and the defect ran both
+ways. A function or arithmetic as an operand compared against `""` and returned **nothing**. An
+ordering comparison with `null` and an unsupported function on its own returned **everything**. One
+`AbstractFilterTranslator` for both paths; only lambdas differ, being refused on SQL. `contains`/
+`startswith`/`endswith` escape wildcards (`ESCAPE '!'`, as `OP09`). `in` read its list through
+`visitFunctionCall('__list')` and got `[]`.
+
+A second defect had to go with it, or the 501 could never arrive. `EntitySetHandler` started the
+resolver's generator inside the stream callback, so every error during the query came after `200`.
+The generator is now run to the first row before the response is committed (see `OP16`). Found and
+left for `OP31`: the parser accepts neither `in` nor lambdas. Tests:
+`tests/Driver/Sql/FilterTranslationTest.php`, with both paths over one table; `in`/`any` drive the
+translators directly.
 
 ## [x] `OP05` `@odata.nextLink` drops every query option except `$skip` — page 2 is unfiltered (v3.1.0)
 

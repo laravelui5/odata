@@ -62,6 +62,27 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**`$filter` refuses what it cannot translate.** An unsupported construct answered `200` with the
+wrong rows, and in both directions. A function or arithmetic as an operand (`length(x) eq 3`,
+`id add 1 eq 2`) compared against an empty column name and returned **nothing**. An ordering
+comparison with `null` and any unsupported function on its own returned **everything**. Both
+translators now share one `AbstractFilterTranslator`, so they cannot drift apart again:
+- Untranslatable functions, operators and lambdas answer **`501 unsupported_filter`**, naming the
+  construct.
+- A comparison without a property, `null` with anything but `eq`/`ne`, or a non-Boolean on its own
+  answers **`400 invalid_filter`**.
+- `tolower`/`toupper` now translate to `LOWER()`/`UPPER()` in any comparison. UI5's
+  case-insensitive filters (`tolower(Name) eq tolower('x')`) returned nothing before.
+- `contains`/`startswith`/`endswith` match literally, with wildcards escaped as for `$search`.
+- `3 lt id` is mirrored, a Boolean property on its own filters, and `$filter=false` returns nothing
+  (it returned everything).
+- `in` read its list through a path that yielded `[]`. It is translated correctly now, but the
+  parser does not accept `in` yet (see the ROADMAP).
+
+**Errors before the first row keep their status code.** `EntitySetHandler` ran the query lazily,
+inside the stream callback, so a refused filter or a SQL error arrived after `200` had been sent.
+The query now runs up to the first row before the response is committed. Rows still stream.
+
 **`@odata.nextLink` repeats the query.** The link was `<Set>?$skip=n`. A client that paged
 `Users?$filter=…&$orderby=…&$select=…` got a correct first page, then followed the link to an
 unfiltered, unsorted, unprojected second page, and a navigation collection linked into the whole
@@ -251,7 +272,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 708.
+Additive. The suite is green at 750.
 
 ## [3.0.6] – 2026-09-09
 
