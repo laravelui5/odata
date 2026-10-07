@@ -24,28 +24,29 @@ use LaravelUi5\OData\Tests\TestCase;
  * `expandDenier()` builds an enforcer that walks the plan's expand tree and drops every expand
  * pointing at the named set — the shape an SDK `#[Read]` enforcer will take.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        $this->app->instance(ODataServiceRegistryInterface::class, new FlightServiceRegistry());
+beforeEach(function () {
+    $this->withExceptionHandling();
 
-        Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
-            ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
-        ]);
+    $this->app->instance(ODataServiceRegistryInterface::class, new FlightServiceRegistry());
 
-        Passenger::insert([
-            ['name' => 'Alice', 'flight_id' => 1],
-            ['name' => 'Bob',   'flight_id' => 1],
-            ['name' => 'Carol', 'flight_id' => 2],
-        ]);
+    Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
+        ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
+    ]);
 
-        Airport::insert([
-            ['name' => 'Heathrow', 'code' => 'LHR'],
-            ['name' => 'Los Angeles Intl', 'code' => 'LAX'],
-        ]);
-    });
+    Passenger::insert([
+        ['name' => 'Alice', 'flight_id' => 1],
+        ['name' => 'Bob',   'flight_id' => 1],
+        ['name' => 'Carol', 'flight_id' => 2],
+    ]);
+
+    Airport::insert([
+        ['name' => 'Heathrow', 'code' => 'LHR'],
+        ['name' => 'Los Angeles Intl', 'code' => 'LAX'],
+    ]);
+});
 
 /** An enforcer that drops every $expand targeting $set, at any depth. */
 function expandDenier(string $set): ReadAuthorizerInterface

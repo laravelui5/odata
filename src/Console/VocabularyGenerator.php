@@ -997,10 +997,21 @@ PHP;
         string $description,
     ): string {
         $docblock = $description !== '' ? "/**\n * {$description}\n */\n" : '';
-        $cases    = implode("\n", array_map(
-            static fn($m) => "    case {$m['name']} = {$m['value']};",
-            $enumInfo['members'],
-        ));
+        // A PHP enum refuses two cases with one value (fatal on first access),
+        // but a vocabulary may alias a member — Common.FieldControlType has
+        // Hidden = 0 beside Inapplicable = 0. The first member keeps the case;
+        // an alias becomes a constant pointing at it, so the name still works.
+        $lines = [];
+        $seen  = [];
+        foreach ($enumInfo['members'] as $m) {
+            if (isset($seen[$m['value']])) {
+                $lines[] = "    public const {$m['name']} = self::{$seen[$m['value']]};";
+                continue;
+            }
+            $seen[$m['value']] = $m['name'];
+            $lines[] = "    case {$m['name']} = {$m['value']};";
+        }
+        $cases = implode("\n", $lines);
         $flagsComment = $enumInfo['isFlags'] ? "\n    // IsFlags = true" : '';
 
         return <<<PHP

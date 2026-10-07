@@ -12,22 +12,23 @@ use LaravelUi5\OData\Tests\TestCase;
  * Verifies that a column declared as a backed-enum class-string lands as
  * an EnumType in $metadata and emits the symbolic member name on the wire.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        $this->app->instance(
-            ODataServiceRegistryInterface::class,
-            new EnumServiceRegistry(),
-        );
+beforeEach(function () {
+    $this->withExceptionHandling();
 
-        \LaravelUi5\OData\Fixtures\Models\Passenger::insert([
-            ['name' => 'Alice', 'flight_id' => 1, 'colour' => 1],   // Red
-            ['name' => 'Bob',   'flight_id' => 1, 'colour' => 2],   // Green
-            ['name' => 'Carol', 'flight_id' => 2, 'colour' => 8],   // Brown
-            ['name' => 'Dave',  'flight_id' => 2, 'colour' => 99],  // unknown — drift case
-        ]);
-    });
+    $this->app->instance(
+        ODataServiceRegistryInterface::class,
+        new EnumServiceRegistry(),
+    );
+
+    \LaravelUi5\OData\Fixtures\Models\Passenger::insert([
+        ['name' => 'Alice', 'flight_id' => 1, 'colour' => 1],   // Red
+        ['name' => 'Bob',   'flight_id' => 1, 'colour' => 2],   // Green
+        ['name' => 'Carol', 'flight_id' => 2, 'colour' => 8],   // Brown
+        ['name' => 'Dave',  'flight_id' => 2, 'colour' => 99],  // unknown — drift case
+    ]);
+});
 
 describe('EnumType $metadata', function () {
     it('emits the EnumType element with all members', function () {

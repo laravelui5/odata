@@ -12,15 +12,16 @@ use LaravelUi5\OData\Tests\TestCase;
  * Verifies that vocabulary annotations on Eloquent models appear in the
  * $metadata CSDL XML response after being discovered by ModelDiscovery.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        $this->app->instance(
-            ODataServiceRegistryInterface::class,
-            new AnnotationDiscoveryServiceRegistry(),
-        );
-    });
+beforeEach(function () {
+    $this->withExceptionHandling();
+
+    $this->app->instance(
+        ODataServiceRegistryInterface::class,
+        new AnnotationDiscoveryServiceRegistry(),
+    );
+});
 
 // ── Entity type annotations in $metadata ─────────────────────────────────────
 

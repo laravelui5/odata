@@ -6,6 +6,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [3.1.0] – unreleased
+
+`discoverModel()` describes its columns in `$metadata`: `Nullable`, `Precision`/`Scale` and
+`MaxLength` come from the column schema, and `odata:cache` keeps them.
+
+**Facets from the column.** Discovery built each property from a name, a type and its annotations,
+and nothing else. A `decimal(19,6)` column became a bare `Edm.Decimal`, so UI5's
+`sap.ui.model.odata.type.Decimal` formatted it without a scale. Discovery now reads the facets from
+`Schema::getColumns()`:
+
+- `Nullable` follows the column. A key property is never nullable. SQLite reports an integer primary
+  key as nullable, and that report is ignored.
+- `Precision` and `Scale` come from `decimal(p,s)` / `numeric(p,s)`. A bare `decimal(p)` gives
+  `Scale` 0.
+- `MaxLength` comes from a length-bearing character type (`varchar(n)`, `char(n)`, `nvarchar(n|max)`,
+  `character varying(n)`).
+
+A facet is taken only when the final Edm type can carry it. A `#[ODataProperty(type:)]` override
+therefore never inherits a length or scale that belongs to the column's original type. A nullable
+column with nothing else to declare stays without facets and serializes exactly as before.
+
+**`#[ODataProperty(nullable:)]` is read.** The parameter had been declared since the attribute
+existed and changed nothing. It now overrides the column's nullability.
+
+**`odata:cache` keeps the facets.** `EdmxWriter` generated every property as
+`new Property(name, type)` and dropped facets, the collection flag and the default value. A
+cached service would have announced a schema different from the one the same service builds cold.
+This is the failure that 3.0.3 fixed for enum types. The writer now carries all three, and a test asserts
+that warm and cold `$metadata` are identical.
+
+**What a host sees.** Every `NOT NULL` column now announces `Nullable="false"`, and every
+length-bearing string column announces its `MaxLength`. UI5's V4 types read both as constraints. A
+control bound two-way to such a property validates against them.
+
+**`FieldControlType::Hidden` no longer kills the request.** The Common vocabulary defines `Hidden`
+as an alias of `Inapplicable`, both with value 0. The generator wrote them as two enum cases, and
+PHP refuses that. The first access to the enum ended in a fatal `Duplicate value in enum` error, so
+`#[FieldControl(FieldControlType::Hidden)]` could never have worked. `VocabularyGenerator` now keeps
+the first member of a value as the case and writes every alias as a constant pointing at it.
+`FieldControlType::Hidden` resolves to `Inapplicable`, and existing code keeps working. PHPStan 2
+found the defect.
+
+**Static analysis runs again, now over the tests too (dev only).** `phpstan/phpstan` goes from
+`^1.0` to `^2.1`, because PHPStan 1 could not parse PHP 8.4 property hooks. Two dev packages are new:
+`larastan/larastan` for Eloquent and the container, and `mrpunyapal/peststan` for Pest. PestStan
+gives the test closures their `$this`. The official `pestphp/pest-plugin-phpstan` needs Pest 5, and
+this package is on Pest 3. `phpstan.neon` loses the paths inherited from lodata, none of which
+existed, and analyses `src` and `tests` at level 1 without errors. To get there:
+
+- Thirteen test files split `uses(TestCase::class)->beforeEach(...)` into two statements. PestStan
+  does not bind `$this` inside the chained form. The behaviour is the same.
+- PestStan's `pest.expectation.redundant` is ignored under `tests/`. The affected assertions are
+  contract tests ("implements X") that guard the class hierarchy.
+- The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
+- Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
+
+Additive. The suite is green at 618.
+
 ## [3.0.6] – 2026-09-09
 
 The distributed package stops carrying the test suite.

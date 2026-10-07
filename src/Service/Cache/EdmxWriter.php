@@ -20,6 +20,7 @@ use LaravelUi5\OData\Edm\Contracts\SchemaInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\TypeFacetsInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeInterface;
 
 /**
@@ -500,12 +501,44 @@ final class EdmxWriter
     {
         $lines = [];
         foreach ($properties as $prop) {
-            $typeCode = $this->generateTypeCode($prop->getType(), $typeMap);
-            $lines[] = "            new Property('{$this->e($prop->getName())}', {$typeCode}),";
+            $args = [
+                "'{$this->e($prop->getName())}'",
+                $this->generateTypeCode($prop->getType(), $typeMap),
+            ];
+            if ($prop->isCollection()) {
+                $args[] = 'isCollection: true';
+            }
+            if ($prop->getFacets() !== null) {
+                $args[] = 'facets: ' . $this->generateFacetsCode($prop->getFacets());
+            }
+            if ($prop->getDefaultValue() !== null) {
+                $args[] = "defaultValue: '{$this->e($prop->getDefaultValue())}'";
+            }
+            $lines[] = '            new Property(' . implode(', ', $args) . '),';
         }
 
         $block = implode("\n", $lines);
         return "        \$this->declaredProperties = [\n{$block}\n        ];";
+    }
+
+    /**
+     * Generate PHP code for a property's type facets.
+     *
+     * Every facet is written, defaults included, so the cached property
+     * answers each facet getter exactly as the one discovery built.
+     */
+    private function generateFacetsCode(TypeFacetsInterface $facets): string
+    {
+        $int = static fn (?int $v): string => $v === null ? 'null' : (string) $v;
+        $unicode = $facets->isUnicode() === null ? 'null' : $this->bool($facets->isUnicode());
+
+        return 'new \\LaravelUi5\\OData\\Edm\\Type\\TypeFacets('
+            . "nullable: {$this->bool($facets->isNullable())}, "
+            . "maxLength: {$int($facets->getMaxLength())}, "
+            . "precision: {$int($facets->getPrecision())}, "
+            . "scale: {$int($facets->getScale())}, "
+            . "unicode: {$unicode}, "
+            . "srid: {$int($facets->getSrid())})";
     }
 
     /**

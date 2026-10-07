@@ -16,14 +16,14 @@ abstract readonly class FilterExpression
     final public function accept(FilterExpressionVisitor $visitor): mixed
     {
         return match ($this->kind()) {
-            FilterExpressionKind::Literal        => $visitor->visitLiteral($this),        // @phpstan-ignore-line
-            FilterExpressionKind::NullLiteral    => $visitor->visitNullLiteral($this),    // @phpstan-ignore-line
-            FilterExpressionKind::PropertyPath   => $visitor->visitPropertyPath($this),   // @phpstan-ignore-line
-            FilterExpressionKind::Binary         => $visitor->visitBinary($this),         // @phpstan-ignore-line
-            FilterExpressionKind::Unary          => $visitor->visitUnary($this),          // @phpstan-ignore-line
-            FilterExpressionKind::FunctionCall   => $visitor->visitFunctionCall($this),   // @phpstan-ignore-line
-            FilterExpressionKind::Lambda         => $visitor->visitLambda($this),         // @phpstan-ignore-line
-            FilterExpressionKind::LambdaVariable => $visitor->visitLambdaVariable($this), // @phpstan-ignore-line
+            FilterExpressionKind::Literal        => $visitor->visitLiteral($this),
+            FilterExpressionKind::NullLiteral    => $visitor->visitNullLiteral($this),
+            FilterExpressionKind::PropertyPath   => $visitor->visitPropertyPath($this),
+            FilterExpressionKind::Binary         => $visitor->visitBinary($this),
+            FilterExpressionKind::Unary          => $visitor->visitUnary($this),
+            FilterExpressionKind::FunctionCall   => $visitor->visitFunctionCall($this),
+            FilterExpressionKind::Lambda         => $visitor->visitLambda($this),
+            FilterExpressionKind::LambdaVariable => $visitor->visitLambdaVariable($this),
         };
     }
 }

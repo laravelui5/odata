@@ -12,21 +12,22 @@ use LaravelUi5\OData\Tests\TestCase;
  * inside a `$batch`. The batch case is the regression guard: custom options live
  * only on the inner request's URL, never on the outer `$batch` envelope.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        $this->app->instance(
-            ODataServiceRegistryInterface::class,
-            new CustomOptionServiceRegistry(),
-        );
+beforeEach(function () {
+    $this->withExceptionHandling();
 
-        \LaravelUi5\OData\Fixtures\Models\Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
-            ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
-            ['origin' => 'lhr', 'destination' => 'jfk', 'gate' => 3, 'duration' => 3600.0],
-        ]);
-    });
+    $this->app->instance(
+        ODataServiceRegistryInterface::class,
+        new CustomOptionServiceRegistry(),
+    );
+
+    \LaravelUi5\OData\Fixtures\Models\Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
+        ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
+        ['origin' => 'lhr', 'destination' => 'jfk', 'gate' => 3, 'duration' => 3600.0],
+    ]);
+});
 
 it('applies a custom query option on a direct GET', function () {
     $response = $this->get('/odata/CustomOptionFlights?origin=lhr');

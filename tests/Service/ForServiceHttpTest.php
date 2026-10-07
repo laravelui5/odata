@@ -16,21 +16,22 @@ use LaravelUi5\OData\Tests\TestCase;
  * documented "alternative client" pattern, e.g. `/excel` + auth.basic), and verifies
  * both that it serves and that the bound mount is honored in self-referential URLs.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        // A service-bound route on its own prefix — no registry involved.
-        Route::any('alt/{path?}', fn (Request $request, ?string $path = null) =>
-            app(OData::class)->forService($request, app(BoundMountFlightService::class))
-        )->where('path', '.*');
+beforeEach(function () {
+    $this->withExceptionHandling();
 
-        Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
-            ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
-            ['origin' => 'lhr', 'destination' => 'jfk', 'gate' => 3, 'duration' => 3600.0],
-        ]);
-    });
+    // A service-bound route on its own prefix — no registry involved.
+    Route::any('alt/{path?}', fn (Request $request, ?string $path = null) =>
+        app(OData::class)->forService($request, app(BoundMountFlightService::class))
+    )->where('path', '.*');
+
+    Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
+        ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
+        ['origin' => 'lhr', 'destination' => 'jfk', 'gate' => 3, 'duration' => 3600.0],
+    ]);
+});
 
 it('serves $metadata for a bound service on a custom prefix', function () {
     $response = $this->get('/alt/$metadata');

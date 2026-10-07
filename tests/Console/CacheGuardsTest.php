@@ -118,7 +118,7 @@ function makeVendoredService(): ODataServiceInterface
 
     require_once $file;
 
-    return new VendoredGuardService();
+    return new VendoredGuardService(); // @phpstan-ignore class.notFound (written to a temp file above)
 }
 
 function rmVendoredService(): void

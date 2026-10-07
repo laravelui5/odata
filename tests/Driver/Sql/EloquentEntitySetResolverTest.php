@@ -28,14 +28,15 @@ use LaravelUi5\OData\Tests\TestCase;
  * Boots Orchestra TestCase (SQLite in-memory) so that the flights table and
  * real Eloquent queries are available. Does NOT make HTTP requests.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100],
-            ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133],
-            ['origin' => 'jfk', 'destination' => 'ord', 'gate' => 3, 'duration' => 3600],
-        ]);
-    });
+uses(TestCase::class);
+
+beforeEach(function () {
+    Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100],
+        ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133],
+        ['origin' => 'jfk', 'destination' => 'ord', 'gate' => 3, 'duration' => 3600],
+    ]);
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -20,20 +20,21 @@ use LaravelUi5\OData\Tests\TestCase;
  * A denied inner request produces a per-inner 403 entry; sibling requests are unaffected
  * (the batch envelope carries per-request status natively).
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        $this->app->instance(ODataServiceRegistryInterface::class, new FlightServiceRegistry());
+beforeEach(function () {
+    $this->withExceptionHandling();
 
-        Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
-        ]);
+    $this->app->instance(ODataServiceRegistryInterface::class, new FlightServiceRegistry());
 
-        Passenger::insert([
-            ['name' => 'Alice', 'flight_id' => 1],
-        ]);
-    });
+    Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
+    ]);
+
+    Passenger::insert([
+        ['name' => 'Alice', 'flight_id' => 1],
+    ]);
+});
 
 /** An enforcer that hard-denies reads of the named root set. */
 function rootDenier(string $set): ReadAuthorizerInterface

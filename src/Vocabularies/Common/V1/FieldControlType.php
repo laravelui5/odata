@@ -13,5 +13,5 @@ enum FieldControlType: int
     case Optional = 3;
     case ReadOnly = 1;
     case Inapplicable = 0;
-    case Hidden = 0;
+    public const Hidden = self::Inapplicable;
 }

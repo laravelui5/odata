@@ -12,43 +12,44 @@ use LaravelUi5\OData\Tests\TestCase;
  *
  * Uses FlightService + FlightServiceRegistry as the test fixture.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        $this->app->instance(
-            ODataServiceRegistryInterface::class,
-            new FlightServiceRegistry(),
-        );
+beforeEach(function () {
+    $this->withExceptionHandling();
 
-        \LaravelUi5\OData\Fixtures\Models\Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
-            ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
-            ['origin' => 'jfk', 'destination' => 'ord', 'gate' => 3, 'duration' => 3600.0],
-        ]);
+    $this->app->instance(
+        ODataServiceRegistryInterface::class,
+        new FlightServiceRegistry(),
+    );
 
-        \LaravelUi5\OData\Fixtures\Models\Passenger::insert([
-            ['name' => 'Alice', 'flight_id' => 1],
-            ['name' => 'Bob',   'flight_id' => 1],
-            ['name' => 'Carol', 'flight_id' => 2],
-        ]);
+    \LaravelUi5\OData\Fixtures\Models\Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
+        ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
+        ['origin' => 'jfk', 'destination' => 'ord', 'gate' => 3, 'duration' => 3600.0],
+    ]);
 
-        \LaravelUi5\OData\Fixtures\Models\Airport::insert([
-            ['name' => 'Heathrow',             'code' => 'LHR'],
-            ['name' => 'Los Angeles Intl',     'code' => 'LAX'],
-            ['name' => 'San Francisco Intl',   'code' => 'SFO'],
-        ]);
+    \LaravelUi5\OData\Fixtures\Models\Passenger::insert([
+        ['name' => 'Alice', 'flight_id' => 1],
+        ['name' => 'Bob',   'flight_id' => 1],
+        ['name' => 'Carol', 'flight_id' => 2],
+    ]);
 
-        // Pivot: flight_id → airport_id with role.
-        // Pivot rows have their own auto-increment `id` to reproduce the
-        // column-name collision edge case (pivot.id vs airports.id).
-        \Illuminate\Support\Facades\DB::table('airport_flight')->insert([
-            ['flight_id' => 1, 'airport_id' => 1, 'role' => 'origin'],      // LHR→LAX: Heathrow
-            ['flight_id' => 1, 'airport_id' => 2, 'role' => 'destination'], // LHR→LAX: LAX
-            ['flight_id' => 2, 'airport_id' => 3, 'role' => 'origin'],      // SFO→LAX: SFO
-            ['flight_id' => 2, 'airport_id' => 2, 'role' => 'destination'], // SFO→LAX: LAX
-        ]);
-    });
+    \LaravelUi5\OData\Fixtures\Models\Airport::insert([
+        ['name' => 'Heathrow',             'code' => 'LHR'],
+        ['name' => 'Los Angeles Intl',     'code' => 'LAX'],
+        ['name' => 'San Francisco Intl',   'code' => 'SFO'],
+    ]);
+
+    // Pivot: flight_id → airport_id with role.
+    // Pivot rows have their own auto-increment `id` to reproduce the
+    // column-name collision edge case (pivot.id vs airports.id).
+    \Illuminate\Support\Facades\DB::table('airport_flight')->insert([
+        ['flight_id' => 1, 'airport_id' => 1, 'role' => 'origin'],      // LHR→LAX: Heathrow
+        ['flight_id' => 1, 'airport_id' => 2, 'role' => 'destination'], // LHR→LAX: LAX
+        ['flight_id' => 2, 'airport_id' => 3, 'role' => 'origin'],      // SFO→LAX: SFO
+        ['flight_id' => 2, 'airport_id' => 2, 'role' => 'destination'], // SFO→LAX: LAX
+    ]);
+});
 
 // ── $metadata ─────────────────────────────────────────────────────────────────
 

@@ -24,7 +24,7 @@ an entry below.
 
 ## Pending
 
-## [ ] EDM cache is keyed by class location, not service identity — load-side silent collision
+## [ ] `OP01` EDM cache is keyed by class location, not service identity — load-side silent collision
 
 Surfaced 2026-06-11 (`pragmatiqu/timesheet.biz`) building a second, **route-composed** service
 (`ExcelService`, via the 1.0.6 `OData::forService()` seam) beside the registry-cached
@@ -45,7 +45,7 @@ Silent-wrong-schema is the worst failure mode — same family as the 1.0.5 colli
 Reasoned through in the internal route-composition notes.
 <!-- Atom [[ODATA_ALTERNATIVE_CLIENT_DEDICATED_SERVICE]] · spec docs/meta/specs/odata-route-composition.md OP5. -->
 
-## [ ] SQL-driver serialization emits raw DB scalars, not values coerced to the declared Edm type
+## [ ] `OP02` SQL-driver serialization emits raw DB scalars, not values coerced to the declared Edm type
 
 Surfaced 2026-07-06 (`laravelui5/sdk` — `sdk-host` Partners `PartnerParametersEntitySet`) adding a
 computed `writable_by_actor` column declared `EdmPrimitiveType::Boolean`. A custom entity set's rows
@@ -83,7 +83,7 @@ already the house style in the same folder (`PartnerGrantableAbilitiesExpand` ca
 until then. The count matters for the fix's case: three sets in one app were already affected, and the
 cast is only ever remembered by whoever last hit the error.
 
-## [ ] Virtual `$expand` is resolved only on Eloquent-backed sets — custom (SQL) entity sets ignore it
+## [ ] `OP03` Virtual `$expand` is resolved only on Eloquent-backed sets — custom (SQL) entity sets ignore it
 
 Surfaced 2026-07-08 (`laravelui5/sdk` — `sdk-host` Partners, building the ui5-partners **object-page
 header** pattern, PA-DETAILS-A-10). A header binds ONE keyed resource and lets its variable-length
@@ -119,7 +119,7 @@ still wants expand-able adornments. Until then, prefer an Eloquent header over a
 Same resolver-family gap as the 2026-07-06 Edm-coercion item above (both: `SqlEntitySetResolver` lacks a
 capability `EloquentEntitySetResolver` has).
 
-## [ ] A lean / no-hydration path for expand-less `discoverModel` reads — reclaim streaming speed on lists
+## [ ] `OP04` A lean / no-hydration path for expand-less `discoverModel` reads — reclaim streaming speed on lists
 
 Surfaced 2026-07-08 (`laravelui5/sdk` — measuring the Partners master/detail migration). The engine's whole
 speed advantage over `flat3/lodata` is that it **streams optimized SQL rows and does not hydrate models**.
@@ -145,7 +145,7 @@ need the relations). This would let one discovered set serve a **fast lean list*
 
 In the spirit of the engine: the fast path should be the default, hydration the opt-in that expands require.
 
-## [ ] `@odata.nextLink` drops every query option except `$skip` — page 2 is unfiltered
+## [ ] `OP05` `@odata.nextLink` drops every query option except `$skip` — page 2 is unfiltered
 
 Surfaced 2026-08-22 (docs/code drift audit of `docs/odata/`). `EntitySetHandler.php:93` builds the
 server-driven-paging continuation as
@@ -189,13 +189,13 @@ request path and query have to be passed down explicitly, controller or `BatchHa
 request, so the handler cannot read the inner query from it. Three source files, no use of `ReadGate`,
 `Engine` or the handlers outside this package (checked against Core, SDK, pragmatiqu.io), so a patch.
 Tests: a filtered set paged to exhaustion, a navigation collection, a `$batch` inner request, a
-route-composed service. Docs: drop the warning in `query-options/pagination.md` with the release.
+route-composed service. Docs: drop the warning in `query-options/pagination.md` **and the transitional warning in `core/recipes/excel-power-bi.md` § *Until the next laravelui5/odata release*** with the release (both noted 2026-09-23 when the GEO/Boost continuation closed).
 
 **Why it is not only theoretical.** Excel and Power BI follow `@odata.nextLink` and fold editor steps
 into `$filter`/`$select`; any set above the default page size (200) then loads rows the filter
 excludes. The Excel/Power BI recipe (2026-09-18) carries an interim note until this ships.
 
-## [ ] Unsupported `$filter` constructs are silently dropped, widening the result set
+## [ ] `OP06` Unsupported `$filter` constructs are silently dropped, widening the result set
 
 Surfaced 2026-08-22 (docs/code drift audit of `docs/odata/`). Both translators end their dispatch in
 a no-op default:
@@ -225,7 +225,7 @@ Note the asymmetry to resolve alongside it: `FilterToEloquent` supports `any`/`a
 `whereDoesntHave`) and `FilterToQuery` does not, so the same URL behaves differently depending on
 which resolver backs the set.
 
-## [ ] Generated vocabulary attributes emit invalid CSDL — `#[LineItem]` gives no columns, `Boolean="1"`
+## [ ] `OP07` Generated vocabulary attributes emit invalid CSDL — `#[LineItem]` gives no columns, `Boolean="1"`
 
 Surfaced 2026-09-17 in the docs SEO pass (`docs/ROADMAP.md`, `/odata/` → *Docs and code disagree*),
 re-checked in code 2026-09-18. Two defects in the attributes `bin/generate.php` produces under
@@ -251,7 +251,7 @@ the CSDL kind names (`Bool`, `Int`, `String`, `Path` …), plus `Boolean` → `B
 `KIND_TO_XML_ATTR` as a guard. A `$metadata` test per affected term family (DataField collection,
 boolean capability) keeps it fixed.
 
-## [ ] Should the package ship a filter-extraction helper for Tier-3 resolvers? — evaluation
+## [ ] `OP08` Should the package ship a filter-extraction helper for Tier-3 resolvers? — evaluation
 
 Opened 2026-09-21 out of Rangliste Punkt 6. `resolvers/custom-resolvers` documented a trait
 `App\OData\ExtractsFilterValues` with an `extractFilterParams()` helper "for common filter patterns".
@@ -275,7 +275,7 @@ and its value is the refusal as much as the extraction.
 trait, and whether the real answer is simply "document the walk" — which is what the page does today,
 and may be enough. An acceptable outcome is "no helper, and here is why".
 
-## [ ] `$search` passes `%` and `_` through to `LIKE` — a search term is a wildcard pattern
+## [ ] `OP09` `$search` passes `%` and `_` through to `LIKE` — a search term is a wildcard pattern
 
 Found 2026-09-21 while documenting `query-options/search` (Rangliste Punkt 6). Both resolvers build the
 clause the same way — `SqlEntitySetResolver::applySearch()` (`:116`) and
@@ -304,7 +304,7 @@ apostrophe loses it. Harmless in practice; mentioned so the fix does not re-intr
 `query-options/search` documents the current behaviour — including the wildcard leak — since
 2026-09-21.
 
-## [ ] `SqlQueryInterface`'s docblock promises consumers that do not exist
+## [ ] `OP10` `SqlQueryInterface`'s docblock promises consumers that do not exist
 
 Found 2026-09-21 while repairing `resolvers/custom-entity-sets` (Rangliste Punkt 6). The interface
 documents its consumers as:
@@ -327,7 +327,7 @@ SDK's reporting and analytics layer is built on the same idea, and if it adopts 
 docblock says so then. The doc page was corrected on 2026-09-21 and already reads that way; this entry
 is the code half.
 
-## [ ] The service document ignores `includedInServiceDocument` and never lists function imports
+## [ ] `OP11` The service document ignores `includedInServiceDocument` and never lists function imports
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
 `ServiceDocumentHandler::handle()` walks entity sets (`:32`) and singletons (`:38`) and emits every
@@ -351,7 +351,7 @@ function import.
 `metadata/service-document` already describes the target state per kind; the only thing that moves on
 the page is the documented `FunctionImport` default.
 
-## [ ] `cachedMetadataXMLPath()` is declared, implemented and read by nothing — **finish specifying**
+## [ ] `OP12` `cachedMetadataXMLPath()` is declared, implemented and read by nothing — **finish specifying**
 
 Surfaced 2026-09-17 in the docs SEO pass. The method sits on the public interface
 (`Service/Contracts/ODataServiceInterface.php:45`) and on `ODataService:82`, and no caller exists in
@@ -382,7 +382,7 @@ That keeps the interface honest, removes a per-request serialization from the wa
 Until those are settled, the two doc pages keep describing the mechanism (docs-are-the-spec); they
 must not describe the path or the command flag, because neither is decided.
 
-## [ ] The `version` config never reaches the `OData-Version` response header
+## [ ] `OP13` The `version` config never reaches the `OData-Version` response header
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
 `config.php:36` (`ODATA_VERSION`, default `'4.0'`) feeds exactly one consumer: the Edmx `Version`
@@ -398,7 +398,7 @@ small accessor on the service (or a response helper the handlers already share),
 4.01 is one config change rather than a grep. Test: a service configured to `4.01` answers `4.01` on
 both surfaces.
 
-## [ ] Key literals are not validated — `Products(abc)` becomes `Products(0)`
+## [ ] `OP14` Key literals are not validated — `Products(abc)` becomes `Products(0)`
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
 `QueryPlanner::parseLiteralForEdmType()` (`:459`) casts raw: `(int) 'abc'` is `0`, `(float) 'abc'` is
@@ -414,7 +414,7 @@ the existing guid handling for `Edm.Guid`) and throw `BadRequestException('inval
 failure — the code the page names, in the same tone as `unknown_key_property` two methods above. One
 test per family, plus the composite-key path.
 
-## [ ] Nested `$count` inside `$expand` is parsed and never emitted
+## [ ] `OP15` Nested `$count` inside `$expand` is parsed and never emitted
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
 `$expand=Items($count=true)` parses cleanly and reaches the plan — `QueryPlanner:617` sets
@@ -431,7 +431,7 @@ lever — there the honest answer is a loud `400`, not silence. Tests: one Eloqu
 `query-options/select-and-expand` describes the target state; it must show nested `$count` as
 supported once this lands, and must not be trimmed back in the meantime.
 
-## [ ] The announced `odata-error` trailer is not an HTTP trailer — it corrupts the body instead
+## [ ] `OP16` The announced `odata-error` trailer is not an HTTP trailer — it corrupts the body instead
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Minor**).
 While streaming, `ODataResponse::sendContent()` announces `trailer: odata-error` (`:33`). If a
@@ -452,7 +452,7 @@ never comes.
 that a consumer who hits a truncated body knows what they are looking at and that `odata.streaming =
 false` is the way around it today.
 
-## [ ] `immutable_date` maps to `Edm.DateTimeOffset`
+## [ ] `OP17` `immutable_date` maps to `Edm.DateTimeOffset`
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
 `ModelDiscovery::mapCastType()` throws `'datetime', 'timestamp', 'immutable_date', 'immutable_datetime'`
@@ -460,21 +460,51 @@ into one arm (`:471`). Laravel's `immutable_date` is a pure date and belongs wit
 above (`:470`) → `Edm.Date`. One line, plus a discovery test with an `immutable_date` cast.
 `services/model-discovery` already says `Edm.Date`.
 
-## [ ] `#[ODataProperty(nullable:)]` is declared and never read
+## [~] `OP19` `discoverModel()` emits no type facets — a `decimal(19,6)` column becomes a bare `Edm.Decimal`
 
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
-The attribute carries the parameter (`Service/Discovery/Attributes/ODataProperty.php:15`); discovery
-reads only `->type` and `->name` (`ModelDiscovery.php:240 ff.`). Setting it changes nothing in the
-schema.
+> **Status 2026-10-07: level 1 built (v3.1.0).** `Nullable`, `Precision`/`Scale` and `MaxLength`
+> come from `Schema::getColumns()`, and `odata:cache` keeps them (`EdmxWriter` had dropped facets,
+> the collection flag and the default value). Tests: `tests/Service/Discovery/ColumnFacetsTest.php`,
+> including identical `$metadata` warm and cold. **Open:** points 1–3 of the extension below.
+> Point 1 is now unblocked: `OP24` settled the shape. Points 2–3 wait for the check that D50 (5)
+> names, namely how UI5's V4 model consumes code lists.
 
-**Fix: read it, do not remove it.** Removing a parameter from a public attribute would be a contract
-break; reading it is additive and makes the declaration true — pass it through to the `Property`
-constructor, with the discovered column nullability as the default when the attribute is silent.
+Surfaced 2026-10-01 in the SDK Foundation signing (`meta/specs/sdk-foundation-v1.0.md`, OP27 / D50),
+**confirmed by reading, test still to write.** The serializer can emit every facet
+(`Service/Serialization/CsdlSerializer.php:534-552`: `Nullable`, `MaxLength`, `Precision`, `Scale`
+incl. `variable`), and `Edm\Property\Property` accepts `TypeFacetsInterface`. But discovery builds
+each property with name, type and annotations only (`ModelDiscovery.php:258-262`); nothing in `src/`
+constructs `TypeFacets` with a precision or scale. So a model column `decimal(19,6)` reaches
+`$metadata` without `Precision`/`Scale`, a `varchar(255)` without `MaxLength`, and every property
+without `Nullable` from the schema.
 
-**Belongs to the same session as the property-attribute entry below** (author, 2026-09-21): both are
-defects of the same attribute surface, and the decision there may move where the parameter is written.
+**Why it matters now.** The SDK stores amounts, prices, quantities and percentages with one fixed
+scale (Foundation OP27) and relies on `$metadata` to describe it; UI5's `sap.ui.model.odata.type.Decimal`
+reads `Scale` for formatting and input validation. A bare `Edm.Decimal` is formatted without a scale.
 
-## [ ] Morph relations are discovered as ordinary navigations — short-term cure
+**Fix:** derive the facets from the column schema discovery already reads (`$column['type_name']`, the
+type's precision/scale/length, nullability) and pass a `TypeFacets` to the `Property` constructor;
+`#[ODataProperty]` overrides win (see the `nullable:` entry above — same surface, same session).
+Additive. Test: a model with `decimal(19,6)`, `varchar(40)` and a nullable column; assert the three
+facets in `$metadata`.
+
+**Extended 2026-10-01 (Foundation D51) — three more things the SDK's code lists need from the engine:**
+
+1. **Overriding a facet.** A unit price is stored as `decimal(19,6)` but must be announced with the
+   installation's price decimals (`Scale="4"`), and a percentage likewise — UI5's `Decimal` type formats
+   and validates input by `Scale`. The schema value is the default; an override wins: a `scale:` (and
+   `precision:`) parameter on `#[ODataProperty]`, or a facet resolver the SDK binds, since the value is
+   an installation fact, not a literal. Same session as the `nullable:` entry below.
+2. **The `CodeList` vocabulary** (`com.sap.vocabularies.CodeList.v1`: `CurrencyCodes`, `UnitsOfMeasure`
+   as `CodeListSource` with `Url` and `CollectionPath`; `StandardCode`), generated with the
+   `VocabularyGenerator`. Container-level annotations are already serialized (`CsdlSerializer.php:154 ff.`);
+   `Measures` and `Common.UnitSpecificScale` already exist.
+3. **Code-list sets are never paged by the server.** UI5 loads a code list with
+   `requestContexts(0, Infinity)` through its own shared model and caches it per session. Today
+   server-driven paging applies only when a client sends `Prefer: odata.maxpagesize`
+   (`EntitySetHandler.php:37`); that must stay so for these sets, and `$select` must work on them.
+
+## [ ] `OP20` Morph relations are discovered as ordinary navigations — short-term cure
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
 Relation discovery decides by `instanceof` (`ModelDiscovery.php:336-337`). In Laravel `MorphTo`
@@ -487,7 +517,7 @@ it is, the schema is **silently wrong** for every row of a different morph type.
 **Fix.** Explicit morph arms **before** the regular ones, skipping them — which is what
 `services/model-discovery` says happens. One discovery test per morph shape.
 
-## [ ] Morph relations: is there a spec-conform way to expose them at all? — evaluation
+## [ ] `OP21` Morph relations: is there a spec-conform way to expose them at all? — evaluation
 
 Opened 2026-09-21 (author), the medium-term half of the entry above. The short-term cure skips morph
 relations; that is correct and not satisfying. A polymorphic relation is a legitimate modelling tool,
@@ -503,7 +533,7 @@ the polymorphic edge explicitly in a custom entity set.
 Outcome is a decision, not necessarily code: "morph relations stay out, here is why, here is what to
 do instead" is an acceptable result and would then go into `services/model-discovery` as guidance.
 
-## [ ] `discoverCustomEntitySet()` builds resolvers with `new`, not the container
+## [ ] `OP22` `discoverCustomEntitySet()` builds resolvers with `new`, not the container
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
 `applyCustomEntitySets()` instantiates every registered resolver with `new $resolverClass()`
@@ -516,7 +546,7 @@ fix: this is the **schema-build path**, so the dependency must be resolvable at 
 resolver that needs a request is a different bug and should stay one. Test: a custom set with a bound
 dependency.
 
-## [ ] `Edm.Binary` goes onto the wire unencoded
+## [ ] `OP23` `Edm.Binary` goes onto the wire unencoded
 
 Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
 `RowCoercion` coerces two property kinds — temporal primitives and enums. `Edm.Binary` is not among
@@ -528,7 +558,14 @@ wrong, it does not come out at all. `getting-started/concepts` says base64.
 which is what the OData v4 JSON format prescribes, not a plain `base64_encode`. Test with a blob
 column carrying non-UTF-8 bytes.
 
-## [ ] Property-level discovery attributes require a declared PHP property — which shadows Eloquent's attribute bag
+## [ ] `OP24` Property-level discovery attributes require a declared PHP property — which shadows Eloquent's attribute bag
+
+> **Decided 2026-10-07 (author): option three plus `useHidden`.** Column attributes
+> (`#[ODataProperty]`, `#[ODataIgnore]`, vocabulary annotations) are written on a **hooked
+> property** that delegates to the attribute bag, as `AnnotatedAirport` already does. On the class,
+> `useHidden: true` takes the model's `$hidden` out of the entity type, which also removes the
+> `$filter` question on hidden columns. Still to build: `useHidden`, the docs samples, and the
+> idiom checked against mass assignment, `toArray()` and `isset()`.
 
 Surfaced 2026-09-18 in the docs pass over `/odata/`, entered 2026-09-20 (author: record it, decide
 separately). `ModelDiscovery` reads `#[ODataIgnore]`, `#[ODataProperty]` and every vocabulary
@@ -579,7 +616,7 @@ at all — `ModelDiscoveryTest` covers only the class-level `#[ODataEntity]` ove
 annotation tests use the hooked fixture, which is why the shadowing has never shown up in a run. A
 test that writes and re-reads an ignored column *through the model* would catch it.
 
-## [ ] The shipped `namespace` default is our own house namespace — and it disagrees with the code fallback
+## [ ] `OP25` The shipped `namespace` default is our own house namespace — and it disagrees with the code fallback
 
 Surfaced 2026-09-18 alongside the same default in Core's `ui5:app` generator, entered 2026-09-20
 (author: record it, discuss separately). `config.php:31` ships
@@ -603,6 +640,24 @@ Note the deliberate difference to Core's `ui5:app`, which was decided the other 
 repository, where a wrong prefix is expensive to undo; the OData namespace is a runtime value a host
 changes in one line of config. Same question, two answers, on purpose.
 
+## [ ] `OP26` `odata:cache` drops every vocabulary annotation — the warm `$metadata` carries none
+
+Found 2026-10-07 while building `OP19` level 1, **confirmed by reading, test still to write.**
+`EdmxWriter` generates each entity type, complex type and entity set with `$this->annotations = []`
+(`src/Service/Cache/EdmxWriter.php`, the three class templates), and each property without its
+annotations. Discovery reads `#[Label]`, `#[LineItem]`, `#[SelectionFields]` and the rest onto the
+cold schema. A cached service serves none of them. Production runs cached.
+
+Same family as the 3.0.3 enum fix and the facets in 3.1.0: the cached and the cold schema disagree,
+silently. The parity test in `ColumnFacetsTest` uses a model with no annotations for exactly this
+reason; `AnnotatedAirport` would fail it.
+
+**Fix.** Generate the annotations as code: `Annotation` with term, qualifier and value, the value
+recursive over `ConstantAnnotationValue`, `RecordAnnotationValue` (`PropertyValue`s) and
+`CollectionAnnotationValue`. Typed vocabulary classes (`TypedAnnotationTrait`) need checking:
+either they are regenerated as their own class or flattened to the generic `Annotation`, provided the
+serializer output stays identical. Test: warm and cold `$metadata` identical for `AnnotatedAirport`.
+
 ---
 
 ## Done
@@ -610,6 +665,24 @@ changes in one line of config. Same question, two answers, on purpose.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP18` `#[ODataProperty(nullable:)]` is declared and never read (v3.1.0)
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
+The attribute carries the parameter (`Service/Discovery/Attributes/ODataProperty.php:15`); discovery
+reads only `->type` and `->name` (`ModelDiscovery.php:240 ff.`). Setting it changes nothing in the
+schema.
+
+**Fix: read it, do not remove it.** Removing a parameter from a public attribute would be a contract
+break; reading it is additive and makes the declaration true — pass it through to the `Property`
+constructor, with the discovered column nullability as the default when the attribute is silent.
+
+**Belongs to the same session as the property-attribute entry below** (author, 2026-09-21): both are
+defects of the same attribute surface, and the decision there may move where the parameter is written.
+
+**Done 2026-10-07 (v3.1.0)** together with level 1 of `OP19`: the attribute overrides the column's
+nullability, which discovery now reads as the default. The `OP24` decision (attributes on a hooked
+property) keeps the parameter where it was.
 
 ## [x] `odata:cache` writes (and first deletes) `Edm/` directories inside `vendor/` (v3.0.3)
 

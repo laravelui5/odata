@@ -21,19 +21,20 @@ use LaravelUi5\OData\Tests\TestCase;
  * fake host enforcer that denies the `Flights` set — exercising the same plan downcast an SDK
  * enforcer will use (`EntitySetQueryPlan` → `->target->getName()`).
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        Route::any('alt/{path?}', fn (Request $request, ?string $path = null) =>
-            app(OData::class)->forService($request, app(BoundMountFlightService::class))
-        )->where('path', '.*');
+beforeEach(function () {
+    $this->withExceptionHandling();
 
-        Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
-            ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
-        ]);
-    });
+    Route::any('alt/{path?}', fn (Request $request, ?string $path = null) =>
+        app(OData::class)->forService($request, app(BoundMountFlightService::class))
+    )->where('path', '.*');
+
+    Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
+        ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
+    ]);
+});
 
 it('serves normally under the allow-all default authorizer', function () {
     $response = $this->get('/alt/Flights');

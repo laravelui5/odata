@@ -12,27 +12,28 @@ use LaravelUi5\OData\Tests\TestCase;
  * Adapted from flat3/lodata BatchMultipartTest for the read-only engine.
  * Uses FlightService + FlightServiceRegistry as the test fixture.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        $this->app->instance(
-            ODataServiceRegistryInterface::class,
-            new FlightServiceRegistry(),
-        );
+beforeEach(function () {
+    $this->withExceptionHandling();
 
-        \LaravelUi5\OData\Fixtures\Models\Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
-            ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
-            ['origin' => 'jfk', 'destination' => 'ord', 'gate' => 3, 'duration' => 3600.0],
-        ]);
+    $this->app->instance(
+        ODataServiceRegistryInterface::class,
+        new FlightServiceRegistry(),
+    );
 
-        \LaravelUi5\OData\Fixtures\Models\Passenger::insert([
-            ['name' => 'Alice', 'flight_id' => 1],
-            ['name' => 'Bob',   'flight_id' => 1],
-            ['name' => 'Carol', 'flight_id' => 2],
-        ]);
-    });
+    \LaravelUi5\OData\Fixtures\Models\Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
+        ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
+        ['origin' => 'jfk', 'destination' => 'ord', 'gate' => 3, 'duration' => 3600.0],
+    ]);
+
+    \LaravelUi5\OData\Fixtures\Models\Passenger::insert([
+        ['name' => 'Alice', 'flight_id' => 1],
+        ['name' => 'Bob',   'flight_id' => 1],
+        ['name' => 'Carol', 'flight_id' => 2],
+    ]);
+});
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 

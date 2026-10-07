@@ -31,13 +31,14 @@ use LaravelUi5\OData\Tests\TestCase;
  * resolver. Tests are black-box: they capture the streamed response body and
  * assert on the decoded JSON / raw XML.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
-            ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
-        ]);
-    });
+uses(TestCase::class);
+
+beforeEach(function () {
+    Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
+        ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
+    ]);
+});
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

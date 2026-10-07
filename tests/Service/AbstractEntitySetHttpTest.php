@@ -13,28 +13,29 @@ use LaravelUi5\OData\Tests\TestCase;
  * through the OData engine: $metadata, service document, entity set queries,
  * single entity access, $filter, $select, $orderby, $count.
  */
-uses(TestCase::class)
-    ->beforeEach(function () {
-        $this->withExceptionHandling();
+uses(TestCase::class);
 
-        $this->app->instance(
-            ODataServiceRegistryInterface::class,
-            new AbstractEntitySetServiceRegistry(),
-        );
+beforeEach(function () {
+    $this->withExceptionHandling();
 
-        \LaravelUi5\OData\Fixtures\Models\Flight::insert([
-            ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
-            ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
-            ['origin' => 'lhr', 'destination' => 'jfk', 'gate' => 3, 'duration' => 3600.0],
-        ]);
+    $this->app->instance(
+        ODataServiceRegistryInterface::class,
+        new AbstractEntitySetServiceRegistry(),
+    );
 
-        \LaravelUi5\OData\Fixtures\Models\Passenger::insert([
-            ['name' => 'Alice', 'flight_id' => 1],
-            ['name' => 'Bob',   'flight_id' => 1],
-            ['name' => 'Carol', 'flight_id' => 2],
-            ['name' => 'Dave',  'flight_id' => 3],
-        ]);
-    });
+    \LaravelUi5\OData\Fixtures\Models\Flight::insert([
+        ['origin' => 'lhr', 'destination' => 'lax', 'gate' => 1, 'duration' => 41100.0],
+        ['origin' => 'sfo', 'destination' => 'lax', 'gate' => 2, 'duration' => 2133.0],
+        ['origin' => 'lhr', 'destination' => 'jfk', 'gate' => 3, 'duration' => 3600.0],
+    ]);
+
+    \LaravelUi5\OData\Fixtures\Models\Passenger::insert([
+        ['name' => 'Alice', 'flight_id' => 1],
+        ['name' => 'Bob',   'flight_id' => 1],
+        ['name' => 'Carol', 'flight_id' => 2],
+        ['name' => 'Dave',  'flight_id' => 3],
+    ]);
+});
 
 // ── $metadata ────────────────────────────────────────────────────────────────
 

@@ -21,6 +21,7 @@ use LaravelUi5\OData\Edm\Property\NavigationProperty;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
+use LaravelUi5\OData\Edm\Type\TypeFacets;
 use LaravelUi5\OData\Service\Contracts\EdmBuilderInterface;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataEntity;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataIgnore;
@@ -258,6 +259,7 @@ final class ModelDiscovery
             $property = new Property(
                 name: $propName,
                 type: new PrimitiveType($primitiveType),
+                facets: self::columnFacets($column, $primitiveType, $colName === $keyName, $propAttr?->nullable),
                 annotations: $propAnnotations,
             );
 
@@ -425,6 +427,63 @@ final class ModelDiscovery
     private static function instantiate(ReflectionClass $ref): Model
     {
         return $ref->newInstance();
+    }
+
+    /**
+     * Derive the type facets of a discovered column from its schema.
+     *
+     * The column decides `Nullable`, `Precision`/`Scale` on a `decimal(p,s)`
+     * and `MaxLength` on a length-bearing character type. A facet is taken only
+     * when the final Edm type can carry it, so a `#[ODataProperty(type:)]`
+     * override never inherits a length or a scale that belongs to another type.
+     * `#[ODataProperty(nullable:)]` wins over the column, and a key property is
+     * never nullable — SQLite reports its integer primary key as nullable.
+     *
+     * Returns null when there is nothing to say beyond the spec's defaults, so
+     * an unconstrained property serializes exactly as before.
+     *
+     * @param array{type_name: string, type: string, nullable: bool} $column
+     */
+    private static function columnFacets(
+        array            $column,
+        EdmPrimitiveType $type,
+        bool             $isKey,
+        ?bool            $nullableOverride,
+    ): ?TypeFacets {
+        $nullable = $isKey ? false : ($nullableOverride ?? (bool) $column['nullable']);
+
+        $typeName = strtolower($column['type_name']);
+        $declared = strtolower($column['type']);
+
+        $maxLength = null;
+        $precision = null;
+        $scale     = null;
+
+        if ($type === EdmPrimitiveType::Decimal
+            && in_array($typeName, ['decimal', 'numeric'], true)
+            && preg_match('/\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\)/', $declared, $m) === 1
+        ) {
+            $precision = (int) $m[1];
+            $scale     = isset($m[2]) ? (int) $m[2] : 0;
+        }
+
+        if ($type === EdmPrimitiveType::String
+            && in_array($typeName, ['varchar', 'char', 'nvarchar', 'nchar', 'bpchar', 'character varying', 'character'], true)
+            && preg_match('/\(\s*(\d+|max)\s*\)/', $declared, $m) === 1
+        ) {
+            $maxLength = $m[1] === 'max' ? PHP_INT_MAX : (int) $m[1];
+        }
+
+        if ($nullable && $maxLength === null && $precision === null) {
+            return null;
+        }
+
+        return new TypeFacets(
+            nullable:  $nullable,
+            maxLength: $maxLength,
+            precision: $precision,
+            scale:     $scale,
+        );
     }
 
     private static function mapColumnType(string $typeName): EdmPrimitiveType
