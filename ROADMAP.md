@@ -468,8 +468,8 @@ above (`:470`) → `Edm.Date`. One line, plus a discovery test with an `immutabl
 > including identical `$metadata` warm and cold. **Point 1 of the extension built the same day
 > (v3.1.0):** `#[ODataProperty(precision:, scale:)]` and `ColumnFacetResolverInterface` (default
 > `ColumnFacetsAsDeclared`, `bindIf`), order schema → resolver → attribute, illegal facets refused
-> loud. The SDK's price/percentage resolver is SDK work. **Open:** points 2–3, which wait for the
-> check that D50 (5) names, namely how UI5's V4 model consumes code lists.
+> loud. The SDK's price/percentage resolver is SDK work. **Open:** level 3, reshaped by the probe
+> below.
 
 Surfaced 2026-10-01 in the SDK Foundation signing (`meta/specs/sdk-foundation-v1.0.md`, OP27 / D50),
 **confirmed by reading, test still to write.** The serializer can emit every facet
@@ -505,6 +505,30 @@ facets in `$metadata`.
    `requestContexts(0, Infinity)` through its own shared model and caches it per session. Today
    server-driven paging applies only when a client sends `Prefer: odata.maxpagesize`
    (`EntitySetHandler.php:37`); that must stay so for these sets, and `$select` must work on them.
+
+**Level 3 reshaped by the probe (2026-10-07).** The check D50 (5) asked for ran in `acme` with
+OpenUI5 1.136.18 against odata 3.0.6 (findings: `meta/specs/codelists-v1.0.md`, Nachtrag
+2026-10-07). The mechanism works against this engine: per-row formatting by the code's scale, texts,
+standard codes. What it changes here:
+
+- **Point 3 is no mechanism, only a guarantee.** UI5 sends `GET Set?$select=key,scale,text,standard`,
+  with no `$top`/`$skip`/`$count` and no `Prefer`, and the engine already answers unpaged. What remains
+  is a test that pins this down: no `Prefer` → no `@odata.nextLink`, `$select` honoured.
+- **Container annotations need a builder API.** The serializer writes them inline and external
+  (UI5 reads both), but `EdmBuilder` offers no way to set them. The probe needed a decorator that
+  rebuilds the frozen `EntityContainer`. Fix: something like `annotateContainer(AnnotationInterface ...)`
+  on `EdmBuilderInterface`. Additive.
+- **Path-valued annotations.** Every annotation the mechanism needs is a `Path`:
+  `Measures.ISOCurrency` / `Measures.Unit` on the business property, `Common.UnitSpecificScale` /
+  `Common.Text` / `CodeList.StandardCode` on the code-list key. The generated classes emit constants
+  only (`ISOCurrency` takes a `string` and writes `String="…"`). The probe used a generic
+  `Annotation` with `ConstantAnnotationValue('Path', …)`, which the serializer writes correctly.
+  Fix in the `VocabularyGenerator`: terms whose type allows a path get a path form.
+- **The `CodeList` vocabulary** (point 2) as planned: `CurrencyCodes`, `UnitsOfMeasure`
+  (`CodeListSource`: `Url`, `CollectionPath`), `StandardCode`. The `Url` is **static** (relative,
+  any `@version` resolves), so no facet resolver or installation value is involved.
+- **Prerequisite: `OP26`** (done 2026-10-07, v3.1.0). The warm path used to drop every annotation,
+  the container's included.
 
 ## [ ] `OP20` Morph relations are discovered as ordinary navigations — short-term cure
 
@@ -642,23 +666,50 @@ Note the deliberate difference to Core's `ui5:app`, which was decided the other 
 repository, where a wrong prefix is expensive to undo; the OData namespace is a runtime value a host
 changes in one line of config. Same question, two answers, on purpose.
 
-## [ ] `OP26` `odata:cache` drops every vocabulary annotation — the warm `$metadata` carries none
+## [ ] `OP27` `IEEE754Compatible=true` is ignored — `Edm.Decimal` and `Edm.Int64` go out as JSON numbers
 
-Found 2026-10-07 while building `OP19` level 1, **confirmed by reading, test still to write.**
-`EdmxWriter` generates each entity type, complex type and entity set with `$this->annotations = []`
-(`src/Service/Cache/EdmxWriter.php`, the three class templates), and each property without its
-annotations. Discovery reads `#[Label]`, `#[LineItem]`, `#[SelectionFields]` and the rest onto the
-cold schema. A cached service serves none of them. Production runs cached.
+Found 2026-10-07 by the code-list probe (`meta/specs/codelists-v1.0.md`, Nachtrag 2026-10-07). UI5's
+V4 model sends `Accept: application/json;odata.metadata=minimal;IEEE754Compatible=true` on every
+request. The format parameter asks the service to write `Edm.Int64` and `Edm.Decimal` as JSON
+**strings**, because a JavaScript number cannot hold them exactly. The engine ignores the parameter:
+`"amount":1234.5`, not `"amount":"1234.5"`, with or without it.
 
-Same family as the 3.0.3 enum fix and the facets in 3.1.0: the cached and the cold schema disagree,
-silently. The parity test in `ColumnFacetsTest` uses a model with no annotations for exactly this
-reason; `AnnotatedAirport` would fail it.
+UI5 accepted the numbers in the probe, so nothing breaks visibly. The problem is precision. A
+`decimal(19,6)` (the SDK's amounts, prices and quantities, Foundation D161) holds up to 19 significant
+digits, and a JavaScript number about 15–17. Large amounts get rounded in the client without any
+error. An `Int64` key above 2^53 is corrupted the same way.
 
-**Fix.** Generate the annotations as code: `Annotation` with term, qualifier and value, the value
-recursive over `ConstantAnnotationValue`, `RecordAnnotationValue` (`PropertyValue`s) and
-`CollectionAnnotationValue`. Typed vocabulary classes (`TypedAnnotationTrait`) need checking:
-either they are regenerated as their own class or flattened to the generic `Annotation`, provided the
-serializer output stays identical. Test: warm and cold `$metadata` identical for `AnnotatedAirport`.
+**Fix.** Honour `IEEE754Compatible=true` from the `Accept` header (or `$format`): `Edm.Decimal` and
+`Edm.Int64` are written as strings, `null` stays `null`. Without the parameter the output stays as it
+is. The natural seat is the row coercion (`RowCoercion`), the same place as `OP02` and `OP23`; do all
+three in one session. The response's `Content-Type` echoes `IEEE754Compatible=true` when it was
+applied. Test: one decimal and one Int64 column, with and without the parameter; a decimal with 19
+significant digits round-trips exactly.
+
+## [ ] `OP28` `odata:cache` is still lossy beyond annotations — complex types do not even load
+
+Found 2026-10-07 while fixing `OP26`, **confirmed for complex types, the rest by reading.** The
+warm path must reproduce the cold Edmx, and in these places it does not:
+
+- **Complex types break the cache.** `writeEdmx()` registers them as `Types\X::instance()`, but the
+  complex-type template has no `instance()`. A cached service with a complex type dies with
+  `Call to undefined method …::instance()`. Discovery never produces complex types, so only
+  hand-configured services are affected.
+- **Type definitions are dropped.** The generated `Schema` gets no `typeDefinitions`, and a property
+  typed by one falls back to `Edm.String` (`generateTypeCode()`).
+- **Functions lose their shape.** `generateFunctionCode()` keeps name, return type and parameters
+  only: `isBound`, `isComposable`, `returnsCollection`, `isReturnTypeNullable` and `entitySetPath` are
+  lost, and parameters lose `isCollection`, `isNullable` and their facets. A non-primitive parameter
+  or return type becomes `Edm.String` (`generateParamTypeCode()`).
+- **Function imports** lose `entitySet` and `includedInServiceDocument` (this matters with `OP11`).
+- **Singletons** lose their navigation property bindings.
+- **Entity and complex types** lose `baseType`, `isAbstract` and `isOpen`. The templates return
+  `null`/`false`.
+
+**Fix.** One session that does for these what `OP26` did for annotations: generate each from the
+cold object, and extend `AnnotationsCacheTest`'s warm-equals-cold check (or a sibling) with a model
+that uses every feature. The parity test is the contract. Anything the serializer writes, the cache
+must carry. Patch.
 
 ---
 
@@ -667,6 +718,36 @@ serializer output stays identical. Test: warm and cold `$metadata` identical for
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+## [x] `OP26` `odata:cache` drops every vocabulary annotation — the warm `$metadata` carries none (v3.1.0)
+
+Found 2026-10-07 while building `OP19` level 1, **confirmed by reading, test still to write.**
+`EdmxWriter` generates each entity type, complex type and entity set with `$this->annotations = []`
+(`src/Service/Cache/EdmxWriter.php`, the three class templates), and each property without its
+annotations. Discovery reads `#[Label]`, `#[LineItem]`, `#[SelectionFields]` and the rest onto the
+cold schema. A cached service serves none of them. Production runs cached.
+
+Same family as the 3.0.3 enum fix and the facets in 3.1.0: the cached and the cold schema disagree,
+silently. **It also blocks `OP19` level 3:** the container annotations (`CodeList.CurrencyCodes`,
+`UnitsOfMeasure`) and the `Measures` paths are annotations too, so a cached installation would serve
+none of them. Confirmed as a dependency by the code-list probe of 2026-10-07. The parity test in `ColumnFacetsTest` uses a model with no annotations for exactly this
+reason; `AnnotatedAirport` would fail it.
+
+**Fix.** Generate the annotations as code: `Annotation` with term, qualifier and value, the value
+recursive over `ConstantAnnotationValue`, `RecordAnnotationValue` (`PropertyValue`s) and
+`CollectionAnnotationValue`. Typed vocabulary classes (`TypedAnnotationTrait`) need checking:
+either they are regenerated as their own class or flattened to the generic `Annotation`, provided the
+serializer output stays identical. Test: warm and cold `$metadata` identical for `AnnotatedAirport`.
+
+**Done 2026-10-07 (v3.1.0).** The scope turned out wider than the entry: the writer dropped the
+annotations of **every** element the serializer annotates (container, schema, entity and complex
+types, properties, navigation properties, entity sets, singletons, function imports, functions,
+parameters, enum types and members) and the `edmx:Reference`s. The generated classes also overrode
+`getAnnotation()` with `return null`. `EdmxWriter` now generates all of them as generic `Annotation`
+code (constant, record and collection values, recursively). Literals go through `var_export`, because
+`addslashes` would keep a `"` as `\"` in a single-quoted literal. Tests:
+`tests/Service/Cache/AnnotationsCacheTest.php`, with identical `$metadata` warm and cold for a model
+annotated everywhere and for the discovered `AnnotatedAirport`. Against the old writer all four fail.
 
 ## [x] `OP18` `#[ODataProperty(nullable:)]` is declared and never read (v3.1.0)
 

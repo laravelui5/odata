@@ -62,6 +62,17 @@ The resolver runs when the schema is built. A service cached with `odata:cache` 
 returned then, and a test asserts that this value is served warm as it was cold. When the
 installation fact changes, the cache has to be rebuilt.
 
+**`odata:cache` keeps every annotation.** The warm path served a `$metadata` without vocabulary
+annotations. `EdmxWriter` wrote `annotations = []` into every generated class and dropped those of
+properties, navigation properties, singletons, function imports, functions, parameters, enum types
+and members, the container and the schema, and the `edmx:Reference`s as well. A cached service lost
+`#[Label]`, `#[LineItem]` and everything else discovery had read. The generated classes also answered
+`getAnnotation()` with `null`. The writer now generates all of them as generic annotation code
+(constant, record and collection values, recursively), and the classes use the `HasAnnotations`
+lookup. String literals are written with `var_export`, so annotation text with `"` or `\` survives.
+A test asserts identical `$metadata` warm and cold for a model annotated everywhere and for a
+discovered model with vocabulary attributes.
+
 **`FieldControlType::Hidden` no longer kills the request.** The Common vocabulary defines `Hidden`
 as an alias of `Inapplicable`, both with value 0. The generator wrote them as two enum cases, and
 PHP refuses that. The first access to the enum ended in a fatal `Duplicate value in enum` error, so
@@ -84,7 +95,7 @@ existed, and analyses `src` and `tests` at level 1 without errors. To get there:
 - The two classes that tests generate at runtime carry an inline `@phpstan-ignore class.notFound`.
 - Eight `@phpstan-ignore-line` comments in `FilterExpression` covered nothing and are gone.
 
-Additive. The suite is green at 627.
+Additive. The suite is green at 631.
 
 ## [3.0.6] – 2026-09-09
 

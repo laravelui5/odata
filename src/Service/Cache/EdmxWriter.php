@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Service\Cache;
 
 use Closure;
+use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\CollectionAnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\ConstantAnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\RecordAnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;
@@ -110,6 +115,7 @@ final class EdmxWriter
         $props = $this->generateProperties($type->getDeclaredProperties(), $typeMap);
         $navProps = $this->generateNavigationProperties($type->getDeclaredNavigationProperties(), $typeMap);
         $key = $this->generateKeyReferences($type->getKey());
+        $annotations = $this->generateAnnotationsCode($type->getAnnotations());
 
         $code = <<<PHP
         <?php
@@ -146,7 +152,7 @@ final class EdmxWriter
 
             public function __construct()
             {
-                \$this->annotations = [];
+                \$this->annotations = {$annotations};
         {$props}
                 \$this->declaredNavigationProperties = [];
                 \$this->key = [{$key}];
@@ -193,7 +199,6 @@ final class EdmxWriter
             }
 
             public function getAnnotations(): array { return \$this->annotations; }
-            public function getAnnotation(string \$term, ?string \$qualifier = null): ?\\LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\AnnotationInterface { return null; }
         }
 
         PHP;
@@ -210,6 +215,7 @@ final class EdmxWriter
         $ns = $this->namespace . '\\Types';
 
         $props = $this->generateProperties($type->getDeclaredProperties(), $typeMap);
+        $annotations = $this->generateAnnotationsCode($type->getAnnotations());
 
         $code = <<<PHP
         <?php
@@ -235,7 +241,7 @@ final class EdmxWriter
 
             public function __construct()
             {
-                \$this->annotations = [];
+                \$this->annotations = {$annotations};
         {$props}
             }
 
@@ -257,7 +263,6 @@ final class EdmxWriter
             public function getDeclaredNavigationProperties(): array { return []; }
             public function getNavigationProperty(string \$name): ?NavigationPropertyInterface { return null; }
             public function getAnnotations(): array { return \$this->annotations; }
-            public function getAnnotation(string \$term, ?string \$qualifier = null): ?\\LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\AnnotationInterface { return null; }
         }
 
         PHP;
@@ -276,6 +281,7 @@ final class EdmxWriter
         $typeFqcn = $this->namespace . '\\Types\\' . $typeClass;
 
         $bindings = $this->generateBindings($set->getNavigationPropertyBindings());
+        $annotations = $this->generateAnnotationsCode($set->getAnnotations());
 
         $code = <<<PHP
         <?php
@@ -301,7 +307,7 @@ final class EdmxWriter
 
             public function __construct()
             {
-                \$this->annotations = [];
+                \$this->annotations = {$annotations};
                 \$this->entityType = \\{$typeFqcn}::instance();
         {$bindings}
             }
@@ -320,7 +326,6 @@ final class EdmxWriter
             }
 
             public function getAnnotations(): array { return \$this->annotations; }
-            public function getAnnotation(string \$term, ?string \$qualifier = null): ?\\LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\AnnotationInterface { return null; }
         }
 
         PHP;
@@ -350,14 +355,14 @@ final class EdmxWriter
         foreach ($container->getSingletons() as $singleton) {
             $typeClass = $typeMap[$singleton->getEntityType()->getQualifiedName()] ?? $singleton->getEntityType()->getName();
             $typeFqcn = $this->namespace . '\\Types\\' . $typeClass;
-            $singletonInits[] = "            new \\LaravelUi5\\OData\\Edm\\Container\\Singleton('{$this->e($singleton->getName())}', \\{$typeFqcn}::instance()),";
+            $singletonInits[] = "            new \\LaravelUi5\\OData\\Edm\\Container\\Singleton('{$this->e($singleton->getName())}', \\{$typeFqcn}::instance(), annotations: {$this->generateAnnotationsCode($singleton->getAnnotations())}),";
         }
 
         // Build function import instantiations
         $funcImportInits = [];
         foreach ($container->getFunctionImports() as $import) {
             $funcCode = $this->generateFunctionCode($import->getFunction());
-            $funcImportInits[] = "            new \\LaravelUi5\\OData\\Edm\\Container\\FunctionImport('{$this->e($import->getName())}', {$funcCode}),";
+            $funcImportInits[] = "            new \\LaravelUi5\\OData\\Edm\\Container\\FunctionImport('{$this->e($import->getName())}', {$funcCode}, annotations: {$this->generateAnnotationsCode($import->getAnnotations())}),";
         }
 
         // Build entity type instantiations for schema
@@ -401,6 +406,10 @@ final class EdmxWriter
             }
         }
 
+        $containerAnnotations = $this->generateAnnotationsCode($container->getAnnotations());
+        $schemaAnnotations    = $this->generateAnnotationsCode($schema?->getAnnotations() ?? []);
+        $references           = $this->generateReferencesCode($this->edmx->getReferences());
+
         $ns = $this->namespace;
         $version = $this->e($this->edmx->getVersion());
         $containerName = $this->e($container->getName());
@@ -438,6 +447,9 @@ final class EdmxWriter
             /** @var array<string, SchemaInterface> */
             private array \$schemas;
 
+            /** @var list<\\LaravelUi5\\OData\\Edm\\Contracts\\ReferenceInterface> */
+            private array \$references;
+
             public function __construct()
             {
                 \$this->container = new EntityContainer(
@@ -451,6 +463,7 @@ final class EdmxWriter
                     functionImports: [
         {$funcImportBlock}
                     ],
+                    annotations: {$containerAnnotations},
                 );
 
                 \$this->schemas = [
@@ -469,16 +482,26 @@ final class EdmxWriter
                         functions: [
         {$funcBlock}
                         ],
+                        annotations: {$schemaAnnotations},
                     ),
                 ];
+
+                \$this->references = {$references};
 
                 // Wire navigation properties after all types exist (breaks circular refs).
         {$navInitBlock}
             }
 
             public function getVersion(): string { return '{$version}'; }
-            public function getReferences(): array { return []; }
-            public function getReference(string \$uri): ?\\LaravelUi5\\OData\\Edm\\Contracts\\ReferenceInterface { return null; }
+            public function getReferences(): array { return \$this->references; }
+
+            public function getReference(string \$uri): ?\\LaravelUi5\\OData\\Edm\\Contracts\\ReferenceInterface
+            {
+                foreach (\$this->references as \$reference) {
+                    if (\$reference->getUri() === \$uri) return \$reference;
+                }
+                return null;
+            }
             public function getSchemas(): array { return \$this->schemas; }
             public function getSchema(string \$namespace): ?SchemaInterface { return \$this->schemas[\$namespace] ?? null; }
             public function getEntityContainer(): EntityContainerInterface { return \$this->container; }
@@ -513,6 +536,9 @@ final class EdmxWriter
             }
             if ($prop->getDefaultValue() !== null) {
                 $args[] = "defaultValue: '{$this->e($prop->getDefaultValue())}'";
+            }
+            if ($prop->getAnnotations() !== []) {
+                $args[] = 'annotations: ' . $this->generateAnnotationsCode($prop->getAnnotations());
             }
             $lines[] = '            new Property(' . implode(', ', $args) . '),';
         }
@@ -571,6 +597,9 @@ final class EdmxWriter
             if ($nav->getReferentialConstraints() !== []) {
                 $constraints = $this->generateArrayLiteral($nav->getReferentialConstraints());
                 $args[] = "referentialConstraints: {$constraints}";
+            }
+            if ($nav->getAnnotations() !== []) {
+                $args[] = 'annotations: ' . $this->generateAnnotationsCode($nav->getAnnotations());
             }
 
             $argStr = implode(', ', $args);
@@ -659,9 +688,10 @@ final class EdmxWriter
         $members = [];
         foreach ($type->getMembers() as $member) {
             $members[] = sprintf(
-                "new \\LaravelUi5\\OData\\Edm\\Container\\EnumMember('%s', %d)",
+                "new \\LaravelUi5\\OData\\Edm\\Container\\EnumMember('%s', %d%s)",
                 $this->e($member->getName()),
                 $member->getValue(),
+                $this->optionalAnnotationsArg($member->getAnnotations()),
             );
         }
 
@@ -672,12 +702,13 @@ final class EdmxWriter
         return sprintf(
             // Fully qualified: the same literal is emitted into Types/*.php,
             // which imports EdmPrimitiveType, and into Edmx.php, which does not.
-            "new \\LaravelUi5\\OData\\Edm\\Container\\EnumType('%s', '%s', \\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::%s, %s, [%s])",
+            "new \\LaravelUi5\\OData\\Edm\\Container\\EnumType('%s', '%s', \\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::%s, %s, [%s]%s)",
             $this->e($namespace),
             $this->e($type->getName()),
             $type->getUnderlyingType()->name,
             $this->bool($type->isFlags()),
             implode(', ', $members),
+            $this->optionalAnnotationsArg($type->getAnnotations()),
         );
     }
 
@@ -705,7 +736,10 @@ final class EdmxWriter
         $params = [];
         foreach ($func->getParameters() as $param) {
             $typeCode = $this->generateParamTypeCode($param->getType());
-            $params[] = "new \\LaravelUi5\\OData\\Edm\\FunctionParameter('{$this->e($param->getName())}', {$typeCode})";
+            $paramAnnotations = $param->getAnnotations() !== []
+                ? ', annotations: ' . $this->generateAnnotationsCode($param->getAnnotations())
+                : '';
+            $params[] = "new \\LaravelUi5\\OData\\Edm\\FunctionParameter('{$this->e($param->getName())}', {$typeCode}{$paramAnnotations})";
         }
 
         $args = ["name: '{$this->e($func->getName())}'"];
@@ -717,6 +751,10 @@ final class EdmxWriter
         if ($params !== []) {
             $paramStr = implode(', ', $params);
             $args[] = "parameters: [{$paramStr}]";
+        }
+
+        if ($func->getAnnotations() !== []) {
+            $args[] = 'annotations: ' . $this->generateAnnotationsCode($func->getAnnotations());
         }
 
         return 'new \\LaravelUi5\\OData\\Edm\\EdmFunction(' . implode(', ', $args) . ')';
@@ -733,6 +771,121 @@ final class EdmxWriter
         }
 
         return "new \\LaravelUi5\\OData\\Edm\\Type\\PrimitiveType(\\LaravelUi5\\OData\\Edm\\EdmPrimitiveType::String)";
+    }
+
+    // ── Annotation generation ───────────────────────────────────────────────
+
+    /**
+     * Generate a PHP array literal of annotations, fully qualified so the same
+     * code works in Types/, Entities/ and Edmx.php alike.
+     *
+     * Typed vocabulary annotations (`#[Label]`, `#[LineItem]`, …) are already
+     * generic `Annotation`s by the time they reach the Edm (AttributeReader calls
+     * `toAnnotation()`), so the generic shape is all the cache has to carry.
+     *
+     * @param list<AnnotationInterface> $annotations
+     */
+    private function generateAnnotationsCode(array $annotations): string
+    {
+        if ($annotations === []) {
+            return '[]';
+        }
+
+        return '[' . implode(', ', array_map($this->generateAnnotationCode(...), $annotations)) . ']';
+    }
+
+    /**
+     * `, <annotations>` as a trailing positional argument, or nothing — keeps the
+     * generated code unchanged for the common case of no annotations.
+     *
+     * @param list<AnnotationInterface> $annotations
+     */
+    private function optionalAnnotationsArg(array $annotations): string
+    {
+        return $annotations === [] ? '' : ', ' . $this->generateAnnotationsCode($annotations);
+    }
+
+    private function generateAnnotationCode(AnnotationInterface $annotation): string
+    {
+        return sprintf(
+            'new \\LaravelUi5\\OData\\Edm\\Annotation\\Annotation(%s, %s, %s)',
+            $this->literal($annotation->getTerm()),
+            $this->literal($annotation->getQualifier()),
+            $annotation->getValue() === null ? 'null' : $this->generateAnnotationValueCode($annotation->getValue()),
+        );
+    }
+
+    private function generateAnnotationValueCode(AnnotationValueInterface $value): string
+    {
+        if ($value instanceof ConstantAnnotationValueInterface) {
+            return sprintf(
+                'new \\LaravelUi5\\OData\\Edm\\Annotation\\ConstantAnnotationValue(%s, %s)',
+                $this->literal($value->getKind()),
+                $this->literal($value->getValue()),
+            );
+        }
+
+        if ($value instanceof RecordAnnotationValueInterface) {
+            $args = [$this->literal($value->getType())];
+            foreach ($value->getPropertyValues() as $pv) {
+                $args[] = sprintf(
+                    'new \\LaravelUi5\\OData\\Edm\\Annotation\\PropertyValue(%s, %s)',
+                    $this->literal($pv->getProperty()),
+                    $this->generateAnnotationValueCode($pv->getValue()),
+                );
+            }
+            return 'new \\LaravelUi5\\OData\\Edm\\Annotation\\RecordAnnotationValue(' . implode(', ', $args) . ')';
+        }
+
+        if ($value instanceof CollectionAnnotationValueInterface) {
+            $items = array_map($this->generateAnnotationValueCode(...), $value->getItems());
+            return 'new \\LaravelUi5\\OData\\Edm\\Annotation\\CollectionAnnotationValue(' . implode(', ', $items) . ')';
+        }
+
+        throw new \LogicException(sprintf(
+            'odata:cache cannot write an annotation value of type %s; the serializer would not write it either.',
+            get_debug_type($value),
+        ));
+    }
+
+    /**
+     * @param list<\LaravelUi5\OData\Edm\Contracts\ReferenceInterface> $references
+     */
+    private function generateReferencesCode(array $references): string
+    {
+        if ($references === []) {
+            return '[]';
+        }
+
+        $items = [];
+        foreach ($references as $reference) {
+            $includes = array_map(
+                fn ($include) => sprintf(
+                    'new \\LaravelUi5\\OData\\Edm\\IncludedSchema(%s, %s)',
+                    $this->literal($include->getNamespace()),
+                    $this->literal($include->getAlias()),
+                ),
+                $reference->getIncludes(),
+            );
+            $items[] = sprintf(
+                'new \\LaravelUi5\\OData\\Edm\\Reference(%s, [%s], %s)',
+                $this->literal($reference->getUri()),
+                implode(', ', $includes),
+                $this->generateAnnotationsCode($reference->getAnnotations()),
+            );
+        }
+
+        return '[' . implode(', ', $items) . ']';
+    }
+
+    /**
+     * A PHP literal for a string or null. `var_export` quotes exactly what a
+     * single-quoted literal needs; `e()` (addslashes) would also escape `"`,
+     * which a single-quoted literal keeps as `\"` — wrong for annotation text.
+     */
+    private function literal(?string $value): string
+    {
+        return var_export($value, true) === 'NULL' ? 'null' : var_export($value, true);
     }
 
     // ── Utility ─────────────────────────────────────────────────────────────
