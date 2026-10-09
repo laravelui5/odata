@@ -259,7 +259,8 @@ fixed now. What remains decides how a full regeneration has to be done:
 
 **Fix.** Settle the first three, then run `php bin/generate.php` once over all vocabularies and
 review the diff as a release of its own. Do it together with `OP07`, since both are the generator's
-value shapes. Minor if the defaults land, otherwise major.
+value shapes. Minor if the defaults land, otherwise major. Feeds `OP32`: 357 of its level-5
+findings sit in the generated classes.
 
 ## [ ] `OP30` Server-driven paging reaches neither navigation collections nor `$batch` parts
 
@@ -287,6 +288,60 @@ probe in `acme` before switching it on.
 **Fix (once settled).** Resolve the page size per inner request (its own `Prefer`, then the config)
 and pass it into the navigation plans too. Probably a Minor, since server-visible behaviour changes
 for hosts that set `pagination.default`.
+
+## [ ] `OP32` PHPStan level 5 — collective ticket for what levels 2–5 find
+
+Found 2026-10-09, when the dev setup moved to Pest 5 (PHPUnit 13, Testbench 11) and
+`pest-plugin-phpstan` replaced the abandoned `peststan`. Core went to level 5 the same day
+(`core 3.0.1`). odata **stays at level 1** until the related tickets are closed and the blast radius
+is known. A trial run at level 5 (no baseline, `src` + `tests`):
+
+| Level | `src` | `tests` |
+|:--|--:|--:|
+| 1 (today) | 0 | 0 |
+| 2 | 72 | 209 |
+| 4 | 386 | 213 |
+| 5 | 395 | 218 |
+
+**Generated vocabularies — 357 of the 395 `src` findings.** They belong to the generator, not to the
+committed files.
+
+- **69 × `cast.string`** — `(string) $this->groupableProperties` on an array, which writes the string
+  `"Array"` into the CSDL. This is `OP07`, now counted exactly.
+- **288 × `return.unusedType`** — the template declares `?AnnotationValueInterface` for
+  `buildAnnotationValue()`, which never returns `null`. Harmless; noise from the template.
+
+**Hand-written `src` — 38 findings**, none that fails at runtime on the samples checked:
+
+- *Incomplete docblocks:* array shapes missing a key (`expand` in `QueryPlanner:697`, `operandCount`
+  in `FilterParser:377`), `$containerAnnotations` typed as `array{}` (`ODataService:209`).
+- *Interface cuts PHPStan cannot see:* `VirtualExpandResolverInterface::entityType()` /
+  `entitySetName()` (`ODataService:365–400`), `buildForCache()` on `ODataServiceInterface`
+  (`CacheCommand:80`).
+- *Dead code:* `is_string()` on property objects (`PropertyResolver:112/135`), `isset()` on keys
+  that always exist (`BatchHandler:250`), redundant `?->` before `??` (`ModelDiscovery`), checks that
+  are always true or false (`OData:148`, `CustomQueryOptions:45`, `ExpressionLexer:280`,
+  `FilterParser:603`, `VocabularyGenerator:503`), `?string` on three `getSourceClass()` that never
+  return `null`.
+- *Tool limits:* the visitor dispatch by `match` in `FilterExpression::accept()`, two `match` over a
+  regex-guarded string (`EloquentEntitySetResolver:515`, `SqlEntitySetResolver:206`).
+- **Two touch a signature** and need a look of their own before any edit:
+  `ODataResponse::sendContent()` / `sendContentBuffered()` (`static` against `$this`), and
+  `ProtocolException::toResponse($request = null)` against `Responsable::toResponse(Request)`.
+
+**Tests — 218 findings.** 187 are one pattern: `expect($expr)->toBeInstanceOf(X::class)` followed by
+`$expr->name`. A Pest expectation does not narrow the variable for PHPStan. Preferred cure: a small
+typed helper (`$call = narrow(FunctionCallExpression::class, $expr)`) that asserts at runtime and
+hands PHPStan the type — mechanical, ~180 sites, and keeps typos in tests visible. An ignore by path
+would be cheaper and hide exactly those typos.
+
+**Order.**
+1. `OP07` + `OP29` repair the generator; regenerate. The vocabulary findings go with it.
+2. Estimate the blast radius of the two signature findings.
+3. Fix the hand-written `src` findings and the tests, raise `phpstan.neon` to level 5, no baseline.
+
+**Done when** `composer analyse` is green at level 5. The `src` fixes are a patch, unless one of the
+two signature findings cannot be solved without a break.
 
 ---
 

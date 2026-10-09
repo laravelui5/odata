@@ -1,16 +1,13 @@
 includes:
     - vendor/larastan/larastan/extension.neon
-    - vendor/mrpunyapal/peststan/extension.neon
+    - vendor/pestphp/pest-plugin-phpstan/extension.neon
+    - vendor/phpstan/phpstan-mockery/extension.neon
 
 parameters:
     level: 1
     paths:
         - src
         - tests
-    peststan:
-        testCaseClass: LaravelUi5\OData\Tests\TestCase
-        pestConfigFiles:
-            - tests/Pest.php
     ignoreErrors:
         # Contract tests assert a type PHPStan already knows statically ("implements X").
         # They are regression guards for the class hierarchy, not dead assertions.

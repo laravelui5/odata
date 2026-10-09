@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [Unreleased]
+
+### Development
+
+- Pest 5 (PHPUnit 13, Testbench 11 — Laravel 13 as the dev environment), replacing Pest 3.
+  `require-dev` only; the supported runtime range (Laravel 11–13) is unchanged.
+- `pestphp/pest-plugin-phpstan` replaces the abandoned `mrpunyapal/peststan`; `phpstan/phpstan-mockery`
+  added. PHPStan stays at level 1 — the road to level 5 is `ROADMAP.md` `OP32`.
+- Removed `staudenmeir/eloquent-json-relations` and `sebastian/diff` from `require-dev`. Nothing used
+  them, and the first held the dev environment on Laravel 12.
+
 ## [3.1.0] – 2026-10-07
 
 `discoverModel()` describes its columns in `$metadata`: `Nullable`, `Precision`/`Scale` and
