@@ -345,6 +345,46 @@ two signature findings cannot be solved without a break.
 
 ---
 
+## [ ] `OP33` Stale "next slice" comments on the read forward-exit — from SDK `OP09`, 2026-10-09
+
+`Service/ReadContext.php` (`:18`, `:48`, `:73`, `:79`) and `Service/ReadMessage.php` (`:14`, `:36`) still
+say pruning and the `sap-messages` header come "in the next slice". `ReadGate` already prunes and the
+header ships. Comment-only; no behaviour changes.
+
+---
+
+## [ ] `OP34` `discoverModel()` cannot serve a computed scalar property — the code beside a code-list `…_id` — from SDK Foundation D178, 2026-10-12
+
+Surfaced in the SDK 2.0 validation round (`meta/specs/mod-sales.md`, Foundation D168, D178). A business
+row stores a code-list reference as an integer foreign key (`unit_id` → `codelist_units.id`), but UI5's
+`Unit` and `Currency` types need the **code** in the row: `Measures.Unit` / `Measures.ISOCurrency` must
+point to a property whose value is the code-list set's key (`KGM`, `EUR`). A probe on 2026-10-12
+(OpenUI5 1.136.18, `acme/app/Probe`) showed that a numeric key formats empty and that UI5 displays and
+parses the key itself, so the set stays keyed by the code and the business entity has to serve the code
+**beside** its `…_id`. The same holds for an amount's currency: the tenant's base currency as a computed
+`currency` property (Foundation D175), never a constant in `$metadata`.
+
+**The gap.** `ModelDiscovery` builds an entity type's properties from `Schema::getColumns($table)`
+(`ModelDiscovery.php:227`). A computed **scalar** property has no column, so it cannot be declared on a
+`discoverModel` set. The engine computes only **navigations** (`addVirtualExpand()`); a custom entity set
+can select a join or a literal today, but `discoverModel` is the paved path for small-N master data
+(`mod-sales` part 1: `ServiceItems` with `standard_cost` needs `currency`; part 2: every position with a
+quantity needs `unit`).
+
+**Questions for the session:**
+1. **Shape:** a computed property declared on the model (an attribute on a method or on a hooked
+   property, after the `OP24` idiom) with its Edm type, or a declaration on `discoverModel()` itself?
+2. **Source of the value:** a SQL expression the resolver adds to its `SELECT` (a join to the code-list
+   table, a literal per request), so `$select`, `$filter` and `$orderby` keep working — or an Eloquent
+   accessor read after hydration, which serves `$select` but neither `$filter` nor `$orderby`.
+3. **Annotations:** `Measures.Unit` / `ISOCurrency` must be able to point to the computed property (a
+   `Path`), and the computed property itself must survive `odata:cache` (`OP26`, `OP28`).
+4. **Read-only:** the property is never writable (OData is read-only in LaravelUi5 anyway), but it
+   should carry `Core.Computed` so clients know.
+
+**Target:** Minor (additive). Needed before `mod-sales` part 2 is built; part 1 needs it only for
+`standard_cost`'s currency.
+
 ## Done
 
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
