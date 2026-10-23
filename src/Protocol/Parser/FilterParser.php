@@ -21,13 +21,12 @@ use LaravelUi5\OData\Protocol\Planning\Expression\UnaryOperator;
 /**
  * OData $filter expression parser — Shunting Yard producing FilterExpression directly.
  *
- * Eliminates the 83-class Node tree by placing FilterExpression objects on the
- * operand stack during parsing. Property names are stored as unresolved strings
+ * FilterExpression objects go straight onto the operand stack during parsing;
+ * there is no separate node tree. Property names are stored as unresolved strings
  * in PropertyPathExpression segments; callers resolve them against an EntityType.
- *
- * Reuses the proven operator precedence levels and regex patterns from the legacy
- * parser but is fully self-contained with no legacy dependencies.
  */
+// History: replaces lodata's 83-class Node tree; reuses the operator precedence levels and regex
+// patterns of the lodata-era parser, without its dependencies.
 final class FilterParser
 {
     // ── Operator symbol registry ────────────────────────────────────────

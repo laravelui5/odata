@@ -7,11 +7,11 @@ namespace LaravelUi5\OData\Service\Contracts;
 /**
  * Contract for an addressable OData service endpoint.
  *
- * This is the single service interface for the entire package. Both the
- * legacy engine (Controller\Engine) and the new engine (Protocol\Execution\Engine)
- * consume it.  The protected hooks configure() and bindResolvers() are
+ * This is the single service interface for the entire package; the engine
+ * ({@see \LaravelUi5\OData\Protocol\Execution\Engine}) consumes it. The protected hooks configure() and bindResolvers() are
  * extension points on ODataService, not part of this public contract.
  */
+// History: during the lodata migration both the legacy Controller\Engine and the new engine consumed it.
 interface ODataServiceInterface
 {
     /**

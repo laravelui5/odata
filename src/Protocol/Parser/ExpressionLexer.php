@@ -9,11 +9,11 @@ use LaravelUi5\OData\Exception\BadRequestException;
 /**
  * OData expression lexer — tokenizes filter/search/compute expressions.
  *
- * Uses the same regex patterns as the legacy Expression\Lexer (OData ABNF spec)
- * but is self-contained with no legacy infrastructure dependencies.
+ * Its patterns follow the OData ABNF.
  *
  * @link https://docs.oasis-open.org/odata/odata/v4.01/os/abnf/odata-abnf-construction-rules.txt
  */
+// History: the same regex patterns as the lodata-era Expression\Lexer, without its infrastructure.
 final class ExpressionLexer
 {
     // ── OData ABNF regex patterns ───────────────────────────────────────

@@ -48,9 +48,9 @@ interface EdmBuilderInterface
      * Sets the name of the entity container.
      *
      * Must be set explicitly — the concrete EdmBuilder defaults to
-     * "DefaultContainer" when this is not called, matching the behaviour
-     * of the legacy implementation.
+     * "DefaultContainer" when this is not called.
      */
+    // The default matches the lodata-era implementation.
     public function containerName(string $name): static;
 
     // ── References ────────────────────────────────────────────────────────────

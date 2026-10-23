@@ -31,9 +31,8 @@ use SimpleXMLElement;
 /**
  * Serialises a fully resolved EdmxInterface model to a CSDL XML string.
  *
- * This is the new-architecture counterpart to the legacy PathSegment\Metadata\XML.
  * It queries exclusively through Edm\Contracts\ interfaces and has no dependency
- * on the legacy Model singleton, Laravel, or any HTTP layer.
+ * on a model singleton, Laravel, or any HTTP layer.
  *
  * Traversal follows Olingo's recursive-descent pattern: one private append*()
  * method per model element type, called top-down from serialize(). instanceof
@@ -43,6 +42,7 @@ use SimpleXMLElement;
  * @see OData CSDL XML v4.01 §4 (CSDL XML Document)
  * @see EdmxInterface
  */
+// History: the counterpart of the lodata-era PathSegment\Metadata\XML.
 final readonly class CsdlSerializer
 {
     private const string EDM_NS   = 'http://docs.oasis-open.org/odata/ns/edm';
@@ -62,8 +62,9 @@ final readonly class CsdlSerializer
      * Serialises the given EdmxInterface to a CSDL XML string.
      *
      * The returned string is UTF-8 encoded and starts with the XML
-     * declaration, matching the format produced by the legacy XML.php.
+     * declaration.
      */
+    // The format matches the lodata-era XML.php.
     public function serialize(EdmxInterface $edmx): string
     {
         $root = new SimpleXMLElement(

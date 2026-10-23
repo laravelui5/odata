@@ -10,10 +10,8 @@ namespace LaravelUi5\OData\Http;
  * Holds only the URL path and the system query options that the planner needs.
  * Intentionally independent of Illuminate\Http\Request so that tier-2 tests
  * (QueryPlanner tests) can construct it without booting Laravel.
- *
- * The existing Controller\ODataRequest (legacy) is converted into this type
- * by the HTTP entry point once it is wired in Step 7.
  */
+// History: replaced the lodata-era Controller\ODataRequest (migration step 7).
 final readonly class ODataRequest
 {
     public function __construct(
