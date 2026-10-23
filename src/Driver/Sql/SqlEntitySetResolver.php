@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Driver\Sql;
 
 use Illuminate\Database\Query\Builder;
+use LaravelUi5\OData\Driver\Sql\Expression\AbstractFilterTranslator;
 use LaravelUi5\OData\Driver\Sql\Expression\FilterToQuery;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
@@ -109,13 +110,13 @@ readonly class SqlEntitySetResolver implements EntitySetResolverInterface, Entit
         }
 
         $query->where(function (Builder $q) use ($plan): void {
-            (new FilterToQuery($q))->apply($plan->filter);
+            (new FilterToQuery($q, $this->source::class))->apply($plan->filter);
         });
     }
 
     private function applySearch(Builder $query, EntitySetQueryPlan $plan): void
     {
-        SearchClause::apply($query, $plan->target->getEntityType(), $plan->search);
+        SearchClause::apply($query, $plan->target->getEntityType(), $plan->search, $this->source::class);
     }
 
     private function applySelect(Builder $query, EntitySetQueryPlan $plan): void
@@ -150,7 +151,15 @@ readonly class SqlEntitySetResolver implements EntitySetResolverInterface, Entit
             $segments = $item->expression->segments;
             $column   = $segments[count($segments) - 1]->getName();
             $direction = $item->direction === OrderDirection::Desc ? 'desc' : 'asc';
-            $query->orderBy($column, $direction);
+
+            // A property of the set itself may be an expression (ColumnExpressionResolverInterface).
+            $expression = count($segments) === 1
+                ? AbstractFilterTranslator::columnExpression($query, $this->source::class, $column)
+                : null;
+
+            $expression === null
+                ? $query->orderBy($column, $direction)
+                : $query->orderByRaw("({$expression}) {$direction}");
         }
     }
 

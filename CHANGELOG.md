@@ -6,16 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
-## [Unreleased]
+## [3.2.0] – 2026-10-23
+
+A property can be an expression on the query instead of its column, and `$filter`, `$orderby` and `$search` compare, sort and search by it. Additive; nothing changes for a host that binds nothing.
+
+### Added
+
+- **`ColumnExpressionResolverInterface`** — the expression forward-exit of query execution, beside the facet forward-exit of discovery. `expression(string $source, string $property): ?string` is asked with the model class of an Eloquent-backed set or the class of a custom entity set; raw SQL replaces the column in `WHERE` (every comparison, `in`, `contains`/`startswith`/`endswith`, `tolower`/`toupper` around it), in `ORDER BY` and in the `LIKE` of `$search`, on both read paths. The default, `Driver\Sql\ColumnsAsNamed`, answers null. Bound with `bindIf`, so a package's binding wins regardless of provider order. The resolver guarantees the SQL is valid on every query of its source (a join it relies on belongs in the model's global scope or the set's `query()`); a path through a navigation property keeps its column; `$apply` does not use it. First consumer: the LaravelUi5 SDK, whose translated columns now filter and sort in the request's language.
+- `AbstractFilterTranslator` and `FilterToQuery` take an optional `$source`; `SearchClause::apply()` takes an optional fourth `$source`. An Eloquent builder names its model itself.
 
 ### Development
 
-- Pest 5 (PHPUnit 13, Testbench 11 — Laravel 13 as the dev environment), replacing Pest 3.
-  `require-dev` only; the supported runtime range (Laravel 11–13) is unchanged.
-- `pestphp/pest-plugin-phpstan` replaces the abandoned `mrpunyapal/peststan`; `phpstan/phpstan-mockery`
-  added. PHPStan stays at level 1 — the road to level 5 is `ROADMAP.md` `OP32`.
-- Removed `staudenmeir/eloquent-json-relations` and `sebastian/diff` from `require-dev`. Nothing used
-  them, and the first held the dev environment on Laravel 12.
+- Pest 5 (PHPUnit 13, Testbench 11 — Laravel 13 as the dev environment), replacing Pest 3. `require-dev` only; the supported runtime range (Laravel 11–13) is unchanged.
+- `pestphp/pest-plugin-phpstan` replaces the abandoned `mrpunyapal/peststan`; `phpstan/phpstan-mockery` added. PHPStan stays at level 1 — the road to level 5 is `ROADMAP.md` `OP32`.
+- Removed `staudenmeir/eloquent-json-relations` and `sebastian/diff` from `require-dev`. Nothing used them, and the first held the dev environment on Laravel 12.
 
 ## [3.1.0] – 2026-10-07
 

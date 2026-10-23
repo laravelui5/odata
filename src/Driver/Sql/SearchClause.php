@@ -6,6 +6,7 @@ namespace LaravelUi5\OData\Driver\Sql;
 
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use LaravelUi5\OData\Driver\Sql\Expression\AbstractFilterTranslator;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
@@ -24,7 +25,11 @@ final class SearchClause
 {
     private const string ESCAPE = '!';
 
-    public static function apply(QueryBuilder|EloquentBuilder $query, EntityTypeInterface $type, ?string $search): void
+    /**
+     * @param string|null $source the custom set's class, for {@see AbstractFilterTranslator::columnExpression()};
+     *                            an Eloquent builder names its model itself
+     */
+    public static function apply(QueryBuilder|EloquentBuilder $query, EntityTypeInterface $type, ?string $search, ?string $source = null): void
     {
         if ($search === null || $search === '') {
             return;
@@ -45,9 +50,17 @@ final class SearchClause
         $pattern = '%' . self::escape(self::term($search)) . '%';
         $grammar = ($query instanceof EloquentBuilder ? $query->getQuery() : $query)->getGrammar();
 
-        $query->where(static function ($q) use ($columns, $pattern, $grammar): void {
-            foreach ($columns as $column) {
-                $q->orWhereRaw($grammar->wrap($column) . " LIKE ? ESCAPE '" . self::ESCAPE . "'", [$pattern]);
+        // A property of the set itself may be an expression (ColumnExpressionResolverInterface).
+        $operands = array_map(
+            static fn (string $column): string => ($expression = AbstractFilterTranslator::columnExpression($query, $source, $column)) === null
+                ? $grammar->wrap($column)
+                : '(' . $expression . ')',
+            $columns,
+        );
+
+        $query->where(static function ($q) use ($operands, $pattern): void {
+            foreach ($operands as $operand) {
+                $q->orWhereRaw($operand . " LIKE ? ESCAPE '" . self::ESCAPE . "'", [$pattern]);
             }
         });
     }

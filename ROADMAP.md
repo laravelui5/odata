@@ -41,7 +41,7 @@ service-provided cache key) so a pre-existing or hand-placed collision can't be 
 Silent-wrong-schema is the worst failure mode — same family as the 1.0.5 collision.
 
 Reasoned through in the internal route-composition notes.
-<!-- Atom [[ODATA_ALTERNATIVE_CLIENT_DEDICATED_SERVICE]] · spec docs/meta/specs/odata-route-composition.md OP5. -->
+<!-- Atom [[ODATA_ALTERNATIVE_CLIENT_DEDICATED_SERVICE]] · spec docs/meta/specs/odata/route-composition.md OP5. -->
 
 ## [ ] `OP03` Virtual `$expand` is resolved only on Eloquent-backed sets — custom (SQL) entity sets ignore it
 
@@ -343,19 +343,15 @@ would be cheaper and hide exactly those typos.
 **Done when** `composer analyse` is green at level 5. The `src` fixes are a patch, unless one of the
 two signature findings cannot be solved without a break.
 
----
-
 ## [ ] `OP33` Stale "next slice" comments on the read forward-exit — from SDK `OP09`, 2026-10-09
 
 `Service/ReadContext.php` (`:18`, `:48`, `:73`, `:79`) and `Service/ReadMessage.php` (`:14`, `:36`) still
 say pruning and the `sap-messages` header come "in the next slice". `ReadGate` already prunes and the
 header ships. Comment-only; no behaviour changes.
 
----
-
 ## [ ] `OP34` `discoverModel()` cannot serve a computed scalar property — the code beside a code-list `…_id` — from SDK Foundation D178, 2026-10-12
 
-Surfaced in the SDK 2.0 validation round (`meta/specs/mod-sales.md`, Foundation D168, D178). A business
+Surfaced in the SDK 2.0 validation round (`meta/specs/modules/sales.md`, Foundation D168, D178). A business
 row stores a code-list reference as an integer foreign key (`unit_id` → `codelist_units.id`), but UI5's
 `Unit` and `Currency` types need the **code** in the row: `Measures.Unit` / `Measures.ISOCurrency` must
 point to a property whose value is the code-list set's key (`KGM`, `EUR`). A probe on 2026-10-12
@@ -384,6 +380,8 @@ quantity needs `unit`).
 
 **Target:** Minor (additive). Needed before `mod-sales` part 2 is built; part 1 needs it only for
 `standard_cost`'s currency.
+
+---
 
 ## Done
 
@@ -910,7 +908,7 @@ also wrote `Nullable` twice on a parameter with facets and at all on a `TypeDefi
 
 ## [x] `OP27` `IEEE754Compatible=true` is ignored — `Edm.Decimal` and `Edm.Int64` go out as JSON numbers (v3.1.0)
 
-Found 2026-10-07 by the code-list probe (`meta/specs/codelists-v1.0.md`, Nachtrag 2026-10-07). UI5's
+Found 2026-10-07 by the code-list probe (`meta/specs/foundation/codelists-v1.0.md`, Nachtrag 2026-10-07). UI5's
 V4 model sends `Accept: application/json;odata.metadata=minimal;IEEE754Compatible=true` on every
 request. The format parameter asks the service to write `Edm.Int64` and `Edm.Decimal` as JSON
 **strings**, because a JavaScript number cannot hold them exactly. The engine ignores the parameter:
@@ -948,7 +946,7 @@ are coerced too, and the `Content-Type` echoes the parameter. `OP02` and `OP23` 
 > and the unpaged guarantee as a test (`tests/Service/CodeListHttpTest.php`, including warm = cold).
 > Only `Measures`, `CodeList` and three `Common` terms were regenerated; the rest is `OP29`.
 
-Surfaced 2026-10-01 in the SDK Foundation signing (`meta/specs/sdk-foundation-v1.0.md`, OP27 / D50),
+Surfaced 2026-10-01 in the SDK Foundation signing (`meta/specs/foundation/foundation-v1.0.md`, OP27 / D50),
 **confirmed by reading, test still to write.** The serializer can emit every facet
 (`Service/Serialization/CsdlSerializer.php:534-552`: `Nullable`, `MaxLength`, `Precision`, `Scale`
 incl. `variable`), and `Edm\Property\Property` accepts `TypeFacetsInterface`. But discovery builds
@@ -984,7 +982,7 @@ facets in `$metadata`.
    (`EntitySetHandler.php:37`); that must stay so for these sets, and `$select` must work on them.
 
 **Level 3 reshaped by the probe (2026-10-07).** The check D50 (5) asked for ran in `acme` with
-OpenUI5 1.136.18 against odata 3.0.6 (findings: `meta/specs/codelists-v1.0.md`, Nachtrag
+OpenUI5 1.136.18 against odata 3.0.6 (findings: `meta/specs/foundation/codelists-v1.0.md`, Nachtrag
 2026-10-07). The mechanism works against this engine: per-row formatting by the code's scale, texts,
 standard codes. What it changes here:
 

@@ -17,14 +17,15 @@ use LaravelUi5\OData\Protocol\Planning\Expression\LambdaExpression;
  */
 final class FilterToQuery extends AbstractFilterTranslator
 {
-    public function __construct(QueryBuilder $builder)
+    public function __construct(QueryBuilder $builder, ?string $source = null)
     {
-        parent::__construct($builder);
+        parent::__construct($builder, $source);
     }
 
     protected function nested(QueryBuilder|EloquentBuilder $builder): static
     {
-        return new self($builder);
+        /** @var QueryBuilder $builder */
+        return new self($builder, $this->source);
     }
 
     public function visitLambda(LambdaExpression $node): mixed

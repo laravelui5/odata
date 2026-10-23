@@ -7,6 +7,7 @@ namespace LaravelUi5\OData\Driver\Sql;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use LaravelUi5\OData\Driver\Sql\Expression\AbstractFilterTranslator;
 use LaravelUi5\OData\Driver\Sql\Expression\FilterToEloquent;
 use LaravelUi5\OData\Protocol\Planning\EntitySetQueryPlan;
 use LaravelUi5\OData\Protocol\Planning\ExpandList;
@@ -637,7 +638,15 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
             $segments = $item->expression->segments;
             $column   = $segments[count($segments) - 1]->getName();
             $direction = $item->direction === OrderDirection::Desc ? 'desc' : 'asc';
-            $query->orderBy($column, $direction);
+
+            // A property of the set itself may be an expression (ColumnExpressionResolverInterface).
+            $expression = count($segments) === 1
+                ? AbstractFilterTranslator::columnExpression($query, null, $column)
+                : null;
+
+            $expression === null
+                ? $query->orderBy($column, $direction)
+                : $query->orderByRaw("({$expression}) {$direction}");
         }
     }
 

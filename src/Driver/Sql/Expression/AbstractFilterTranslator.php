@@ -23,6 +23,7 @@ use LaravelUi5\OData\Protocol\Planning\Expression\NullLiteralExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\PropertyPathExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\UnaryExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\UnaryOperator;
+use LaravelUi5\OData\Service\Contracts\ColumnExpressionResolverInterface;
 
 /**
  * Translates a `$filter` tree into WHERE clauses — shared by the SQL and the Eloquent path,
@@ -45,7 +46,14 @@ abstract class AbstractFilterTranslator implements FilterExpressionVisitor
 {
     private const array MIRRORED = ['=' => '=', '<>' => '<>', '>' => '<', '>=' => '<=', '<' => '>', '<=' => '>='];
 
-    public function __construct(protected readonly QueryBuilder|EloquentBuilder $builder) {}
+    /**
+     * @param string|null $source the class {@see ColumnExpressionResolverInterface} is asked for — a custom set's
+     *                            class; an Eloquent builder names its model itself
+     */
+    public function __construct(
+        protected readonly QueryBuilder|EloquentBuilder $builder,
+        protected readonly ?string                      $source = null,
+    ) {}
 
     public function apply(FilterExpression $expression): void
     {
@@ -149,7 +157,14 @@ abstract class AbstractFilterTranslator implements FilterExpressionVisitor
     protected function operand(FilterExpression $expr): array
     {
         if ($expr instanceof PropertyPathExpression) {
-            return ['kind' => 'column', 'sql' => $expr->segments[count($expr->segments) - 1]->getName(), 'raw' => false];
+            $name = $expr->segments[count($expr->segments) - 1]->getName();
+
+            // A property of the set itself may be an expression (ColumnExpressionResolverInterface).
+            if (count($expr->segments) === 1 && ($sql = self::columnExpression($this->builder, $this->source, $name)) !== null) {
+                return ['kind' => 'column', 'sql' => '(' . $sql . ')', 'raw' => true];
+            }
+
+            return ['kind' => 'column', 'sql' => $name, 'raw' => false];
         }
         if ($expr instanceof LiteralExpression) {
             return ['kind' => 'value', 'value' => $expr->value];
@@ -250,6 +265,17 @@ abstract class AbstractFilterTranslator implements FilterExpressionVisitor
             $this->wrap($column) . " LIKE ? ESCAPE '!'",
             [$prefix . SearchClause::escape($value['value']) . $suffix],
         );
+    }
+
+    /**
+     * The expression bound for `$property` of the query's source, or null for its column. The source is the
+     * Eloquent builder's model, else `$source`; without either there is nothing to ask.
+     */
+    public static function columnExpression(QueryBuilder|EloquentBuilder $builder, ?string $source, string $property): ?string
+    {
+        $source ??= $builder instanceof EloquentBuilder ? $builder->getModel()::class : null;
+
+        return $source === null ? null : app(ColumnExpressionResolverInterface::class)->expression($source, $property);
     }
 
     /** @param array{kind: 'column', sql: string, raw: bool} $column */
