@@ -115,22 +115,6 @@ declared type* does not hold here. OData has no JSON type; the property is a str
 **Workaround in place:** a cast that serializes to text (`LaravelUi5\Sdk\Audit\Casts\JsonText`, `sdk-db`).
 **Fix:** `RowCoercion` encodes an array under `Edm.String`. Check what that does to a consumer that reads the object today.
 
-### [x] `OP40` `$compute` reads columns `$metadata` does not declare
-
-Found 2026-11-02 with `OP38`. `QueryPlanner::parseCompute()` splits `expression as alias` and checks the expression against
-nothing; `EloquentEntitySetResolver::evaluateComputeExpression()` answers a property reference with `$row[$expr]`, read off
-the full `toArray()`. So `?$compute=x as y` hands out any column the model serializes, declared or not. With
-`#[ODataIgnore]` gone (`OP38`) that is a model's `$appends` and an undeclared attribute; a `$hidden` column stays safe,
-since `toArray()` never carries it.
-
-**Fix:** a property reference in `$compute` must name a declared structural property of the set's type, checked at plan
-time (400 otherwise, like `$select`); the evaluator reads only those. **Test:** `$compute=<undeclared> as x` answers 400,
-`$compute=<declared> as x` still works.
-
-**Built 2026-11-02** (unreleased, next major): `QueryPlanner::parseCompute()` parses each expression with `FilterParser`
-and resolves it with `PropertyResolver('$compute')` against the set's type; the evaluators are unchanged. This covers
-custom sets too, whose rows may carry undeclared columns. Tests in `DeclaredPropertiesOnWireTest` (*$compute (OP40)*).
-
 ### [ ] `OP41` `#[ODataEntity]` keeps only the names — `$hidden` and `$visible` always apply — major
 
 > **Decided 2026-11-02 (author), after a review of the attribute.**
@@ -607,6 +591,22 @@ unparseable part and a GET answers three parts, the middle one an error.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+### [x] `OP40` `$compute` reads columns `$metadata` does not declare
+
+Found 2026-11-02 with `OP38`. `QueryPlanner::parseCompute()` splits `expression as alias` and checks the expression against
+nothing; `EloquentEntitySetResolver::evaluateComputeExpression()` answers a property reference with `$row[$expr]`, read off
+the full `toArray()`. So `?$compute=x as y` hands out any column the model serializes, declared or not. With
+`#[ODataIgnore]` gone (`OP38`) that is a model's `$appends` and an undeclared attribute; a `$hidden` column stays safe,
+since `toArray()` never carries it.
+
+**Fix:** a property reference in `$compute` must name a declared structural property of the set's type, checked at plan
+time (400 otherwise, like `$select`); the evaluator reads only those. **Test:** `$compute=<undeclared> as x` answers 400,
+`$compute=<declared> as x` still works.
+
+**Built 2026-11-02** (unreleased, next major): `QueryPlanner::parseCompute()` parses each expression with `FilterParser`
+and resolves it with `PropertyResolver('$compute')` against the set's type; the evaluators are unchanged. This covers
+custom sets too, whose rows may carry undeclared columns. Tests in `DeclaredPropertiesOnWireTest` (*$compute (OP40)*).
 
 ### [x] `OP36` An expanded `belongsToMany` row carries Laravel's `pivot` — a property `$metadata` does not declare — from SDK audit, 2026-10-25
 
