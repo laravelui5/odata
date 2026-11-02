@@ -16,11 +16,12 @@ use LaravelUi5\OData\Tests\TestCase;
 
 /*
  * OP24, decided 2026-10-07: column-level discovery attributes sit on a PHP 8.4
- * property with hooks that delegate to Eloquent's attribute bag, and
- * #[ODataEntity(useHidden: true)] keeps the model's $hidden out of the schema.
+ * property with hooks that delegate to Eloquent's attribute bag.
+ * OP41, decided 2026-11-02: what the model never serializes ($hidden, $visible)
+ * is not declared — always, no switch.
  *
  * The first block checks the idiom against what a model must keep doing;
- * the second the useHidden switch.
+ * the second the serialization rules.
  */
 
 uses(TestCase::class);
@@ -78,15 +79,15 @@ describe('column attributes on hooked properties', function () {
     });
 });
 
-// ── useHidden ────────────────────────────────────────────────────────────────
+// ── $hidden and $visible (OP41) ──────────────────────────────────────────────
 
-#[ODataEntity(name: 'Account', entitySet: 'Accounts', useHidden: true)]
+#[ODataEntity(name: 'Account', entitySet: 'Accounts')]
 class HiddenAccount extends Model
 {
     protected $table = 'hidden_accounts';
     public $timestamps = false;
     protected $guarded = [];
-    protected $hidden = ['password', 'tokens', 'id'];   // `id` is the key: it stays
+    protected $hidden = ['password', 'tokens'];
 
     public function tokens(): HasMany
     {
@@ -94,13 +95,19 @@ class HiddenAccount extends Model
     }
 }
 
-#[ODataEntity(name: 'OpenAccount', entitySet: 'OpenAccounts')]
-class OpenAccount extends Model
+#[ODataEntity(name: 'Profile', entitySet: 'Profiles')]
+class VisibleAccount extends Model
 {
     protected $table = 'hidden_accounts';
     public $timestamps = false;
     protected $guarded = [];
-    protected $hidden = ['password'];
+    protected $visible = ['id', 'name', 'password'];
+    protected $hidden = ['password'];   // $hidden removes from $visible, as in toArray()
+
+    public function tokens(): HasMany
+    {
+        return $this->hasMany(HiddenToken::class, 'account_id');
+    }
 }
 
 #[ODataEntity(name: 'Token', entitySet: 'Tokens')]
@@ -111,8 +118,35 @@ class HiddenToken extends Model
     protected $guarded = [];
 }
 
+#[ODataEntity(name: 'Locked', entitySet: 'Locked')]
+class HiddenKeyAccount extends Model
+{
+    protected $table = 'hidden_accounts';
+    public $timestamps = false;
+    protected $hidden = ['id'];
+}
+
+#[ODataEntity(name: 'Unkeyed', entitySet: 'Unkeyed')]
+class InvisibleKeyAccount extends Model
+{
+    protected $table = 'hidden_accounts';
+    public $timestamps = false;
+    protected $visible = ['name'];
+}
+
+/** Names its type like HiddenToken does: collides. */
+#[ODataEntity(name: 'Token', entitySet: 'MoreTokens')]
+class OtherToken extends Model
+{
+    protected $table = 'hidden_tokens';
+    public $timestamps = false;
+}
+
 final class HiddenService extends ODataService
 {
+    /** @var list<class-string<Model>> */
+    public static array $models = [HiddenAccount::class, VisibleAccount::class, HiddenToken::class];
+
     public function __construct()
     {
         parent::__construct(serviceUriValue: '', namespaceValue: 'Test.Ns');
@@ -120,21 +154,29 @@ final class HiddenService extends ODataService
 
     protected function configure(EdmBuilderInterface $builder): EdmBuilderInterface
     {
-        $this->discoverModel(HiddenAccount::class);
-        $this->discoverModel(OpenAccount::class);
-        $this->discoverModel(HiddenToken::class);
+        foreach (self::$models as $model) {
+            $this->discoverModel($model);
+        }
 
         return $builder->namespace($this->namespace());
     }
 }
 
-describe('#[ODataEntity(useHidden: true)]', function () {
+function entityTypeXml(string $xml, string $name): string
+{
+    $type = substr($xml, strpos($xml, '<EntityType Name="' . $name . '">'));
+
+    return substr($type, 0, strpos($type, '</EntityType>'));
+}
+
+describe('what the model never serializes is not declared', function () {
     beforeEach(function () {
         $this->withExceptionHandling();
+        HiddenService::$models = [HiddenAccount::class, VisibleAccount::class, HiddenToken::class];
 
-        DB::statement('CREATE TABLE hidden_accounts (id integer primary key, name varchar(40) not null, password varchar(60) not null)');
+        DB::statement('CREATE TABLE hidden_accounts (id integer primary key, name varchar(40) not null, password varchar(60) not null, note varchar(40))');
         DB::statement('CREATE TABLE hidden_tokens (id integer primary key, account_id integer not null)');
-        DB::table('hidden_accounts')->insert(['id' => 1, 'name' => 'alice', 'password' => '$2y$10$secret']);
+        DB::table('hidden_accounts')->insert(['id' => 1, 'name' => 'alice', 'password' => '$2y$10$secret', 'note' => 'n']);
 
         $service = new HiddenService();
         $this->app->instance(ODataServiceRegistryInterface::class, new class ($service) implements ODataServiceRegistryInterface {
@@ -144,15 +186,21 @@ describe('#[ODataEntity(useHidden: true)]', function () {
         });
     });
 
-    it('declares neither hidden columns nor hidden relations, but keeps the key', function () {
-        $xml     = $this->get('/odata/$metadata')->streamedContent();
-        $account = substr($xml, strpos($xml, '<EntityType Name="Account">'));
-        $account = substr($account, 0, strpos($account, '</EntityType>'));
-
-        expect($account)
+    it('leaves $hidden columns and relations out, without a switch', function () {
+        expect(entityTypeXml($this->get('/odata/$metadata')->streamedContent(), 'Account'))
             ->toContain('<PropertyRef Name="id"/>')
             ->toContain('Name="name"')
+            ->toContain('Name="note"')
             ->not->toContain('Name="password"')
+            ->not->toContain('NavigationProperty Name="tokens"');
+    });
+
+    it('declares only what $visible admits, less $hidden', function () {
+        expect(entityTypeXml($this->get('/odata/$metadata')->streamedContent(), 'Profile'))
+            ->toContain('Name="id"')
+            ->toContain('Name="name"')
+            ->not->toContain('Name="password"')
+            ->not->toContain('Name="note"')
             ->not->toContain('NavigationProperty Name="tokens"');
     });
 
@@ -160,8 +208,38 @@ describe('#[ODataEntity(useHidden: true)]', function () {
         $this->get("/odata/Accounts?\$filter=startswith(password,'\$2y')")->assertStatus(400);
     });
 
-    it('leaves a model without the switch as it was', function () {
-        expect($this->get('/odata/$metadata')->streamedContent())
-            ->toMatch('/<EntityType Name="OpenAccount">.*Name="password"/s');
+    it('declares exactly what goes on the wire', function () {
+        $row = json_decode($this->get('/odata/Profiles(1)')->streamedContent(), true);
+
+        expect(array_keys(array_filter($row, fn (string $k) => !str_starts_with($k, '@'), ARRAY_FILTER_USE_KEY)))
+            ->toBe(['id', 'name']);
+    });
+});
+
+describe('discovery fails loud', function () {
+    beforeEach(function () {
+        DB::statement('CREATE TABLE hidden_accounts (id integer primary key, name varchar(40) not null, password varchar(60) not null, note varchar(40))');
+        DB::statement('CREATE TABLE hidden_tokens (id integer primary key, account_id integer not null)');
+    });
+
+    it('on a key in $hidden', function () {
+        HiddenService::$models = [HiddenKeyAccount::class];
+
+        expect(fn () => (new HiddenService())->schema())
+            ->toThrow(LogicException::class, 'The key "id" of HiddenKeyAccount is never serialized');
+    });
+
+    it('on a key outside $visible', function () {
+        HiddenService::$models = [InvisibleKeyAccount::class];
+
+        expect(fn () => (new HiddenService())->schema())
+            ->toThrow(LogicException::class, 'The key "id" of InvisibleKeyAccount is never serialized');
+    });
+
+    it('on two models with the same entity type name, naming both', function () {
+        HiddenService::$models = [HiddenToken::class, OtherToken::class];
+
+        expect(fn () => (new HiddenService())->schema())
+            ->toThrow(LogicException::class, 'Both HiddenToken and OtherToken resolve to the entity type "Token"');
     });
 });

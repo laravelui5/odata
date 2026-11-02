@@ -28,6 +28,16 @@ carries exactly what `$metadata` declares.
   `Edm.String`, but the decoded value went out as a JSON object: `"input":{"x":1}`. `RowCoercion` now writes it back as
   text, `"input":"{\"x\":1}"`, at every level. OData has no JSON type; a client parses the string. A client that read
   the object reads a string now. `null` stays `null`; a plain string passes unchanged.
+- **BREAKING: `$hidden` and `$visible` always apply; `#[ODataEntity(useHidden:)]` is gone** (`OP41`). Discovery declares
+  exactly the columns and relations `toArray()` serializes: a non-empty `$visible` admits only what it names, `$hidden`
+  removes from that. Before, `$hidden` needed the switch and `$visible` was ignored, so a column could be declared,
+  filterable and never delivered. **Upgrade:** drop `useHidden: true` from every `#[ODataEntity]`; PHP refuses the
+  unknown named argument. A model that relied on a `$hidden` column being declared (to `$filter` on it) serves it
+  through a custom entity set.
+- **Discovery fails loud** where it used to fail late or not at all (`OP41`): a key in `$hidden` or outside `$visible`
+  (before: declared, missing on the wire), and two models resolving to the same entity type or entity set (before: every
+  request answered 500 with *"The following entity sets have no resolver bound"*). Both messages name the classes.
+- `#[ODataEntity]` carries only the names now: `name` and `entitySet`.
 - `PropertyResolver` takes the name of the query option it resolves for (default `$filter`), so its error names the
   right one.
 - A virtual expand resolver still receives the **full** parent row, and now the entity type's declared name as

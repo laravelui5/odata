@@ -219,6 +219,9 @@ final class ModelDiscovery
         $typeName = $entityAttr?->name ?? $ref->getShortName();
         $entitySetName = $entityAttr?->entitySet ?? Str::plural($typeName);
 
+        self::assertUnique($this->typeNames, $modelClass, $typeName, 'entity type');
+        self::assertUnique($this->entitySetNames, $modelClass, $entitySetName, 'entity set');
+
         $this->typeNames[$modelClass] = $typeName;
         $this->entitySetNames[$modelClass] = $entitySetName;
 
@@ -230,13 +233,19 @@ final class ModelDiscovery
 
         $properties = [];
         $keyProps = [];
-        $hidden = self::hiddenNames($model, $entityAttr);
+        if (!self::serializes($model, $keyName)) {
+            throw new \LogicException(sprintf(
+                'The key "%s" of %s is never serialized ($hidden or $visible), so no entity of type "%s" could be read. '
+                . 'Keep the key serializable, or serve the model through a custom entity set.',
+                $keyName, $modelClass, $typeName,
+            ));
+        }
 
         foreach ($columns as $column) {
             $colName = $column['name'];
 
-            // #[ODataEntity(useHidden: true)]: what the model never serializes is not declared either.
-            if (isset($hidden[$colName]) && $colName !== $keyName) {
+            // What the model never serializes ($hidden, $visible) is not declared either.
+            if (!self::serializes($model, $colName)) {
                 continue;
             }
 
@@ -307,7 +316,6 @@ final class ModelDiscovery
     private function discoverRelationships(Model $model, ReflectionClass $ref, string $namespace): array
     {
         $navProps = [];
-        $hidden   = self::hiddenNames($model, $this->readEntityAttribute($ref));
 
         foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
             // Only own methods, no magic, no parameters
@@ -326,7 +334,7 @@ final class ModelDiscovery
                 continue;
             }
 
-            if (isset($hidden[$method->getName()])) {
+            if (!self::serializes($model, $method->getName())) {
                 continue;
             }
 
@@ -638,13 +646,32 @@ final class ModelDiscovery
     }
 
     /**
-     * The model's `$hidden` as a lookup, when `#[ODataEntity(useHidden: true)]` asks for it.
-     *
-     * @return array<string, true>
+     * Does `toArray()` carry this attribute or relation? Eloquent's own rule: a non-empty `$visible` admits only what
+     * it names, and `$hidden` removes from that. What the model never serializes is not declared.
      */
-    private static function hiddenNames(Model $model, ?ODataEntity $entityAttr): array
+    private static function serializes(Model $model, string $name): bool
     {
-        return ($entityAttr?->useHidden ?? false) ? array_fill_keys($model->getHidden(), true) : [];
+        $visible = $model->getVisible();
+
+        return ($visible === [] || in_array($name, $visible, true))
+            && !in_array($name, $model->getHidden(), true);
+    }
+
+    /**
+     * Two models must not resolve to the same entity type or entity set: the second would replace the first, and
+     * the service would fail on every request with a message about a missing resolver.
+     *
+     * @param array<class-string<Model>, string> $taken model class => name already given
+     */
+    private static function assertUnique(array $taken, string $modelClass, string $name, string $what): void
+    {
+        $other = array_search($name, $taken, true);
+        if ($other !== false && $other !== $modelClass) {
+            throw new \LogicException(sprintf(
+                'Both %s and %s resolve to the %s "%s". Name one of them with #[ODataEntity(name:, entitySet:)].',
+                $other, $modelClass, $what, $name,
+            ));
+        }
     }
 
     private function hasIgnoreAttribute(\ReflectionProperty $prop): bool

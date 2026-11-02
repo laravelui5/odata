@@ -106,37 +106,6 @@ and `$hidden`/`$visible` always apply. The per-column override on a discovered m
   removed attribute: what replaces it.
 - Chiron: the OData skill teaches what the docs teach.
 
-### [ ] `OP41` `#[ODataEntity]` keeps only the names — `$hidden` and `$visible` always apply — major
-
-> **Decided 2026-11-02 (author), after a review of the attribute.**
-> - **`$hidden` and `$visible` always apply.** Discovery declares exactly the columns and relations `toArray()`
->   serializes. The `useHidden` switch goes; what it did becomes the only behaviour (Lodata's, too).
-> - **A key in `$hidden`, or outside `$visible`, fails loud at schema build.** An entity type whose key never reaches the
->   wire cannot be read.
-> - **Two models resolving to the same entity type name fail loud**, naming both classes.
-> - **A virtual expand resolver receives the declared type name** as `$parentEntityType`.
-> - **Not a container for `#[ODataAnnotate]` / `#[ODataComputed]`:** those stay separate repeatable class attributes with
->   typed signatures; an `annotate:` array inside `#[ODataEntity]` is checked by neither PHP nor the IDE, and a model with
->   default names should not need `#[ODataEntity]` just to annotate.
-
-**What it does today.** Class attribute with three fields: `name` (entity type, else the class's short name),
-`entitySet` (else `Str::plural($typeName)`, an English inflection: `Person` → `People`), `useHidden` (keeps `$hidden` out
-of the type, `OP24`). All three work. In the workspace six models use it (all with `useHidden`, two with names).
-
-**Found in a throwaway test, 2026-11-02 (deleted afterwards):**
-1. **`$visible` is ignored.** A model with `$visible = ['id']` declares `a_col` and serves `{"id":1}`: declared, never
-   delivered. `useHidden` does not help.
-2. **A key in `$hidden`** stays declared (`PropertyHooksAndHiddenTest` keeps it on purpose) and is missing on the wire.
-3. **Two models with the same short name** and no `name:` answer 500 on every request, `$metadata` included, with a
-   misleading message: *"The following entity sets have no resolver bound: Items"*.
-4. **`$parentEntityType`** handed to `VirtualExpandResolverInterface::resolveExpand()` is the class's short name
-   (`EloquentEntitySetResolver.php:407`), not the declared type name. No resolver reads it today; latent. *Fixed with `OP36`, 2026-11-02.*
-
-**To build:** read `$hidden` and `$visible` unconditionally in `ModelDiscovery` (columns and relations); the key check;
-a duplicate-name check before the builder; the type name into `attachExpandedRelations()`; remove `useHidden` from the
-attribute, the tests (`HiddenAccount`'s key case becomes a failure test) and the docs. Consumers drop `useHidden: true`
-(the six in `sdk-db` and the Support/Audit models) with no change in behaviour.
-
 ### [ ] `OP01` EDM cache is keyed by class location, not service identity — load-side silent collision
 
 Surfaced 2026-06-11 (`pragmatiqu/timesheet.biz`) building a second, **route-composed** service
@@ -582,6 +551,44 @@ unparseable part and a GET answers three parts, the middle one an error.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+### [x] `OP41` `#[ODataEntity]` keeps only the names — `$hidden` and `$visible` always apply — major
+
+> **Decided 2026-11-02 (author), after a review of the attribute.**
+> - **`$hidden` and `$visible` always apply.** Discovery declares exactly the columns and relations `toArray()`
+    >   serializes. The `useHidden` switch goes; what it did becomes the only behaviour (Lodata's, too).
+> - **A key in `$hidden`, or outside `$visible`, fails loud at schema build.** An entity type whose key never reaches the
+    >   wire cannot be read.
+> - **Two models resolving to the same entity type name fail loud**, naming both classes.
+> - **A virtual expand resolver receives the declared type name** as `$parentEntityType`.
+> - **Not a container for `#[ODataAnnotate]` / `#[ODataComputed]`:** those stay separate repeatable class attributes with
+    >   typed signatures; an `annotate:` array inside `#[ODataEntity]` is checked by neither PHP nor the IDE, and a model with
+    >   default names should not need `#[ODataEntity]` just to annotate.
+
+**What it does today.** Class attribute with three fields: `name` (entity type, else the class's short name),
+`entitySet` (else `Str::plural($typeName)`, an English inflection: `Person` → `People`), `useHidden` (keeps `$hidden` out
+of the type, `OP24`). All three work. In the workspace six models use it (all with `useHidden`, two with names).
+
+**Found in a throwaway test, 2026-11-02 (deleted afterwards):**
+1. **`$visible` is ignored.** A model with `$visible = ['id']` declares `a_col` and serves `{"id":1}`: declared, never
+   delivered. `useHidden` does not help.
+2. **A key in `$hidden`** stays declared (`PropertyHooksAndHiddenTest` keeps it on purpose) and is missing on the wire.
+3. **Two models with the same short name** and no `name:` answer 500 on every request, `$metadata` included, with a
+   misleading message: *"The following entity sets have no resolver bound: Items"*.
+4. **`$parentEntityType`** handed to `VirtualExpandResolverInterface::resolveExpand()` is the class's short name
+   (`EloquentEntitySetResolver.php:407`), not the declared type name. No resolver reads it today; latent. *Fixed with `OP36`, 2026-11-02.*
+
+**To build:** read `$hidden` and `$visible` unconditionally in `ModelDiscovery` (columns and relations); the key check;
+a duplicate-name check before the builder; the type name into `attachExpandedRelations()`; remove `useHidden` from the
+attribute, the tests (`HiddenAccount`'s key case becomes a failure test) and the docs. Consumers drop `useHidden: true`
+(the six in `sdk-db` and the Support/Audit models) with no change in behaviour.
+
+**Built 2026-11-02** (unreleased, next major): `ModelDiscovery::serializes()` mirrors Eloquent's rule for columns and
+relations; the key check and `assertUnique()` (entity type and entity set) throw `LogicException` at schema build;
+`ODataEntity` keeps `name` and `entitySet`. Tests: `PropertyHooksAndHiddenTest`, blocks *what the model never serializes
+is not declared* and *discovery fails loud*. Every model the workspace serves with a `$hidden` already carried
+`useHidden: true` (checked 2026-11-02), so dropping the argument changes no schema there. Docs follow in the major's docs
+pass.
 
 ### [x] `OP39` A `json` cast goes out as an object where `$metadata` declares `Edm.String`
 
