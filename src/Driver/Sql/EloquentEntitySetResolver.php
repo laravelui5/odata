@@ -7,6 +7,7 @@ namespace LaravelUi5\OData\Driver\Sql;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use LaravelUi5\OData\Driver\Sql\Expression\AbstractFilterTranslator;
 use LaravelUi5\OData\Driver\Sql\Expression\FilterToEloquent;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
@@ -16,12 +17,14 @@ use LaravelUi5\OData\Protocol\Planning\Expression\PropertyPathExpression;
 use LaravelUi5\OData\Protocol\Planning\NavigationAnchor;
 use LaravelUi5\OData\Protocol\Planning\OrderDirection;
 use LaravelUi5\OData\Protocol\Planning\PropertySelectItem;
+use LaravelUi5\OData\Protocol\Planning\SelectList;
 use LaravelUi5\OData\Protocol\Planning\EntityQueryPlan;
 use LaravelUi5\OData\Service\Contracts\EntityResolverInterface;
 use LaravelUi5\OData\Service\Contracts\EntitySetResolverInterface;
 use LaravelUi5\OData\Service\Contracts\QueryPlanInterface;
 use LaravelUi5\OData\Service\Contracts\RuntimeSchemaInterface;
 use LaravelUi5\OData\Service\Contracts\VirtualExpandResolverInterface;
+use LaravelUi5\OData\Service\Discovery\ComputedProperties;
 
 /**
  * Resolves entity-set and single-entity plans against an Eloquent model class.
@@ -92,6 +95,8 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
         $this->applyFilter($query, $plan);
         $this->applySearch($query, $plan);
         $this->applySelect($query, $plan);
+        // $compute may name any declared property, a computed one included: select them all then.
+        self::selectComputed($query, $plan->compute !== [] ? null : self::selectedNames($plan->select));
         $this->applyOrderBy($query, $plan);
         $this->applyPagination($query, $plan);
         $type = $plan->target->getEntityType();
@@ -135,12 +140,7 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
         }
 
         if (!$plan->select->isSelectAll()) {
-            $columns = [];
-            foreach ($plan->select->items as $item) {
-                if ($item instanceof PropertySelectItem) {
-                    $columns[] = $item->property->getName();
-                }
-            }
+            $columns = self::selectedColumns($plan->select, $query->getModel()::class);
             // When expanding, always include the PK for relation matching.
             if (!$plan->expand->isEmpty()) {
                 $keyName = (new ($this->modelClass))->getKeyName();
@@ -152,6 +152,7 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
                 $query->select($columns);
             }
         }
+        self::selectComputed($query, self::selectedNames($plan->select));
 
         $this->applyExpand($query, $plan->expand);
 
@@ -296,11 +297,12 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
                 continue;
             }
 
-            $childCounts = array_filter($item->expand->items, static fn ($child) => $child->count);
+            $childCounts  = array_filter($item->expand->items, static fn ($child) => $child->count);
+            $relatedClass = get_class((new $modelClass)->$navName()->getRelated());
 
             $hasConstraints = $item->filter !== null || !$item->select->isSelectAll()
                 || $item->orderBy !== null || $item->top !== null || $item->skip !== null
-                || $childCounts !== [];
+                || $childCounts !== [] || ComputedProperties::of($relatedClass) !== [];
 
             if (!$hasConstraints) {
                 $withs[] = $fullPath;
@@ -314,12 +316,7 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
                     }
 
                     if (!$item->select->isSelectAll()) {
-                        $columns = [];
-                        foreach ($item->select->items as $selectItem) {
-                            if ($selectItem instanceof PropertySelectItem) {
-                                $columns[] = $selectItem->property->getName();
-                            }
-                        }
+                        $columns = self::selectedColumns($item->select, get_class($relQuery->getModel()));
                         // Always include PK + FK for relation matching.
                         if ($columns !== []) {
                             // For BelongsToMany, qualify the PK with the table name
@@ -373,6 +370,8 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
                         }
                     }
 
+                    self::selectComputed($relQuery, self::selectedNames($item->select));
+
                     // Counts of the next level hang on this level's query (after any select).
                     if ($item->expand->items !== []) {
                         self::applyExpandCounts($relQuery, $item->expand, get_class($relQuery->getModel()));
@@ -382,9 +381,7 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
 
             // Recurse into nested expands.
             if (!$item->expand->isEmpty()) {
-                // Resolve the related model class for the next depth.
-                $relatedModel = (new $modelClass)->$navName()->getRelated();
-                $nested = $this->collectEagerLoads($item->expand, $fullPath, get_class($relatedModel));
+                $nested = $this->collectEagerLoads($item->expand, $fullPath, $relatedClass);
                 foreach ($nested as $key => $value) {
                     if (is_int($key)) {
                         $withs[] = $value;
@@ -396,6 +393,82 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
         }
 
         return $withs;
+    }
+
+    /**
+     * The columns a `$select` names, without the model's computed properties — those are expressions, selected by
+     * {@see selectComputed()}.
+     *
+     * @param class-string<Model> $modelClass
+     * @return list<string>
+     */
+    private static function selectedColumns(SelectList $select, string $modelClass): array
+    {
+        $computed = ComputedProperties::of($modelClass);
+        $columns  = [];
+        foreach ($select->items as $item) {
+            if ($item instanceof PropertySelectItem && !isset($computed[$item->property->getName()])) {
+                $columns[] = $item->property->getName();
+            }
+        }
+
+        return $columns;
+    }
+
+    /**
+     * The property names a `$select` names, or null when it selects all.
+     *
+     * @return list<string>|null
+     */
+    private static function selectedNames(SelectList $select): ?array
+    {
+        if ($select->isSelectAll()) {
+            return null;
+        }
+
+        $names = [];
+        foreach ($select->items as $item) {
+            if ($item instanceof PropertySelectItem) {
+                $names[] = $item->property->getName();
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * Select the model's computed properties (`#[ODataComputed]`) as `(<expression>) AS <name>`, the expression from
+     * the bound {@see \LaravelUi5\OData\Service\Contracts\ColumnExpressionResolverInterface}. The value then
+     * travels as an attribute of the model. A query that selected nothing yet keeps its table's columns.
+     *
+     * @param list<string>|null $only the names to select; null for all
+     */
+    private static function selectComputed(Builder|Relation $query, ?array $only): void
+    {
+        $eloquent = $query instanceof Relation ? $query->getQuery() : $query;
+        $model    = $eloquent->getModel();
+        $computed = ComputedProperties::of($model::class);
+        if ($only !== null) {
+            $computed = array_intersect_key($computed, array_flip($only));
+        }
+        if ($computed === []) {
+            return;
+        }
+
+        $base = $eloquent->getQuery();
+        if ($base->columns === null) {
+            $eloquent->select($model->getTable() . '.*');
+        }
+
+        foreach (array_keys($computed) as $name) {
+            $expression = AbstractFilterTranslator::columnExpression($eloquent, null, $name)
+                ?? throw new \LogicException(sprintf(
+                    'The computed property "%s" of %s has no expression: bind a ColumnExpressionResolverInterface '
+                    . 'that answers it.',
+                    $name, $model::class,
+                ));
+            $eloquent->selectRaw('(' . $expression . ') as ' . $base->getGrammar()->wrap($name));
+        }
     }
 
     /**
@@ -624,12 +697,7 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
             return;
         }
 
-        $columns = [];
-        foreach ($plan->select->items as $item) {
-            if ($item instanceof PropertySelectItem) {
-                $columns[] = $item->property->getName();
-            }
-        }
+        $columns = self::selectedColumns($plan->select, $query->getModel()::class);
 
         // When expanding, always include the model's key column so Eloquent
         // can match eager-loaded relations to their parent rows.

@@ -62,6 +62,15 @@ carries exactly what `$metadata` declares.
 
 ### Added
 
+- **`#[ODataComputed]`** (`OP34`) — a computed property on a discovered model: a property with no column, declared on
+  the class with its type and facets (`#[ODataComputed('currency', EdmPrimitiveType::String, maxLength: 3)]`,
+  repeatable), annotated `Core.Computed` by the engine. Its value is the expression the bound
+  `ColumnExpressionResolverInterface` answers for the model and the name; the Eloquent resolver selects
+  `(<expression>) AS <name>` on every path (collection, entity, navigation, expanded rows, nested `$select`), and
+  `$filter`, `$orderby`, `$search` and `$compute` use it as they use any expression. A literal per request — a tenant's
+  base currency — is the resolver's answer. `#[ODataAnnotate]` reaches it, so `Measures.ISOCurrency` can point at it.
+  Discovery fails loud when its name is a column or one the model never serializes; a query fails loud when no
+  expression answers it.
 - **`#[ODataAnnotate]`** (`OP35`, `OP38`) — annotates one property of a discovered model, written on the class:
   `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`, repeatable, any number of typed annotations per
   attribute. The property must be one the entity type declares, or discovery fails loud.

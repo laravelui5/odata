@@ -383,23 +383,61 @@ two signature findings cannot be solved without a break.
 say pruning and the `sap-messages` header come "in the next slice". `ReadGate` already prunes and the
 header ships. Comment-only; no behaviour changes.
 
-### [ ] `OP34` `discoverModel()` cannot serve a computed scalar property — the code beside a code-list `…_id` — from SDK Foundation D178, 2026-10-12
+### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
+
+`Protocol/Execution/BatchHandler::parseMultipartParts()` reads the top level of a `multipart/mixed` body. A part it does
+not recognise as a request line — a nested change set (`Content-Type: multipart/mixed; boundary=changeset_…`), a part
+without headers, an empty message, a method outside the regex — is skipped with `continue`, and the response carries one
+part fewer than the request. UI5's `_Requestor` pairs responses with requests by position: the first request without a
+response is rejected with *"HTTP request was not processed because the previous request failed"*, and so is every one
+after it. The `$batch` in the network panel looks healthy — every response that came back is a 200 — so the cause hides.
+Met in the SDK's Partners smoke on 2026-10-25 while chasing another cause (an undeployed database); the shape is real
+regardless.
+
+**Fix (direction):** answer **every** part. A part that cannot be parsed gets its own error response in its position
+(`400`, an OData error body naming what was wrong); a change set on this read-only engine gets one `400`/`405` response
+for the set as a whole, as the protocol pairs a change set with one response. The JSON `$batch` path validates already
+and fails the whole batch loudly; the multipart path should at least keep the positions. **Test:** a body with a GET, an
+unparseable part and a GET answers three parts, the middle one an error.
+
+**Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
+
+---
+
+## Done
+
+Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
+section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
+that passed through Pending.
+
+### [x] `OP34` `discoverModel()` cannot serve a computed scalar property — the code beside a code-list `…_id` — from SDK Foundation D178, 2026-10-12
 
 > **Decided 2026-11-02 (author): built in the next major, under the declaration rule** (see *Next major*).
 > - **Declared on the model's class:** `#[ODataComputed('currency', type: 'Edm.String', maxLength: 3)]`, repeatable.
->   Static, so `odata:cache` keeps it. The engine adds `Core.Computed` itself.
+    >   Static, so `odata:cache` keeps it. The engine adds `Core.Computed` itself.
 > - **Its value comes from the existing `ColumnExpressionResolverInterface`** (3.2). New is only that the engine selects
->   `<expression> AS currency` for a computed property; today the expression changes what is compared, not what is
->   returned. `$select`, `$filter` and `$orderby` work through the path they already know. A literal per request (the
->   tenant's base currency, Foundation D175) is the resolver's answer; an attribute could not carry it.
+    >   `<expression> AS currency` for a computed property; today the expression changes what is compared, not what is
+    >   returned. `$select`, `$filter` and `$orderby` work through the path they already know. A literal per request (the
+    >   tenant's base currency, Foundation D175) is the resolver's answer; an attribute could not carry it.
 > - **A declared computed property without an expression fails loud at schema build.**
 > - **SQL, not an accessor:** an accessor read after hydration serves neither `$filter` nor `$orderby` and contradicts
->   *streaming, not hydration* (`OP04`).
+    >   *streaming, not hydration* (`OP04`).
 > - **Only the attribute declares.** No resolver that declares computed properties until a consumer needs one.
 > - Annotations reach a computed property like any column: `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`.
 >
 > This answers questions 1–4 below: (1) the class attribute, not a hooked property (`OP38` closes that option); (2) a SQL
 > expression; (3) `Path` through `#[ODataAnnotate]`, cached with the schema; (4) `Core.Computed`, set by the engine.
+
+**Built 2026-11-02** (unreleased, next major): `Attributes\ODataComputed` (type as `EdmPrimitiveType`, facets as
+named arguments), read once per class by `Discovery\ComputedProperties`; `ModelDiscovery::computedProperty()` declares
+it; `EloquentEntitySetResolver::selectComputed()` selects it on the collection, entity, anchor and expand paths, and
+`selectedColumns()` keeps a computed name out of a column `$select`. `tests/Driver/Sql/ComputedPropertyTest.php` (the
+Foundation case: base currency as a literal, unit code through a code-list subquery).
+
+**One deviation, for the author to confirm:** a declared property without an expression fails loud **when it is
+queried**, not at schema build. At schema build the expression resolver would be asked outside a request, in
+`odata:cache` too, and a per-request answer (the tenant's base currency, D175) cannot be given there. The message names
+the property and the model.
 
 Surfaced in the SDK 2.0 validation round (`meta/specs/modules/sales.md`, Foundation D168, D178). A business
 row stores a code-list reference as an integer foreign key (`unit_id` → `codelist_units.id`), but UI5's
@@ -430,33 +468,6 @@ quantity needs `unit`).
 
 **Target:** Minor (additive). Needed before `mod-sales` part 2 is built; part 1 needs it only for
 `standard_cost`'s currency.
-
-### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
-
-`Protocol/Execution/BatchHandler::parseMultipartParts()` reads the top level of a `multipart/mixed` body. A part it does
-not recognise as a request line — a nested change set (`Content-Type: multipart/mixed; boundary=changeset_…`), a part
-without headers, an empty message, a method outside the regex — is skipped with `continue`, and the response carries one
-part fewer than the request. UI5's `_Requestor` pairs responses with requests by position: the first request without a
-response is rejected with *"HTTP request was not processed because the previous request failed"*, and so is every one
-after it. The `$batch` in the network panel looks healthy — every response that came back is a 200 — so the cause hides.
-Met in the SDK's Partners smoke on 2026-10-25 while chasing another cause (an undeployed database); the shape is real
-regardless.
-
-**Fix (direction):** answer **every** part. A part that cannot be parsed gets its own error response in its position
-(`400`, an OData error body naming what was wrong); a change set on this read-only engine gets one `400`/`405` response
-for the set as a whole, as the protocol pairs a change set with one response. The JSON `$batch` path validates already
-and fails the whole batch loudly; the multipart path should at least keep the positions. **Test:** a body with a GET, an
-unparseable part and a GET answers three parts, the middle one an error.
-
-**Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
-
----
-
-## Done
-
-Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
-section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
-that passed through Pending.
 
 ### [x] `OP38` Two surfaces, nothing in between: the property and method attributes go — major
 

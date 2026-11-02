@@ -32,6 +32,8 @@ use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Service\Contracts\ColumnAnnotationResolverInterface;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataAnnotate;
+use LaravelUi5\OData\Service\Discovery\Attributes\ODataComputed;
+use LaravelUi5\OData\Vocabularies\Core\V1\Computed;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -278,6 +280,11 @@ final class ModelDiscovery
             if ($colName === $keyName) {
                 $keyProps[] = $property;
             }
+        }
+
+        foreach (ComputedProperties::of($modelClass) as $name => $computed) {
+            $properties[] = $this->computedProperty($model, $modelClass, $typeName, $computed, $properties, $annotated[$name] ?? []);
+            unset($annotated[$name]);
         }
 
         if ($annotated !== []) {
@@ -610,6 +617,49 @@ final class ModelDiscovery
     {
         $attrs = $ref->getAttributes(ODataEntity::class);
         return $attrs !== [] ? $attrs[0]->newInstance() : null;
+    }
+
+    /**
+     * A `#[ODataComputed]` declaration as a property: its type and facets, `Core.Computed`, and what
+     * `#[ODataAnnotate]` says about it. Its name must be free and serializable — the value travels as an
+     * attribute of the model under that name.
+     *
+     * @param class-string<Model>      $modelClass
+     * @param list<Property>           $columns     the properties declared so far
+     * @param list<AnnotationInterface> $annotations from `#[ODataAnnotate]`
+     */
+    private function computedProperty(
+        Model         $model,
+        string        $modelClass,
+        string        $typeName,
+        ODataComputed $computed,
+        array         $columns,
+        array         $annotations,
+    ): Property {
+        foreach ($columns as $column) {
+            if ($column->getName() === $computed->name) {
+                throw new \LogicException(sprintf(
+                    '#[ODataComputed] on %s declares "%s", which entity type "%s" already has as a column.',
+                    $modelClass, $computed->name, $typeName,
+                ));
+            }
+        }
+        if (!self::serializes($model, $computed->name)) {
+            throw new \LogicException(sprintf(
+                '#[ODataComputed] on %s declares "%s", which the model never serializes ($hidden or $visible).',
+                $modelClass, $computed->name,
+            ));
+        }
+
+        $facets = $computed->facets();
+        self::assertFacetsFit($modelClass, $computed->name, $computed->type, $facets);
+
+        return new Property(
+            name: $computed->name,
+            type: new PrimitiveType($computed->type),
+            facets: $facets->isDefault() ? null : $facets,
+            annotations: self::mergeAnnotations([new Computed()], $annotations),
+        );
     }
 
     /**
