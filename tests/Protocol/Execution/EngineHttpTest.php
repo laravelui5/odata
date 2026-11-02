@@ -1915,7 +1915,7 @@ it('GET /Flights with $expand=airports($select=name) returns selected properties
     $data = json_decode($response->streamedContent(), true);
     expect($data['airports'])->toHaveCount(2);
     // The PK (id) is always included for relation matching.
-    // BelongsToMany also includes 'pivot' from Eloquent's toArray().
+    // The pivot stays behind: the row carries only declared properties (OP36).
     expect($data['airports'][0])->toHaveKey('name')
         ->and($data['airports'][0])->toHaveKey('id')
         ->and($data['airports'][0])->not->toHaveKey('code');

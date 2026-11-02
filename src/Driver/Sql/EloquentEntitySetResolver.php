@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use LaravelUi5\OData\Driver\Sql\Expression\AbstractFilterTranslator;
 use LaravelUi5\OData\Driver\Sql\Expression\FilterToEloquent;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Protocol\Planning\EntitySetQueryPlan;
 use LaravelUi5\OData\Protocol\Planning\ExpandList;
 use LaravelUi5\OData\Protocol\Planning\Expression\PropertyPathExpression;
@@ -33,6 +34,9 @@ use LaravelUi5\OData\Service\Contracts\VirtualExpandResolverInterface;
 final class EloquentEntitySetResolver implements EntitySetResolverInterface, EntityResolverInterface
 {
     private ?RuntimeSchemaInterface $schema = null;
+
+    /** @var array<string, array<string, true>> qualified entity type name → its declared property names */
+    private array $declaredNames = [];
 
     /**
      * @param class-string<Model> $modelClass
@@ -90,18 +94,16 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
         $this->applySelect($query, $plan);
         $this->applyOrderBy($query, $plan);
         $this->applyPagination($query, $plan);
+        $type = $plan->target->getEntityType();
         if ($plan->expand->isEmpty()) {
             foreach ($query->cursor() as $model) {
-                $row = $model->toArray();
-                yield $this->applyCompute($row, $plan);
+                yield $this->applyCompute($this->serialize($model, $type, $plan->expand), $plan);
             }
         } else {
             // Eager loading requires get() — cursor() does not support with().
             $this->applyExpand($query, $plan->expand);
             foreach ($query->get() as $model) {
-                $row = $model->toArray();
-                $row = $this->attachExpandedRelations($row, $model, $plan->expand);
-                yield $this->applyCompute($row, $plan);
+                yield $this->applyCompute($this->serialize($model, $type, $plan->expand), $plan);
             }
         }
     }
@@ -158,8 +160,7 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
             return null;
         }
 
-        $row = $model->toArray();
-        return $this->attachExpandedRelations($row, $model, $plan->expand);
+        return $this->serialize($model, $plan->target->getEntityType(), $plan->expand);
     }
 
     /**
@@ -287,7 +288,7 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
             $navName  = $item->property->getName();
             $fullPath = $prefix !== '' ? $prefix . '.' . $navName : $navName;
 
-            // Skip virtual navigation properties — they're handled in attachExpandedRelations()
+            // Skip virtual navigation properties — they're handled in serialize()
             if (!method_exists($modelClass, $navName)) {
                 if ($item->count) {
                     self::applyExpandCounts(null, new ExpandList([$item]), $modelClass);   // refuses
@@ -398,51 +399,67 @@ final class EloquentEntitySetResolver implements EntitySetResolverInterface, Ent
     }
 
     /**
-     * Move Eloquent-loaded relations into the row array under the nav property name.
+     * A model as it goes on the wire: the declared structural properties of its entity type, then the expanded
+     * navigations (with their `@odata.count`), each related model serialized the same way against its own type.
+     *
+     * Whatever else `toArray()` carries stays behind: `$appends`, a `belongsToMany` row's `pivot`, the `withCount`
+     * helper columns, a relation loaded but not expanded. A virtual expand resolver still receives the full row.
      *
      * @return array<string, mixed>
      */
-    private function attachExpandedRelations(array $row, Model $model, ExpandList $expand): array
+    private function serialize(Model $model, EntityTypeInterface $type, ExpandList $expand): array
     {
-        $entityTypeName = (new \ReflectionClass($model))->getShortName();
+        $full = $model->toArray();
+        $row  = array_intersect_key($full, $this->declaredNames($type));
 
         foreach ($expand->items as $item) {
             $navName = $item->property->getName();
 
             // Virtual navigation property — delegate to its custom resolver
             if (!method_exists($model, $navName)) {
-                $row[$navName] = $this->resolveVirtualExpand($row, $entityTypeName, $item);
+                $row[$navName] = $this->resolveVirtualExpand($full, $type->getName(), $item);
                 continue;
             }
 
-            $relation = $model->getRelation($navName);
-
             if ($item->count) {
-                // The annotation goes before its property; the withCount helper column goes.
-                unset($row[$navName], $row[self::countAlias($navName)]);
+                // The annotation goes before its property.
                 $row[$navName . '@odata.count'] = (int) $model->getAttribute(self::countAlias($navName));
             }
 
+            $relation   = $model->getRelation($navName);
+            $targetType = $item->targetSet->getEntityType();
+
             if ($item->property->isCollection()) {
-                if ($item->expand->isEmpty()) {
-                    $row[$navName] = $relation?->map(fn(Model $m) => $m->toArray())->all() ?? [];
-                } else {
-                    $row[$navName] = $relation?->map(
-                        fn(Model $m) => $this->attachExpandedRelations($m->toArray(), $m, $item->expand)
-                    )->all() ?? [];
-                }
+                $row[$navName] = $relation?->map(
+                    fn (Model $m) => $this->serialize($m, $targetType, $item->expand)
+                )->all() ?? [];
             } else {
-                if ($relation === null) {
-                    $row[$navName] = null;
-                } elseif ($item->expand->isEmpty()) {
-                    $row[$navName] = $relation->toArray();
-                } else {
-                    $row[$navName] = $this->attachExpandedRelations($relation->toArray(), $relation, $item->expand);
-                }
+                $row[$navName] = $relation === null ? null : $this->serialize($relation, $targetType, $item->expand);
             }
         }
 
         return $row;
+    }
+
+    /**
+     * The names of an entity type's structural properties, its base types' included, as a lookup.
+     *
+     * @return array<string, true>
+     */
+    private function declaredNames(EntityTypeInterface $type): array
+    {
+        $id = $type->getQualifiedName();
+        if (!isset($this->declaredNames[$id])) {
+            $names = [];
+            for ($current = $type; $current !== null; $current = $current->getBaseType()) {
+                foreach ($current->getDeclaredProperties() as $property) {
+                    $names[$property->getName()] = true;
+                }
+            }
+            $this->declaredNames[$id] = $names;
+        }
+
+        return $this->declaredNames[$id];
     }
 
     /**

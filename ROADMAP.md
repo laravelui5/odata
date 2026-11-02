@@ -22,7 +22,141 @@ an entry below.
 
 ---
 
+## Next major
+
+> ### The declaration rule
+>
+> **A discovered model is described by its table and its class. What goes beyond the table is declared on the model's
+> class; what depends on the runtime comes from a forward-exit bound in the container. Every declaration adds to
+> discovery; none overrides it. And the wire carries exactly what `$metadata` declares.**
+>
+> Two surfaces, nothing in between: a discovered model (table, casts, `$hidden`, class attributes) or a custom entity set.
+> A rename, another type or a cut of a column is a custom set. No attribute on a PHP property: the property shadows
+> Eloquent's attribute bag (`OP24`), a class attribute cannot. *(Author, 2026-11-02; may be carried into the docs,
+> Chiron and the book.)*
+
+Decided 2026-11-02 (author): an OData major, worked on directly, without a deprecating minor before it. What goes in:
+
+- `OP38` — the property and method attributes go; a discovered model or a custom entity set, nothing in between.
+- `OP35` — column annotations: `#[ODataAnnotate]` on the class for hosts, `ColumnAnnotationResolverInterface` for
+  packages. Replaces vocabulary on hooked properties.
+- `OP40` — `$compute` sees only declared properties.
+- `OP36`, widened to the rule (author, 2026-11-02): **the Eloquent path emits exactly the declared properties**, at every
+  level. Covers `pivot`, undeclared `$appends`, and what `OP40` leaves.
+- `OP39` — a `json` cast goes out as the string `$metadata` declares.
+- `OP34` — computed properties: `#[ODataComputed]` on the class, the value from `ColumnExpressionResolverInterface`.
+- `OP11` — the service document honours `includedInServiceDocument`; `FunctionImport`'s default flips to `true`.
+- `OP41` — `#[ODataEntity]` keeps only the names: `$hidden` and `$visible` always apply, `useHidden` goes, three failure
+  cases fail loud or right.
+- If time is left: `OP32`, for the two signature findings that may need a break.
+
+The entries stay in place under *Pending*; this list is the cut.
+
+---
+
 ## Pending
+
+### [ ] `OP38` Two surfaces, nothing in between: the property and method attributes go — major
+
+> **Decided 2026-11-02 (author): an OData major, built straight away, without a deprecating minor first.**
+> `#[ODataProperty]`, `#[ODataIgnore]` and `#[ODataNavigation]` are removed. A discovered model is described by its
+> table, its casts, its `$hidden` (with `#[ODataEntity(useHidden: true)]`) and `#[ODataEntity]`'s names. Anything
+> beyond that (a rename, another type, a cut) is a custom entity set. Column vocabulary moves to `OP35`, which comes
+> along into the major.
+
+**How it surfaced.** 2026-11-02 in `sdk-host`, on the Audit app's read surface, reproduced against this package with a
+throwaway test. A column marked `#[ODataIgnore]` on a hooked property is not declared and refuses `$select`, `$filter`
+and `$orderby` (400). But `GET /Set` without `$select`, `GET /Set(1)`, a nested `$expand` and `$compute=ip as x` still
+hand it out: `EloquentEntitySetResolver` emits `$model->toArray()`, and the handlers narrow a row only under a `$select`,
+and only at the top level. `useHidden` covers the whole surface, because `toArray()` drops a `$hidden` column on every
+path. The Audit app went that way (`meta/specs/ui5/audit-v1.0.md` D3).
+
+**Why not repair `#[ODataIgnore]` instead.** The property attributes are a hybrid of a discovered model and a custom set.
+They need a declared PHP property, which is why `OP24` had to introduce the hook idiom against Eloquent's attribute
+bag, and the whole surface was checked again on 2026-11-02 (throwaway test, deleted afterwards):
+
+| Attribute | State |
+|:---|:---|
+| `#[ODataProperty(name:)]` | **Broken.** `$metadata` says `FlightCode`, the wire says `flight_number`; `$select=FlightCode` answers empty rows `[[]]`, `$filter=FlightCode eq 'OS123'` answers `[]` without an error (SQLite reads the quoted name as a string literal). |
+| `#[ODataNavigation(name:)]` | **Broken.** `name: 'Segments'` on `legs()` answers `"Segments":[]`: `method_exists()` fails, so the navigation is treated as a virtual expand. A rename that only changes case works by accident (`method_exists()` ignores case) and the row carries `legs` *and* `Legs`. |
+| `#[ODataProperty(type:)]` | Overlaps the casts, which decide anyway. |
+| `#[ODataProperty(nullable/precision/scale)]` | Works. `ColumnFacetResolverInterface` receives the model class and can answer per model. |
+| `#[ODataIgnore]` on a column | Half a fix (above). `useHidden` is the whole one. |
+| `#[ODataIgnore]` on a relation | `useHidden` already leaves `$hidden` relations undeclared (`PropertyHooksAndHiddenTest`). |
+| Vocabulary on a hooked property | Works, and is the one real value: today the only way to annotate a discovered column. → `OP35`. |
+
+No in-house consumer uses `#[ODataProperty]`, `#[ODataNavigation]` or a hooked property (`sdk-host`, `foundation-host`,
+`auth-host`, `pragmatiqu.io`, `core`, checked 2026-11-02).
+
+**Not inherited from Lodata.** All four attributes arrived with the public release (2026-04-06); their earlier history
+is not recorded. `flat3/lodata` has no property-level attribute: its typed attributes (`#[LodataString(name:, source:)]`
+…) sit on the **class** and replace discovery with a complete list, relations are opt-in through `#[LodataRelationship]`,
+and `$hidden`/`$visible` always apply. The per-column override on a discovered model is this package's own invention;
+`useHidden` brought the Lodata behaviour back as an opt-in.
+
+**To build:**
+- Remove the three attribute classes and their reading in `ModelDiscovery` (`readPropertyAttribute`, the
+  `ODataNavigation` lookup, the `hasIgnoreAttribute` checks); `resolveFacets()` loses its attribute layer.
+- `AttributeReader::readProperty()` goes with the hook idiom once `OP35` stands.
+- Tests: `ColumnFacetsTest` moves its per-model cases onto a facet resolver; `PropertyHooksAndHiddenTest` keeps the
+  `useHidden` block, the hook block goes; the `AnnotatedAirport` fixture loses its hooks.
+- Docs: `services/model-discovery` (the attribute sections, *What is NOT discovered*, which today does not name
+  `useHidden`, and the `$hidden` warning that still offers `#[ODataIgnore]` as an equal route) and
+  `annotations/applying-annotations` (*Property-level annotations and PHP 8.4 property hooks*). Upgrade notes per
+  removed attribute: what replaces it.
+- Chiron: the OData skill teaches what the docs teach.
+
+### [ ] `OP39` A `json` cast goes out as an object where `$metadata` declares `Edm.String`
+
+Same test. `mapCastType` maps `array`, `json`, `collection` and `object` to `Edm.String`, but `toArray()` hands the decoded
+array to the wire: `"input":{"x":1}`. `RowCoercion` has no coercer for `Edm.String`, so the 3.1 rule *the wire carries the
+declared type* does not hold here. OData has no JSON type; the property is a string the client parses.
+
+**Workaround in place:** a cast that serializes to text (`LaravelUi5\Sdk\Audit\Casts\JsonText`, `sdk-db`).
+**Fix:** `RowCoercion` encodes an array under `Edm.String`. Check what that does to a consumer that reads the object today.
+
+### [ ] `OP40` `$compute` reads columns `$metadata` does not declare
+
+Found 2026-11-02 with `OP38`. `QueryPlanner::parseCompute()` splits `expression as alias` and checks the expression against
+nothing; `EloquentEntitySetResolver::evaluateComputeExpression()` answers a property reference with `$row[$expr]`, read off
+the full `toArray()`. So `?$compute=x as y` hands out any column the model serializes, declared or not. With
+`#[ODataIgnore]` gone (`OP38`) that is a model's `$appends` and an undeclared attribute; a `$hidden` column stays safe,
+since `toArray()` never carries it.
+
+**Fix:** a property reference in `$compute` must name a declared structural property of the set's type, checked at plan
+time (400 otherwise, like `$select`); the evaluator reads only those. **Test:** `$compute=<undeclared> as x` answers 400,
+`$compute=<declared> as x` still works.
+
+### [ ] `OP41` `#[ODataEntity]` keeps only the names — `$hidden` and `$visible` always apply — major
+
+> **Decided 2026-11-02 (author), after a review of the attribute.**
+> - **`$hidden` and `$visible` always apply.** Discovery declares exactly the columns and relations `toArray()`
+>   serializes. The `useHidden` switch goes; what it did becomes the only behaviour (Lodata's, too).
+> - **A key in `$hidden`, or outside `$visible`, fails loud at schema build.** An entity type whose key never reaches the
+>   wire cannot be read.
+> - **Two models resolving to the same entity type name fail loud**, naming both classes.
+> - **A virtual expand resolver receives the declared type name** as `$parentEntityType`.
+> - **Not a container for `#[ODataAnnotate]` / `#[ODataComputed]`:** those stay separate repeatable class attributes with
+>   typed signatures; an `annotate:` array inside `#[ODataEntity]` is checked by neither PHP nor the IDE, and a model with
+>   default names should not need `#[ODataEntity]` just to annotate.
+
+**What it does today.** Class attribute with three fields: `name` (entity type, else the class's short name),
+`entitySet` (else `Str::plural($typeName)`, an English inflection: `Person` → `People`), `useHidden` (keeps `$hidden` out
+of the type, `OP24`). All three work. In the workspace six models use it (all with `useHidden`, two with names).
+
+**Found in a throwaway test, 2026-11-02 (deleted afterwards):**
+1. **`$visible` is ignored.** A model with `$visible = ['id']` declares `a_col` and serves `{"id":1}`: declared, never
+   delivered. `useHidden` does not help.
+2. **A key in `$hidden`** stays declared (`PropertyHooksAndHiddenTest` keeps it on purpose) and is missing on the wire.
+3. **Two models with the same short name** and no `name:` answer 500 on every request, `$metadata` included, with a
+   misleading message: *"The following entity sets have no resolver bound: Items"*.
+4. **`$parentEntityType`** handed to `VirtualExpandResolverInterface::resolveExpand()` is the class's short name
+   (`EloquentEntitySetResolver.php:407`), not the declared type name. No resolver reads it today; latent. *Fixed with `OP36`, 2026-11-02.*
+
+**To build:** read `$hidden` and `$visible` unconditionally in `ModelDiscovery` (columns and relations); the key check;
+a duplicate-name check before the builder; the type name into `attachExpandedRelations()`; remove `useHidden` from the
+attribute, the tests (`HiddenAccount`'s key case becomes a failure test) and the docs. Consumers drop `useHidden: true`
+(the six in `sdk-db` and the Support/Audit models) with no change in behaviour.
 
 ### [ ] `OP01` EDM cache is keyed by class location, not service identity — load-side silent collision
 
@@ -353,6 +487,22 @@ header ships. Comment-only; no behaviour changes.
 
 ### [ ] `OP34` `discoverModel()` cannot serve a computed scalar property — the code beside a code-list `…_id` — from SDK Foundation D178, 2026-10-12
 
+> **Decided 2026-11-02 (author): built in the next major, under the declaration rule** (see *Next major*).
+> - **Declared on the model's class:** `#[ODataComputed('currency', type: 'Edm.String', maxLength: 3)]`, repeatable.
+>   Static, so `odata:cache` keeps it. The engine adds `Core.Computed` itself.
+> - **Its value comes from the existing `ColumnExpressionResolverInterface`** (3.2). New is only that the engine selects
+>   `<expression> AS currency` for a computed property; today the expression changes what is compared, not what is
+>   returned. `$select`, `$filter` and `$orderby` work through the path they already know. A literal per request (the
+>   tenant's base currency, Foundation D175) is the resolver's answer; an attribute could not carry it.
+> - **A declared computed property without an expression fails loud at schema build.**
+> - **SQL, not an accessor:** an accessor read after hydration serves neither `$filter` nor `$orderby` and contradicts
+>   *streaming, not hydration* (`OP04`).
+> - **Only the attribute declares.** No resolver that declares computed properties until a consumer needs one.
+> - Annotations reach a computed property like any column: `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`.
+>
+> This answers questions 1–4 below: (1) the class attribute, not a hooked property (`OP38` closes that option); (2) a SQL
+> expression; (3) `Path` through `#[ODataAnnotate]`, cached with the schema; (4) `Core.Computed`, set by the engine.
+
 Surfaced in the SDK 2.0 validation round (`meta/specs/modules/sales.md`, Foundation D168, D178). A business
 row stores a code-list reference as an integer foreign key (`unit_id` → `codelist_units.id`), but UI5's
 `Unit` and `Currency` types need the **code** in the row: `Measures.Unit` / `Measures.ISOCurrency` must
@@ -383,6 +533,69 @@ quantity needs `unit`).
 **Target:** Minor (additive). Needed before `mod-sales` part 2 is built; part 1 needs it only for
 `standard_cost`'s currency.
 
+### [ ] `OP35` Discovered columns cannot be annotated from outside — `Core.IsLanguageDependent` for translated fields — from SDK i18n, 2026-10-23
+
+> **Decided 2026-11-02 (author): built in the next major, under the declaration rule** (see *Next major*).
+> - **For a host:** a repeatable class attribute that names the column and carries typed vocabulary objects:
+>   `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`, signature
+>   `(string $property, TypedAnnotationInterface ...$annotations)`. The vocabulary attributes cannot sit on the class
+>   themselves: `AttributeReader::readClass()` reads every one of them there as an annotation of the *entity type*. The
+>   wrapper names the target; the generator (`OP29`) stays untouched. It also targets a computed property (`OP34`).
+> - **For a package:** `ColumnAnnotationResolverInterface` as proposed below. First consumer: the SDK, `IsLanguageDependent`
+>   on whatever `#[Translatable]` names.
+> - **On the same term the attribute wins** (local), as the attribute did over the facet resolver.
+> - **Rejected:** declarations on the service (`annotateProperty(Model::class, …)`, after `annotateContainer()`). Type-level
+>   annotations (`SelectionFields`, `LineItem`) already sit on the model; two places for one kind of declaration is the
+>   unevenness `OP38` removes. Whether `#[ODataEntity]` could be the container instead is part of its review.
+
+Since SDK 2.0 a `#[Translatable]` field (`HasTranslations`) and a column the SDK's adapters read from `sdk_texts` serve
+their value **in the request's language** (`meta/specs/sdk/i18n-v1.0.md` § 1.5, D23; odata 3.2's
+`ColumnExpressionResolverInterface` makes `$filter`/`$orderby`/`$search` follow). `$metadata` should say so:
+`Org.OData.Core.V1.IsLanguageDependent`, a tag term this package already ships
+(`Vocabularies/Core/V1/IsLanguageDependent.php`).
+
+**The gap.** `ModelDiscovery` reads a column's annotations only from a declared PHP property
+(`ModelDiscovery.php:267`, the `OP24` hook idiom). That works for a hand-annotated model, but the SDK knows the fields
+from a class-level `#[Translatable([...])]` and from its adapters; demanding a hook per field duplicates the
+declaration and lets `$metadata` drift from it.
+
+**Shape (proposed, mirrors the two forward-exits beside it):**
+- `ColumnAnnotationResolverInterface::annotations(string $modelClass, string $column): list<AnnotationInterface>`,
+  asked per discovered column next to `ColumnFacetResolverInterface`; default answers `[]`; bound with `bindIf`; one
+  binding, decorate to combine.
+- ~~The answer merges with the property's attribute annotations; on the same term the attribute wins.~~ *Since `OP38`
+  (2026-11-02) there are no property attributes: the resolver is the only source of a discovered column's annotations.*
+  **Open:** whether a host also gets a class-level form that names the column (as `#[SelectionFields]` already sits on
+  the class), so a `Common.Label` or a `Measures.ISOCurrency` does not need a container binding. Decide before building.
+- Runs at schema build, so a cached service keeps what it saw — test that `odata:cache` round-trips it (`OP26`).
+
+**Consumer:** the SDK binds a resolver over `TranslatedColumns` and `LocalizedTableInterface`. No known UI5 control
+acts on the term (unverified); the value is a truthful `$metadata` for other clients, agents, caches and a future
+per-language editor.
+
+**Target:** ~~Minor (additive). Deferred to the first multilingual project (SDK Foundation D163), with the SDK's
+master-data docs page.~~ **The next major** (author, 2026-11-02): it replaces vocabulary on hooked properties, which
+`OP38` removes.
+
+### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
+
+`Protocol/Execution/BatchHandler::parseMultipartParts()` reads the top level of a `multipart/mixed` body. A part it does
+not recognise as a request line — a nested change set (`Content-Type: multipart/mixed; boundary=changeset_…`), a part
+without headers, an empty message, a method outside the regex — is skipped with `continue`, and the response carries one
+part fewer than the request. UI5's `_Requestor` pairs responses with requests by position: the first request without a
+response is rejected with *"HTTP request was not processed because the previous request failed"*, and so is every one
+after it. The `$batch` in the network panel looks healthy — every response that came back is a 200 — so the cause hides.
+Met in the SDK's Partners smoke on 2026-10-25 while chasing another cause (an undeployed database); the shape is real
+regardless.
+
+**Fix (direction):** answer **every** part. A part that cannot be parsed gets its own error response in its position
+(`400`, an OData error body naming what was wrong); a change set on this read-only engine gets one `400`/`405` response
+for the set as a whole, as the protocol pairs a change set with one response. The JSON `$batch` path validates already
+and fails the whole batch loudly; the multipart path should at least keep the positions. **Test:** a body with a GET, an
+unparseable part and a GET answers three parts, the middle one an error.
+
+**Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
+
 ---
 
 ## Done
@@ -390,6 +603,71 @@ quantity needs `unit`).
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+### [x] `OP36` An expanded `belongsToMany` row carries Laravel's `pivot` — a property `$metadata` does not declare — from SDK audit, 2026-10-25
+
+Found in `laravelui5/sdk` while the SDK's group relations moved onto pivot models (`->using()`, SDK audit D7,
+`meta/specs/sdk/audit-v1.0.md`). The pivot models did not cause it: the same test without `->using()` gives the same
+output, only with Laravel's generic `Pivot` class. Request surface and `$metadata` are unchanged by that work.
+
+**Where it shows (the SDK's Partners app).** `ui5-partners/webapp/controller/Groups.controller.ts:124` binds the group
+detail with `bindElement({ path, parameters: { $expand: "roles,abilities" } })`, served by `PartnersApp.php:170`,
+`discoverModel(Group::class)`. `roles` and `abilities` are real Eloquent `belongsToMany` relations, auto-discovered as
+navigation properties — not virtual expands. Under each expanded collection, **every row** carries an extra `pivot`
+object:
+
+```json
+"roles": [
+  { "id": 8, "role": "pmo", "scope": "Project", "created_at": "…", "updated_at": "…",
+    "pivot": { "group_id": 1, "role_id": 8 } }
+],
+"abilities": [
+  { "id": 1, "ability": "partners-admin", "type": 3, …,
+    "pivot": { "group_id": 1, "ability_id": 1 } }
+]
+```
+
+`pivot` is not in `$metadata` — a property the contract does not know.
+
+**Cause** (`Driver/Sql/EloquentEntitySetResolver.php:428`, and the single-valued branch at `:438`). An expanded
+collection is serialized with `$relation->map(fn (Model $m) => $m->toArray())`. For `belongsToMany`, Laravel sets a
+relation named `pivot` on every loaded related model, and `toArray()` emits all loaded relations. The engine does not
+filter the row against the entity type's declared properties afterwards.
+
+**The SDK's read paths, checked:**
+
+| Path | Kind | `pivot`? |
+|:---|:---|:---|
+| `Groups(…)?$expand=roles,abilities` — the group detail | Eloquent `belongsToMany` | **yes** — the case above |
+| `Roles?$expand=abilities`, `Abilities?$expand=roles` | Eloquent `belongsToMany` (`discoverModel(Role)`, `discoverModel(Ability)`) | **yes**, if anyone asks so — the app does not (`Roles` serves a picker) |
+| Partner detail, `$expand=…,group_assignments,role_assignments,…` (`Details.controller.ts:130`) | virtual expands (e.g. `PartnerGroupAssignmentsExpand`, its own `select`) | no |
+| `Partner` → `addresses`, `profiles` | Eloquent `hasMany` | no — `pivot` exists only on `belongsToMany` |
+
+**What it means:**
+- **Functionally harmless today.** UI5's V4 model keeps unknown properties in its cache and binds nothing to them; the
+  Groups catalogue works.
+- **Wrong by contract.** In OData V4 an undeclared property may appear only on an open type. A stricter client, or an
+  agent reading the JSON against `$metadata`, trips over it.
+- **Small in content — for now.** Only the two foreign keys. It widens as soon as a pivot carries more columns
+  (`withPivot()`, `withTimestamps()`): those go out unchecked as well.
+- **Where it sits:** here, not in the SDK. Every customer `discoverModel` with a `belongsToMany` is affected the same way.
+
+**Fix (direction, to be specified):** serialize an expanded row from the target entity type's declared properties —
+or at least drop the `pivot` relation — in both the collection and the single-valued branch, nested expands included.
+Test: `Groups?$expand=roles` yields rows without `pivot`; the SDK's `GroupsReadTest` re-adds
+`->not->toHaveKey('pivot')` once this ships (taken out on 2026-10-25 so the suite stays green).
+
+**Target:** ~~Patch (a fix; the payload moves towards the declared contract, nothing a client may rely on goes away).~~
+**The next major, widened to a rule** (author, 2026-11-02): the Eloquent path serializes every row, top level and
+expanded, from its entity type's declared properties plus the expanded navigations, their `@odata.count` and the
+`$compute` aliases. That also drops undeclared `$appends` (a break, hence the major). Virtual expand resolvers still
+receive the full parent row.
+
+**Built 2026-11-02** (unreleased, next major): `EloquentEntitySetResolver::serialize()` replaces
+`attachExpandedRelations()`; `tests/Driver/Sql/DeclaredPropertiesOnWireTest.php` (`$appends`, `$with`, nested expand,
+`pivot`, the `withCount` helper, `$compute`, the virtual expand's full row). Downstream: the SDK's `GroupsReadTest`
+re-adds `->not->toHaveKey('pivot')` once the SDK is on this major. It also passes the declared type name to a virtual
+expand resolver, item 4 of `OP41`.
 
 ### [x] `OP15` Nested `$count` inside `$expand` is parsed and never emitted (v3.1.0)
 

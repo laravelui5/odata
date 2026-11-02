@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [4.0.0] - unreleased – 
+
+The next major (`ROADMAP.md`, *Next major*). A discovered model is described by its table and its class, and the wire
+carries exactly what `$metadata` declares.
+
+### Changed
+
+- **BREAKING: the Eloquent path emits exactly the declared properties, at every level** (`OP36`). A row of a
+  `discoverModel` set, top level or expanded, now carries its entity type's structural properties, the expanded
+  navigations and their `@odata.count`, and the `$compute` aliases. Whatever else `toArray()` held stays behind: a
+  model's `$appends`, the `pivot` of a `belongsToMany` row (with every `withPivot()` column), a relation loaded through
+  `$with` but not expanded. A client that read an undeclared key reads it no longer; `$metadata` never promised it. A
+  value that should be on the wire is declared, or the set is a custom entity set.
+- `$compute` evaluates against the declared properties only, so `$compute=<undeclared> as x` yields `null` instead of the
+  value. (The planner does not refuse it yet; `OP40`.)
+- A virtual expand resolver still receives the **full** parent row, and now the entity type's declared name as
+  `$parentEntityType` instead of the model's short class name. The two differ when `#[ODataEntity(name:)]` is set.
+
+- **Docblocks no longer tell the Lodata migration story.** Seven docblocks in six files (`ODataRequest`,
+  `EdmBuilderInterface`, `ODataServiceInterface`, `CsdlSerializer`, `FilterParser`, `ExpressionLexer`) compared a class
+  with its legacy predecessor or named build steps — text the API reference published, about classes that no longer
+  exist. They now say what the class does; the history moved to a `//` line, which ApiGen does not render. Comments
+  only.
+
 ## [3.2.0] – 2026-10-23
 
 A property can be an expression on the query instead of its column, and `$filter`, `$orderby` and `$search` compare, sort and search by it. Additive; nothing changes for a host that binds nothing.
