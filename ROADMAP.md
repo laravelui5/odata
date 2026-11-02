@@ -56,64 +56,6 @@ The entries stay in place under *Pending*; this list is the cut.
 
 ## Pending
 
-### [x] `OP38` Two surfaces, nothing in between: the property and method attributes go — major
-
-> **Decided 2026-11-02 (author): an OData major, built straight away, without a deprecating minor first.**
-> `#[ODataProperty]`, `#[ODataIgnore]` and `#[ODataNavigation]` are removed. A discovered model is described by its
-> table, its casts, its `$hidden` (with `#[ODataEntity(useHidden: true)]`) and `#[ODataEntity]`'s names. Anything
-> beyond that (a rename, another type, a cut) is a custom entity set. Column vocabulary moves to `OP35`, which comes
-> along into the major.
-
-**How it surfaced.** 2026-11-02 in `sdk-host`, on the Audit app's read surface, reproduced against this package with a
-throwaway test. A column marked `#[ODataIgnore]` on a hooked property is not declared and refuses `$select`, `$filter`
-and `$orderby` (400). But `GET /Set` without `$select`, `GET /Set(1)`, a nested `$expand` and `$compute=ip as x` still
-hand it out: `EloquentEntitySetResolver` emits `$model->toArray()`, and the handlers narrow a row only under a `$select`,
-and only at the top level. `useHidden` covers the whole surface, because `toArray()` drops a `$hidden` column on every
-path. The Audit app went that way (`meta/specs/ui5/audit-v1.0.md` D3).
-
-**Why not repair `#[ODataIgnore]` instead.** The property attributes are a hybrid of a discovered model and a custom set.
-They need a declared PHP property, which is why `OP24` had to introduce the hook idiom against Eloquent's attribute
-bag, and the whole surface was checked again on 2026-11-02 (throwaway test, deleted afterwards):
-
-| Attribute | State |
-|:---|:---|
-| `#[ODataProperty(name:)]` | **Broken.** `$metadata` says `FlightCode`, the wire says `flight_number`; `$select=FlightCode` answers empty rows `[[]]`, `$filter=FlightCode eq 'OS123'` answers `[]` without an error (SQLite reads the quoted name as a string literal). |
-| `#[ODataNavigation(name:)]` | **Broken.** `name: 'Segments'` on `legs()` answers `"Segments":[]`: `method_exists()` fails, so the navigation is treated as a virtual expand. A rename that only changes case works by accident (`method_exists()` ignores case) and the row carries `legs` *and* `Legs`. |
-| `#[ODataProperty(type:)]` | Overlaps the casts, which decide anyway. |
-| `#[ODataProperty(nullable/precision/scale)]` | Works. `ColumnFacetResolverInterface` receives the model class and can answer per model. |
-| `#[ODataIgnore]` on a column | Half a fix (above). `useHidden` is the whole one. |
-| `#[ODataIgnore]` on a relation | `useHidden` already leaves `$hidden` relations undeclared (`PropertyHooksAndHiddenTest`). |
-| Vocabulary on a hooked property | Works, and is the one real value: today the only way to annotate a discovered column. → `OP35`. |
-
-No in-house consumer uses `#[ODataProperty]`, `#[ODataNavigation]` or a hooked property (`sdk-host`, `foundation-host`,
-`auth-host`, `pragmatiqu.io`, `core`, checked 2026-11-02).
-
-**Not inherited from Lodata.** All four attributes arrived with the public release (2026-04-06); their earlier history
-is not recorded. `flat3/lodata` has no property-level attribute: its typed attributes (`#[LodataString(name:, source:)]`
-…) sit on the **class** and replace discovery with a complete list, relations are opt-in through `#[LodataRelationship]`,
-and `$hidden`/`$visible` always apply. The per-column override on a discovered model is this package's own invention;
-`useHidden` brought the Lodata behaviour back as an opt-in.
-
-**To build:**
-- Remove the three attribute classes and their reading in `ModelDiscovery` (`readPropertyAttribute`, the
-  `ODataNavigation` lookup, the `hasIgnoreAttribute` checks); `resolveFacets()` loses its attribute layer.
-- `AttributeReader::readProperty()` goes with the hook idiom once `OP35` stands.
-- Tests: `ColumnFacetsTest` moves its per-model cases onto a facet resolver; `PropertyHooksAndHiddenTest` keeps the
-  `useHidden` block, the hook block goes; the `AnnotatedAirport` fixture loses its hooks.
-- Docs: `services/model-discovery` (the attribute sections, *What is NOT discovered*, which today does not name
-  `useHidden`, and the `$hidden` warning that still offers `#[ODataIgnore]` as an equal route) and
-  `annotations/applying-annotations` (*Property-level annotations and PHP 8.4 property hooks*). Upgrade notes per
-  removed attribute: what replaces it.
-- Chiron: the OData skill teaches what the docs teach.
-
-**Built 2026-11-02** (unreleased, next major), together with `OP35`: the three attribute classes are gone, and with them
-`readPropertyAttribute()`, `hasIgnoreAttribute()`, the `ODataNavigation` lookup, the attribute layer of
-`resolveFacets()` and `AttributeReader::readProperty()`. Tests moved: `ColumnFacetsTest` answers per model through a
-facet resolver (`ColumnFacetsPerModel`), `PropertyHooksAndHiddenTest` became `HiddenAndVisibleTest` without the hook
-block, `AnnotatedAirport` and the code-list models in `CodeListHttpTest` annotate through `#[ODataAnnotate]`. **Still
-open:** the docs (`services/model-discovery`, `annotations/applying-annotations`, upgrade notes) and Chiron — the
-major's docs pass.
-
 ### [ ] `OP01` EDM cache is keyed by class location, not service identity — load-side silent collision
 
 Surfaced 2026-06-11 (`pragmatiqu/timesheet.biz`) building a second, **route-composed** service
@@ -489,20 +431,105 @@ quantity needs `unit`).
 **Target:** Minor (additive). Needed before `mod-sales` part 2 is built; part 1 needs it only for
 `standard_cost`'s currency.
 
+### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
+
+`Protocol/Execution/BatchHandler::parseMultipartParts()` reads the top level of a `multipart/mixed` body. A part it does
+not recognise as a request line — a nested change set (`Content-Type: multipart/mixed; boundary=changeset_…`), a part
+without headers, an empty message, a method outside the regex — is skipped with `continue`, and the response carries one
+part fewer than the request. UI5's `_Requestor` pairs responses with requests by position: the first request without a
+response is rejected with *"HTTP request was not processed because the previous request failed"*, and so is every one
+after it. The `$batch` in the network panel looks healthy — every response that came back is a 200 — so the cause hides.
+Met in the SDK's Partners smoke on 2026-10-25 while chasing another cause (an undeployed database); the shape is real
+regardless.
+
+**Fix (direction):** answer **every** part. A part that cannot be parsed gets its own error response in its position
+(`400`, an OData error body naming what was wrong); a change set on this read-only engine gets one `400`/`405` response
+for the set as a whole, as the protocol pairs a change set with one response. The JSON `$batch` path validates already
+and fails the whole batch loudly; the multipart path should at least keep the positions. **Test:** a body with a GET, an
+unparseable part and a GET answers three parts, the middle one an error.
+
+**Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
+
+---
+
+## Done
+
+Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
+section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
+that passed through Pending.
+
+### [x] `OP38` Two surfaces, nothing in between: the property and method attributes go — major
+
+> **Decided 2026-11-02 (author): an OData major, built straight away, without a deprecating minor first.**
+> `#[ODataProperty]`, `#[ODataIgnore]` and `#[ODataNavigation]` are removed. A discovered model is described by its
+> table, its casts, its `$hidden` (with `#[ODataEntity(useHidden: true)]`) and `#[ODataEntity]`'s names. Anything
+> beyond that (a rename, another type, a cut) is a custom entity set. Column vocabulary moves to `OP35`, which comes
+> along into the major.
+
+**How it surfaced.** 2026-11-02 in `sdk-host`, on the Audit app's read surface, reproduced against this package with a
+throwaway test. A column marked `#[ODataIgnore]` on a hooked property is not declared and refuses `$select`, `$filter`
+and `$orderby` (400). But `GET /Set` without `$select`, `GET /Set(1)`, a nested `$expand` and `$compute=ip as x` still
+hand it out: `EloquentEntitySetResolver` emits `$model->toArray()`, and the handlers narrow a row only under a `$select`,
+and only at the top level. `useHidden` covers the whole surface, because `toArray()` drops a `$hidden` column on every
+path. The Audit app went that way (`meta/specs/ui5/audit-v1.0.md` D3).
+
+**Why not repair `#[ODataIgnore]` instead.** The property attributes are a hybrid of a discovered model and a custom set.
+They need a declared PHP property, which is why `OP24` had to introduce the hook idiom against Eloquent's attribute
+bag, and the whole surface was checked again on 2026-11-02 (throwaway test, deleted afterwards):
+
+| Attribute | State |
+|:---|:---|
+| `#[ODataProperty(name:)]` | **Broken.** `$metadata` says `FlightCode`, the wire says `flight_number`; `$select=FlightCode` answers empty rows `[[]]`, `$filter=FlightCode eq 'OS123'` answers `[]` without an error (SQLite reads the quoted name as a string literal). |
+| `#[ODataNavigation(name:)]` | **Broken.** `name: 'Segments'` on `legs()` answers `"Segments":[]`: `method_exists()` fails, so the navigation is treated as a virtual expand. A rename that only changes case works by accident (`method_exists()` ignores case) and the row carries `legs` *and* `Legs`. |
+| `#[ODataProperty(type:)]` | Overlaps the casts, which decide anyway. |
+| `#[ODataProperty(nullable/precision/scale)]` | Works. `ColumnFacetResolverInterface` receives the model class and can answer per model. |
+| `#[ODataIgnore]` on a column | Half a fix (above). `useHidden` is the whole one. |
+| `#[ODataIgnore]` on a relation | `useHidden` already leaves `$hidden` relations undeclared (`PropertyHooksAndHiddenTest`). |
+| Vocabulary on a hooked property | Works, and is the one real value: today the only way to annotate a discovered column. → `OP35`. |
+
+No in-house consumer uses `#[ODataProperty]`, `#[ODataNavigation]` or a hooked property (`sdk-host`, `foundation-host`,
+`auth-host`, `pragmatiqu.io`, `core`, checked 2026-11-02).
+
+**Not inherited from Lodata.** All four attributes arrived with the public release (2026-04-06); their earlier history
+is not recorded. `flat3/lodata` has no property-level attribute: its typed attributes (`#[LodataString(name:, source:)]`
+…) sit on the **class** and replace discovery with a complete list, relations are opt-in through `#[LodataRelationship]`,
+and `$hidden`/`$visible` always apply. The per-column override on a discovered model is this package's own invention;
+`useHidden` brought the Lodata behaviour back as an opt-in.
+
+**To build:**
+- Remove the three attribute classes and their reading in `ModelDiscovery` (`readPropertyAttribute`, the
+  `ODataNavigation` lookup, the `hasIgnoreAttribute` checks); `resolveFacets()` loses its attribute layer.
+- `AttributeReader::readProperty()` goes with the hook idiom once `OP35` stands.
+- Tests: `ColumnFacetsTest` moves its per-model cases onto a facet resolver; `PropertyHooksAndHiddenTest` keeps the
+  `useHidden` block, the hook block goes; the `AnnotatedAirport` fixture loses its hooks.
+- Docs: `services/model-discovery` (the attribute sections, *What is NOT discovered*, which today does not name
+  `useHidden`, and the `$hidden` warning that still offers `#[ODataIgnore]` as an equal route) and
+  `annotations/applying-annotations` (*Property-level annotations and PHP 8.4 property hooks*). Upgrade notes per
+  removed attribute: what replaces it.
+- Chiron: the OData skill teaches what the docs teach.
+
+**Built 2026-11-02** (unreleased, next major), together with `OP35`: the three attribute classes are gone, and with them
+`readPropertyAttribute()`, `hasIgnoreAttribute()`, the `ODataNavigation` lookup, the attribute layer of
+`resolveFacets()` and `AttributeReader::readProperty()`. Tests moved: `ColumnFacetsTest` answers per model through a
+facet resolver (`ColumnFacetsPerModel`), `PropertyHooksAndHiddenTest` became `HiddenAndVisibleTest` without the hook
+block, `AnnotatedAirport` and the code-list models in `CodeListHttpTest` annotate through `#[ODataAnnotate]`. **Still
+open:** the docs (`services/model-discovery`, `annotations/applying-annotations`, upgrade notes) and Chiron — the
+major's docs pass.
+
 ### [x] `OP35` Discovered columns cannot be annotated from outside — `Core.IsLanguageDependent` for translated fields — from SDK i18n, 2026-10-23
 
 > **Decided 2026-11-02 (author): built in the next major, under the declaration rule** (see *Next major*).
 > - **For a host:** a repeatable class attribute that names the column and carries typed vocabulary objects:
->   `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`, signature
->   `(string $property, TypedAnnotationInterface ...$annotations)`. The vocabulary attributes cannot sit on the class
->   themselves: `AttributeReader::readClass()` reads every one of them there as an annotation of the *entity type*. The
->   wrapper names the target; the generator (`OP29`) stays untouched. It also targets a computed property (`OP34`).
+    >   `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`, signature
+    >   `(string $property, TypedAnnotationInterface ...$annotations)`. The vocabulary attributes cannot sit on the class
+    >   themselves: `AttributeReader::readClass()` reads every one of them there as an annotation of the *entity type*. The
+    >   wrapper names the target; the generator (`OP29`) stays untouched. It also targets a computed property (`OP34`).
 > - **For a package:** `ColumnAnnotationResolverInterface` as proposed below. First consumer: the SDK, `IsLanguageDependent`
->   on whatever `#[Translatable]` names.
+    >   on whatever `#[Translatable]` names.
 > - **On the same term the attribute wins** (local), as the attribute did over the facet resolver.
 > - **Rejected:** declarations on the service (`annotateProperty(Model::class, …)`, after `annotateContainer()`). Type-level
->   annotations (`SelectionFields`, `LineItem`) already sit on the model; two places for one kind of declaration is the
->   unevenness `OP38` removes. Whether `#[ODataEntity]` could be the container instead is part of its review.
+    >   annotations (`SelectionFields`, `LineItem`) already sit on the model; two places for one kind of declaration is the
+    >   unevenness `OP38` removes. Whether `#[ODataEntity]` could be the container instead is part of its review.
 
 Since SDK 2.0 a `#[Translatable]` field (`HasTranslations`) and a column the SDK's adapters read from `sdk_texts` serve
 their value **in the request's language** (`meta/specs/sdk/i18n-v1.0.md` § 1.5, D23; odata 3.2's
@@ -538,33 +565,6 @@ default `Discovery\ColumnsUnannotated` (bound with `bindIf`), merged in `ModelDi
 `tests/Service/Discovery/ColumnAnnotationsTest.php` (several annotations and qualifiers, unknown and hidden column fail
 loud, default binding, `bindIf`, one call per declared column, attribute wins, `odata:cache` round trip). The SDK's
 resolver over `TranslatedColumns` follows when the SDK moves to this major.
-
-### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
-
-`Protocol/Execution/BatchHandler::parseMultipartParts()` reads the top level of a `multipart/mixed` body. A part it does
-not recognise as a request line — a nested change set (`Content-Type: multipart/mixed; boundary=changeset_…`), a part
-without headers, an empty message, a method outside the regex — is skipped with `continue`, and the response carries one
-part fewer than the request. UI5's `_Requestor` pairs responses with requests by position: the first request without a
-response is rejected with *"HTTP request was not processed because the previous request failed"*, and so is every one
-after it. The `$batch` in the network panel looks healthy — every response that came back is a 200 — so the cause hides.
-Met in the SDK's Partners smoke on 2026-10-25 while chasing another cause (an undeployed database); the shape is real
-regardless.
-
-**Fix (direction):** answer **every** part. A part that cannot be parsed gets its own error response in its position
-(`400`, an OData error body naming what was wrong); a change set on this read-only engine gets one `400`/`405` response
-for the set as a whole, as the protocol pairs a change set with one response. The JSON `$batch` path validates already
-and fails the whole batch loudly; the multipart path should at least keep the positions. **Test:** a body with a GET, an
-unparseable part and a GET answers three parts, the middle one an error.
-
-**Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
-
----
-
-## Done
-
-Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
-section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
-that passed through Pending.
 
 ### [x] `OP41` `#[ODataEntity]` keeps only the names — `$hidden` and `$visible` always apply — major
 
