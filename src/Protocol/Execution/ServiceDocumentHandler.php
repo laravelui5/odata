@@ -6,6 +6,7 @@ namespace LaravelUi5\OData\Protocol\Execution;
 
 use LaravelUi5\OData\Http\ODataResponse;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
+use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\SingletonInterface;
 use LaravelUi5\OData\Protocol\Planning\ServiceDocumentQueryPlan;
 
@@ -15,8 +16,13 @@ use LaravelUi5\OData\Protocol\Planning\ServiceDocumentQueryPlan;
  * Emits:
  *   {"@odata.context":"<serviceRoot>$metadata","value":[
  *     {"name":"Products","kind":"EntitySet","url":"Products"},
+ *     {"name":"Me","kind":"Singleton","url":"Me"},
+ *     {"name":"GetCount","kind":"FunctionImport","url":"GetCount"},
  *     ...
  *   ]}
+ *
+ * An entity set or function import whose `IncludeInServiceDocument` is false is left out; a singleton has no such
+ * flag and is always listed.
  */
 final readonly class ServiceDocumentHandler
 {
@@ -31,14 +37,22 @@ final readonly class ServiceDocumentHandler
 
         foreach ($container->getEntitySets() as $set) {
             /** @var EntitySetInterface $set */
-            $entry = ['name' => $set->getName(), 'kind' => 'EntitySet', 'url' => $set->getName()];
-            $entries[] = $entry;
+            if ($set->isIncludedInServiceDocument()) {
+                $entries[] = ['name' => $set->getName(), 'kind' => 'EntitySet', 'url' => $set->getName()];
+            }
         }
 
+        // A singleton carries no IncludeInServiceDocument flag: it is always listed.
         foreach ($container->getSingletons() as $singleton) {
             /** @var SingletonInterface $singleton */
-            $entry = ['name' => $singleton->getName(), 'kind' => 'Singleton', 'url' => $singleton->getName()];
-            $entries[] = $entry;
+            $entries[] = ['name' => $singleton->getName(), 'kind' => 'Singleton', 'url' => $singleton->getName()];
+        }
+
+        foreach ($container->getFunctionImports() as $import) {
+            /** @var FunctionImportInterface $import */
+            if ($import->isIncludedInServiceDocument()) {
+                $entries[] = ['name' => $import->getName(), 'kind' => 'FunctionImport', 'url' => $import->getName()];
+            }
         }
 
         $response = new ODataResponse(null, 200, [

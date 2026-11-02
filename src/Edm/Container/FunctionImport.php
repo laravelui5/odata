@@ -20,7 +20,7 @@ final readonly class FunctionImport implements FunctionImportInterface
         private string            $name,
         private FunctionInterface $function,
         private ?string           $entitySet                 = null,
-        private bool              $includedInServiceDocument = false,
+        private bool              $includedInServiceDocument = true,
         array                     $annotations               = [],
     ) {
         $this->annotations = $annotations;

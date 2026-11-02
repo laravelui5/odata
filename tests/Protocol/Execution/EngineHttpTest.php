@@ -580,14 +580,15 @@ it('PATCH to entity returns error (read-only)', function () {
 
 // ── Multiple entity sets ─────────────────────────────────────────────────────
 
-it('service document lists all entity sets and singletons with correct format', function () {
+it('service document lists entity sets, singletons and function imports with correct format', function () {
     $response = $this->get('/odata/');
     $doc = json_decode($response->streamedContent(), true);
 
     foreach ($doc['value'] as $entry) {
         expect($entry)->toHaveKeys(['name', 'kind', 'url']);
-        expect($entry['kind'])->toBeIn(['EntitySet', 'Singleton']);
+        expect($entry['kind'])->toBeIn(['EntitySet', 'Singleton', 'FunctionImport']);
     }
+    expect(array_column($doc['value'], 'kind'))->toContain('FunctionImport');
 });
 
 // ── Batch edge cases ─────────────────────────────────────────────────────────

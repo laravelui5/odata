@@ -50,6 +50,12 @@ carries exactly what `$metadata` declares.
   - `#[ODataProperty(name:)]`, `#[ODataNavigation(name:)]` → a custom entity set (both were broken).
   - A vocabulary attribute on a hooked property → `#[ODataAnnotate]` on the class (below); the hooked property can go.
 - **BREAKING: `AttributeReader::readProperty()` is removed** with the hook idiom it served.
+- **BREAKING: the service document honours `IncludeInServiceDocument` and lists function imports** (`OP11`). An entity
+  set built with `includedInServiceDocument: false` is no longer listed; function imports are listed with
+  `"kind":"FunctionImport"`, unless taken out. **`FunctionImport`'s default flips from `false` to `true`**: a function
+  import belongs to the service's front door unless someone says otherwise, as an entity set does. `$metadata` now
+  writes `IncludeInServiceDocument="true"` on every function import that keeps the default; pass
+  `includedInServiceDocument: false` to keep one out. Singletons have no such flag and are always listed.
 - `PropertyResolver` takes the name of the query option it resolves for (default `$filter`), so its error names the
   right one.
 - A virtual expand resolver still receives the **full** parent row, and now the entity type's declared name as

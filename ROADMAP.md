@@ -17,7 +17,7 @@ an entry below.
 
 | Gap | Today | Queued |
 |:---|:---|:---|
-| **Service document** | Neither `includedInServiceDocument` switch is read, and function imports are never listed | Both honoured; `FunctionImport`'s default moves to `true` |
+| **Service document** | Neither `includedInServiceDocument` switch is read, and function imports are never listed | Both honoured; `FunctionImport`'s default moves to `true` — *built for the next major (`OP11`), the row goes with its release* |
 | **Cached `$metadata`** | `$metadata` is serialized on every request; `cachedMetadataXMLPath()` is read by nothing | `odata:cache` writes the document and the serializer streams it; the cold path is unchanged |
 
 ---
@@ -188,30 +188,6 @@ and its value is the refusal as much as the extraction.
 `eq` only? `eq`/`ne`/comparisons? `contains`?), whether it belongs beside `AbstractEntitySet` or as a
 trait, and whether the real answer is simply "document the walk" — which is what the page does today,
 and may be enough. An acceptable outcome is "no helper, and here is why".
-
-### [ ] `OP11` The service document ignores `includedInServiceDocument` and never lists function imports
-
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
-`ServiceDocumentHandler::handle()` walks entity sets (`:32`) and singletons (`:38`) and emits every
-one of them. Two things are missing:
-
-- **The visibility flag is never read.** `EntitySet::isIncludedInServiceDocument()` (`:43`, default
-  `true`) and `FunctionImport::isIncludedInServiceDocument()` (`:46`) exist and are wired through
-  `EdmBuilder:271` — nothing asks them. A set that was deliberately taken out of the service document
-  is listed anyway.
-- **Function imports are absent.** `EntityContainerInterface::getFunctionImports()` (`:59`) is ready;
-  there is no third loop. OData v4 puts entity sets, singletons, function imports and action imports
-  into the service document, each subject to its `IncludedInServiceDocument`.
-
-**Fix.** Filter the entity-set loop on the flag and add a loop over `getFunctionImports()` emitting
-`'kind' => 'FunctionImport'`. Singletons stay unconditional — `Singleton` carries no such flag, and
-`metadata/service-document` says exactly that. **`FunctionImport`'s default flips from `false` to
-`true`** (author, 2026-09-21): a function import belongs to the service's front door unless someone
-says otherwise, same as an entity set. Tests: one hidden set, one listed function import, one hidden
-function import.
-
-`metadata/service-document` already describes the target state per kind; the only thing that moves on
-the page is the documented `FunctionImport` default.
 
 ### [ ] `OP12` `cachedMetadataXMLPath()` is declared, implemented and read by nothing — **finish specifying**
 
@@ -409,6 +385,35 @@ unparseable part and a GET answers three parts, the middle one an error.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+### [x] `OP11` The service document ignores `includedInServiceDocument` and never lists function imports
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Patch**).
+`ServiceDocumentHandler::handle()` walks entity sets (`:32`) and singletons (`:38`) and emits every
+one of them. Two things are missing:
+
+- **The visibility flag is never read.** `EntitySet::isIncludedInServiceDocument()` (`:43`, default
+  `true`) and `FunctionImport::isIncludedInServiceDocument()` (`:46`) exist and are wired through
+  `EdmBuilder:271` — nothing asks them. A set that was deliberately taken out of the service document
+  is listed anyway.
+- **Function imports are absent.** `EntityContainerInterface::getFunctionImports()` (`:59`) is ready;
+  there is no third loop. OData v4 puts entity sets, singletons, function imports and action imports
+  into the service document, each subject to its `IncludedInServiceDocument`.
+
+**Fix.** Filter the entity-set loop on the flag and add a loop over `getFunctionImports()` emitting
+`'kind' => 'FunctionImport'`. Singletons stay unconditional — `Singleton` carries no such flag, and
+`metadata/service-document` says exactly that. **`FunctionImport`'s default flips from `false` to
+`true`** (author, 2026-09-21): a function import belongs to the service's front door unless someone
+says otherwise, same as an entity set. Tests: one hidden set, one listed function import, one hidden
+function import.
+
+`metadata/service-document` already describes the target state per kind; the only thing that moves on
+the page is the documented `FunctionImport` default.
+
+**Built 2026-11-02** (unreleased, next major, author 2026-11-02): `ServiceDocumentHandler` filters entity sets and
+function imports on the flag and lists function imports; `FunctionImport`'s default is `true`.
+`tests/Protocol/Execution/ServiceDocumentTest.php` (a hidden set, a listed and a hidden function import, the default and
+its `$metadata`). The docs pass removes the `<Planned>` marker in `metadata/service-document`.
 
 ### [x] `OP34` `discoverModel()` cannot serve a computed scalar property — the code beside a code-list `…_id` — from SDK Foundation D178, 2026-10-12
 
