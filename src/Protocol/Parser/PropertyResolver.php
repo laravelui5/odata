@@ -25,6 +25,11 @@ use LaravelUi5\OData\Protocol\Planning\Expression\UnaryExpression;
 final readonly class PropertyResolver
 {
     /**
+     * @param string $option the query option the expression came from, named in an error (`$filter`, `$compute`)
+     */
+    public function __construct(private string $option = '$filter') {}
+
+    /**
      * Resolve all property names and apply type hints in the given expression.
      */
     public function resolve(FilterExpression $expr, EntityTypeInterface $entityType): FilterExpression
@@ -137,7 +142,7 @@ final readonly class PropertyResolver
                 if ($property === null) {
                     throw new BadRequestException(
                         'unknown_property',
-                        "Unknown property in \$filter: {$segment}"
+                        "Unknown property in {$this->option}: {$segment}"
                     );
                 }
                 $segments[] = $property;

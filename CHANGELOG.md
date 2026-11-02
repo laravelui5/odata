@@ -19,8 +19,12 @@ carries exactly what `$metadata` declares.
   model's `$appends`, the `pivot` of a `belongsToMany` row (with every `withPivot()` column), a relation loaded through
   `$with` but not expanded. A client that read an undeclared key reads it no longer; `$metadata` never promised it. A
   value that should be on the wire is declared, or the set is a custom entity set.
-- `$compute` evaluates against the declared properties only, so `$compute=<undeclared> as x` yields `null` instead of the
-  value. (The planner does not refuse it yet; `OP40`.)
+- **BREAKING: `$compute` names only declared properties** (`OP40`). Each expression is parsed with the `$filter` grammar
+  and resolved against the set's entity type, on every resolver: `$compute=<undeclared> as x` answers `400` (*Unknown
+  property in $compute: …*) instead of handing out the value. Before, the expression was checked against nothing and read
+  whatever the row held.
+- `PropertyResolver` takes the name of the query option it resolves for (default `$filter`), so its error names the
+  right one.
 - A virtual expand resolver still receives the **full** parent row, and now the entity type's declared name as
   `$parentEntityType` instead of the model's short class name. The two differ when `#[ODataEntity(name:)]` is set.
 

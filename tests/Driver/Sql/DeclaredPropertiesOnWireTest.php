@@ -204,10 +204,23 @@ describe('the wire carries exactly the declared properties', function () {
             ->and(array_filter(array_keys($doc), fn (string $k) => str_starts_with($k, '__odata')))->toBe([]);
     });
 
-    it('lets $compute see only declared properties', function () {
-        $doc = wireGet('/odata/Shelves?$compute=shouting%20as%20loud')['value'][0];
+});
 
-        expect($doc)->toHaveKey('loud', null)
+describe('$compute (OP40)', function () {
+    it('refuses a property the type does not declare', function () {
+        $this->get('/odata/Shelves?$compute=shouting%20as%20loud')
+            ->assertStatus(400)
+            ->assertJsonPath('error.message', 'Unknown property in $compute: shouting');
+    });
+
+    it('refuses an undeclared property inside a function call', function () {
+        $this->get('/odata/Shelves?$compute=toupper(shouting)%20as%20loud')->assertStatus(400);
+    });
+
+    it('computes from declared properties', function () {
+        $doc = wireGet('/odata/Shelves?$compute=toupper(label)%20as%20loud')['value'][0];
+
+        expect($doc)->toHaveKey('loud', 'FICTION')
             ->not->toHaveKey('shouting');
     });
 });

@@ -11,6 +11,8 @@ use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Exception\BadRequestException;
 use LaravelUi5\OData\Http\ODataRequest;
+use LaravelUi5\OData\Protocol\Parser\FilterParser;
+use LaravelUi5\OData\Protocol\Parser\PropertyResolver;
 use LaravelUi5\OData\Protocol\Planning\Expression\BinaryExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\BinaryOperator;
 use LaravelUi5\OData\Protocol\Planning\Expression\FilterExpression;
@@ -137,7 +139,7 @@ final readonly class QueryPlanner
             skipToken:   $request->skipToken,
             count:       $request->count,
             search:      $request->search,
-            compute:     $this->parseCompute($request->compute),
+            compute:     $this->parseCompute($request->compute, $entityType),
             maxPageSize: $request->maxPageSize,
             customQueryOptions: $request->customQueryOptions,
         );
@@ -799,8 +801,8 @@ final readonly class QueryPlanner
 
     private function parseFilterExpression(string $filterString, EntityTypeInterface $entityType): FilterExpression
     {
-        $parser   = new \LaravelUi5\OData\Protocol\Parser\FilterParser();
-        $resolver = new \LaravelUi5\OData\Protocol\Parser\PropertyResolver();
+        $parser   = new FilterParser();
+        $resolver = new PropertyResolver();
 
         $unresolved = $parser->parse($filterString);
         return $resolver->resolve($unresolved, $entityType);
@@ -898,9 +900,13 @@ final readonly class QueryPlanner
      *
      * Format: "expression as alias[,expression as alias,...]"
      *
+     * Every property an expression names must be a declared property of the set's type, as in `$filter`: the
+     * expression is parsed with the filter grammar and resolved against the type (400 otherwise). The resolver
+     * evaluates the expression string itself; the parse only guards what it may read.
+     *
      * @return list<ComputedProperty>
      */
-    private function parseCompute(?string $computeString): array
+    private function parseCompute(?string $computeString, EntityTypeInterface $entityType): array
     {
         if ($computeString === null || $computeString === '') {
             return [];
@@ -929,6 +935,9 @@ final readonly class QueryPlanner
                     sprintf('Invalid $compute clause: "%s"', $clause)
                 );
             }
+
+            (new PropertyResolver('$compute'))
+                ->resolve((new FilterParser())->parse($expression), $entityType);
 
             $result[] = new ComputedProperty($alias, $expression);
         }
