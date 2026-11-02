@@ -206,9 +206,7 @@ class ODataService implements ODataServiceInterface
 
         // Applied to the concrete builder, which a decorating configure() wraps rather
         // than replaces — the annotations land in the container either way.
-        if ($this->containerAnnotations !== []) {
-            $edmBuilder->annotateContainer(...$this->containerAnnotations);
-        }
+        $edmBuilder->annotateContainer(...$this->containerAnnotations);
 
         // Register custom entity types first so discovery and the builder
         // can wire virtual navigation properties.
@@ -358,7 +356,7 @@ class ODataService implements ODataServiceInterface
         foreach ($this->customEntitySets as $resolverClass) {
             $instance = app($resolverClass);
 
-            if (!($instance instanceof VirtualExpandResolverInterface)) {
+            if (!$instance instanceof VirtualExpandResolverInterface || !$instance instanceof CustomEntitySetInterface) {
                 continue;
             }
 
@@ -392,7 +390,7 @@ class ODataService implements ODataServiceInterface
         foreach ($this->customEntitySets as $resolverClass) {
             $instance = app($resolverClass);
 
-            if (!($instance instanceof VirtualExpandResolverInterface)) {
+            if (!$instance instanceof VirtualExpandResolverInterface || !$instance instanceof CustomEntitySetInterface) {
                 continue;
             }
 

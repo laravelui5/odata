@@ -35,7 +35,7 @@ final readonly class CustomQueryOptions
      * Build from a parsed query map, keeping only custom query options — string
      * keys that don't begin with `$` (system options) or `@` (parameter aliases).
      *
-     * @param array<string, mixed> $query
+     * @param array<array-key, mixed> $query  a numeric query key (`?0=x`) arrives as an int
      */
     public static function fromQuery(array $query): self
     {

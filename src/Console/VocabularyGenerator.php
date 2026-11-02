@@ -500,7 +500,7 @@ PHP;
         $attrTargets = $isAttribute ? $this->resolveAttributeTargets($appliesToValues) : null;
 
         // Track terms whose buildAnnotationValue() body cannot be fully resolved.
-        if ($rawType !== 'Edm.Boolean' && $rawType !== '') {
+        if ($rawType !== 'Edm.Boolean') {
             $isCol        = str_starts_with($rawType, 'Collection(');
             $inner        = $isCol ? substr($rawType, 11, -1) : $rawType;
             $isCplx       = $this->isComplexType($inner);

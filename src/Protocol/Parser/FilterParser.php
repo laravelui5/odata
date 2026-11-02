@@ -128,7 +128,7 @@ final class FilterParser
     /** @var FilterExpression[] Operand stack */
     private array $operands = [];
 
-    /** @var list<array{symbol: string, prec: int, isUnary: bool, isBinary: bool, isFunc: bool, isLambda: bool, args: list<FilterExpression>, attachedOp: ?array, navProp: ?string, lambdaVar: ?string}> */
+    /** @var list<array{symbol: string, prec: int, isUnary: bool, isBinary: bool, isFunc: bool, isLambda: bool, args: list<FilterExpression>, attachedOp: ?array, navProp: ?string, lambdaVar: ?string, operandCount?: int}> */
     private array $operators = [];
 
     /** @var list<array{type: string, value: mixed}> Token history for lambda variable lookback */
@@ -599,7 +599,7 @@ final class FilterParser
                 if ($o2['symbol'] === '(') {
                     break;
                 }
-                if (!$o1['isUnary'] || ($o1['isUnary'] && $o2['isUnary'])) {
+                if (!$o1['isUnary'] || $o2['isUnary']) {
                     if ($o2['prec'] >= $o1['prec']) {
                         $this->applyOperator(array_pop($this->operators));
                         continue;

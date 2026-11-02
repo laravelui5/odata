@@ -114,6 +114,7 @@ final readonly class PropertyResolver
     {
         // Resolve the navigation property on the collection path
         $navPropName = $expr->collection->segments[0] ?? null;
+        // The parser leaves segments as strings until they are resolved here; the segment type does not say so yet (OP32).
         if (is_string($navPropName)) {
             $navProperty = $entityType->getNavigationProperty($navPropName);
             if ($navProperty === null) {
@@ -137,6 +138,7 @@ final readonly class PropertyResolver
         $segments = [];
 
         foreach ($expr->segments as $segment) {
+            // The parser leaves segments as strings until they are resolved here; the segment type does not say so yet (OP32).
             if (is_string($segment)) {
                 $property = $entityType->getProperty($segment);
                 if ($property === null) {

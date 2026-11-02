@@ -241,7 +241,7 @@ final readonly class BatchHandler
     /**
      * Validate JSON batch requests: check required keys and GET-only.
      *
-     * @param list<array{id: string, method: string, url: string}> $requests
+     * @param list<array<string, mixed>> $requests as the client sent them
      * @return list<array{id: string, method: string, url: string}>
      */
     private function validateRequests(array $requests): array

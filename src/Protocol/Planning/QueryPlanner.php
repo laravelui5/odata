@@ -742,7 +742,7 @@ final readonly class QueryPlanner
     /**
      * Parse semicolon-separated nested options inside $expand parentheses.
      *
-     * @return array{filter: ?FilterExpression, select: SelectList, orderBy: ?OrderByList, top: ?int, skip: ?int, count: bool}
+     * @return array{filter: ?FilterExpression, select: SelectList, expand: ExpandList, orderBy: ?OrderByList, top: ?int, skip: ?int, count: bool}
      */
     private function parseNestedExpandOptions(
         ?string                $nestedString,

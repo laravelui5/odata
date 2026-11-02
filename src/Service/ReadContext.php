@@ -14,8 +14,8 @@ namespace LaravelUi5\OData\Service;
  *
  *   - a **hard denial** (a primary / root target) → the controller answers a 403
  *     {@see \LaravelUi5\OData\Exception\ForbiddenException};
- *   - a **drop** (an `$expand` target) → the engine prunes it from serialization and emits
- *     a `sap-messages` warning (the honest-partial model — added in the next slice);
+ *   - a **drop** (an `$expand` target) → {@see \LaravelUi5\OData\Http\ReadGate} prunes it from
+ *     the plan and emits a `sap-messages` warning on the 200 (the honest-partial model);
  *   - no verdict recorded → the read proceeds.
  *
  * The default {@see AllowAllReadAuthorizer} records nothing, so an unconfigured OData
@@ -44,9 +44,8 @@ final class ReadContext
     }
 
     /**
-     * Record a droppable (`$expand`) denial → pruned from serialization + a `sap-messages`
-     * warning. Consumed by the honest-partial model (next slice); recorded here so the
-     * collector's contract is stable from the start.
+     * Record a droppable (`$expand`) denial → pruned from the plan + a `sap-messages`
+     * warning on the 200 (the honest-partial model, {@see \LaravelUi5\OData\Http\ReadGate}).
      */
     public function denyDrop(string $target, ReadMessage $message): void
     {
@@ -70,13 +69,13 @@ final class ReadContext
         return $this->hardDenials[0]['message'] ?? null;
     }
 
-    /** @return list<string> the dropped `$expand` target paths (next slice). */
+    /** @return list<string> the dropped `$expand` target paths, which the read gate prunes. */
     public function dropped(): array
     {
         return array_column($this->drops, 'target');
     }
 
-    /** @return list<ReadMessage> the drop messages (for the `sap-messages` header, next slice). */
+    /** @return list<ReadMessage> the drop messages, carried in the `sap-messages` header. */
     public function dropMessages(): array
     {
         return array_column($this->drops, 'message');

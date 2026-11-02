@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Console;
 
+use LaravelUi5\OData\ODataService;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use LaravelUi5\OData\Console\Concerns\ResolvesServices;
@@ -72,6 +73,11 @@ class CacheCommand extends Command
         $built = [];
 
         foreach ($services as $service) {
+            if (!$service instanceof ODataService) {
+                $this->error(sprintf('%s cannot be cached: odata:cache builds services that extend %s.', $service::class, ODataService::class));
+
+                return self::FAILURE;
+            }
             $reflected = new ReflectionClass($service);
 
             // Both out of one cold pass — never from `schema()`, which memoises and

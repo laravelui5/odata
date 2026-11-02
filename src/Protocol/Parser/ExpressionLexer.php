@@ -41,6 +41,8 @@ final class ExpressionLexer
 
     /**
      * Try a parse action; on failure (null return or exception), reset position.
+     *
+     * @phpstan-impure advances the position
      */
     public function with(callable $callback): mixed
     {
@@ -93,6 +95,8 @@ final class ExpressionLexer
      * Match regex at current position, advance cursor, return match.
      *
      * @throws BadRequestException on no match
+     *
+     * @phpstan-impure advances the position
      */
     public function expression(string $pattern, bool $caseSensitive = true, int $group = 0): string
     {
@@ -112,6 +116,7 @@ final class ExpressionLexer
         return $match;
     }
 
+    /** @phpstan-impure advances the position on a match */
     public function maybeExpression(string $pattern, bool $caseSensitive = true, int $group = 0): ?string
     {
         return $this->with(fn() => $this->expression($pattern, $caseSensitive, $group));
@@ -121,6 +126,8 @@ final class ExpressionLexer
      * Match a single character (or any character if $char is empty).
      *
      * @throws BadRequestException
+     *
+     * @phpstan-impure advances the position
      */
     public function char(string $char = ''): string
     {
@@ -138,6 +145,7 @@ final class ExpressionLexer
         throw new BadRequestException('lexer_char', "Expected '{$char}' but got '{$next}' at: " . $this->errorContext());
     }
 
+    /** @phpstan-impure advances the position on a match */
     public function maybeChar(string $char): ?string
     {
         return $this->with(fn() => $this->char($char));
@@ -173,6 +181,8 @@ final class ExpressionLexer
      * Match one of the given literal keywords at the current position.
      *
      * @throws BadRequestException
+     *
+     * @phpstan-impure advances the position
      */
     public function literal(string ...$keywords): string
     {
@@ -186,6 +196,7 @@ final class ExpressionLexer
         throw new BadRequestException('lexer_literal', 'Expected ' . implode('|', $keywords) . ' at: ' . $this->errorContext());
     }
 
+    /** @phpstan-impure advances the position on a match */
     public function maybeLiteral(string ...$keywords): ?string
     {
         return $this->with(fn() => $this->literal(...$keywords));
@@ -198,6 +209,7 @@ final class ExpressionLexer
         return $this->expression('\s+');
     }
 
+    /** @phpstan-impure advances the position on a match */
     public function maybeWhitespace(): ?string
     {
         return $this->with(fn() => $this->whitespace());
@@ -349,6 +361,8 @@ final class ExpressionLexer
 
     /**
      * Match balanced parentheses, return inner content.
+     *
+     * @phpstan-impure advances the position
      */
     public function matchingParenthesis(): string
     {
@@ -373,6 +387,7 @@ final class ExpressionLexer
         return implode('', $chars);
     }
 
+    /** @phpstan-impure advances the position on a match */
     public function maybeMatchingParenthesis(): ?string
     {
         return $this->with(fn() => $this->matchingParenthesis());

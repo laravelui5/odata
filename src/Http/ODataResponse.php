@@ -36,6 +36,7 @@ class ODataResponse extends StreamedResponse
         return $this->streaming ? $this->sendContentStreamed() : $this->sendContentBuffered();
     }
 
+    /** @return $this */
     private function sendContentStreamed(): static
     {
         try {
@@ -50,6 +51,7 @@ class ODataResponse extends StreamedResponse
     }
 
     /**
+     * @return $this
      * @throws Throwable
      */
     private function sendContentBuffered(): static
@@ -65,7 +67,7 @@ class ODataResponse extends StreamedResponse
             $this->headers->replace($response->headers->all());
             $response->sendHeaders();
             $response->sendContentBuffered();
-            return $response;
+            return $this;
         } catch (Throwable $t) {
             ob_end_clean();
             throw $t;

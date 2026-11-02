@@ -215,7 +215,7 @@ readonly class SqlEntitySetResolver implements EntitySetResolverInterface, Entit
             return match ($fn) {
                 'year'  => (int) $date->format('Y'),
                 'month' => (int) $date->format('m'),
-                'day'   => (int) $date->format('d'),
+                default => (int) $date->format('d'),   // 'day' — the regex admits nothing else
             };
         }
 

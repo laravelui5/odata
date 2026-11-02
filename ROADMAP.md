@@ -48,7 +48,8 @@ Decided 2026-11-02 (author): an OData major, worked on directly, without a depre
 - `OP11` — the service document honours `includedInServiceDocument`; `FunctionImport`'s default flips to `true`.
 - `OP41` — `#[ODataEntity]` keeps only the names: `$hidden` and `$visible` always apply, `useHidden` goes, three failure
   cases fail loud or right.
-- If time is left: `OP32`, for the two signature findings that may need a break.
+- `OP32` (partly): the two signature findings need no break; the hand-written `src` is clean at level 5.
+- `OP33` — comments on the read gate.
 
 The entries stay in place under *Pending*; this list is the cut.
 
@@ -353,11 +354,23 @@ would be cheaper and hide exactly those typos.
 **Done when** `composer analyse` is green at level 5. The `src` fixes are a patch, unless one of the
 two signature findings cannot be solved without a break.
 
-### [ ] `OP33` Stale "next slice" comments on the read forward-exit — from SDK `OP09`, 2026-10-09
+**Progress 2026-11-02** (with the next major). Measured again: level 5 finds 394 in `src` (356 in the generated
+vocabularies) and 223 in `tests`. **Neither signature finding needs a break:** `ODataResponse::sendContentBuffered()`
+returned the *error* response where `static` promised itself (now `$this`, the private helpers say `@return $this`),
+and `ProtocolException::toResponse()`'s docblock said `null` where it meant `Request|null`. **All 37 hand-written `src`
+findings are fixed**; one real catch among them: PHPStan assumed the lexer's `maybeExpression()` pure, so a second
+digit loop "could never run" — the `maybe…` methods are `@phpstan-impure` now. `FilterExpression::accept()` dispatches by
+`instanceof`, `CacheCommand` narrows to `ODataService`, the bindings' `getSourceClass()` return `string`.
 
-`Service/ReadContext.php` (`:18`, `:48`, `:73`, `:79`) and `Service/ReadMessage.php` (`:14`, `:36`) still
-say pruning and the `sap-messages` header come "in the next slice". `ReadGate` already prunes and the
-header ships. Comment-only; no behaviour changes.
+**Left, and why it is not in the major:**
+- **The generated vocabularies (356)** — step 1, `OP07` + `OP29`, the generator's own release.
+- **The tests (223)** — the `narrow()` helper, mechanical, no break; any minor.
+- **One type debt, ignored in `phpstan.neon` with its reason:** `PropertyPathExpression::$segments` says resolved
+  properties, but the filter parser puts strings there until `PropertyResolver` resolves them. The honest fix is a
+  type for an unresolved path; it touches every driver that reads segments.
+
+`phpstan.neon` stays at level 1 until those are done; `src` alone is green at 5 today
+(`vendor/bin/phpstan analyse --level=5 src`, vocabularies aside).
 
 ### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
 
@@ -385,6 +398,14 @@ unparseable part and a GET answers three parts, the middle one an error.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+### [x] `OP33` Stale "next slice" comments on the read forward-exit — from SDK `OP09`, 2026-10-09
+
+`Service/ReadContext.php` (`:18`, `:48`, `:73`, `:79`) and `Service/ReadMessage.php` (`:14`, `:36`) still
+say pruning and the `sap-messages` header come "in the next slice". `ReadGate` already prunes and the
+header ships. Comment-only; no behaviour changes.
+
+**Done 2026-11-02** (unreleased, next major): both docblocks say what happens today and point at `ReadGate`.
 
 ### [x] `OP11` The service document ignores `includedInServiceDocument` and never lists function imports
 

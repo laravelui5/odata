@@ -11,7 +11,7 @@ namespace LaravelUi5\OData\Service;
  * `numericSeverity` follows `com.sap.vocabularies.Common.v1.NumericMessageSeverity`:
  * 1 = success, 2 = info, 3 = warning, 4 = error. A root (hard) denial is an error (4)
  * carried in the 403 error envelope; a dropped `$expand` is a warning (3) carried in the
- * `sap-messages` header (the honest-partial model — added in the next slice).
+ * `sap-messages` header of the 200 (the honest-partial model).
  *
  * **Unbound messages MUST carry an empty `target`** — a non-resolvable target is silently
  * dropped by the UI5 v4 model.
@@ -32,8 +32,7 @@ final readonly class ReadMessage
     }
 
     /**
-     * The standard SAP message array (for the `sap-messages` header — consumed by the
-     * honest-partial model in the next slice).
+     * The standard SAP message array, as the `sap-messages` header carries it.
      *
      * @return array<string, mixed>
      */

@@ -14,3 +14,9 @@ parameters:
         -
             identifier: pest.expectation.redundant
             path: tests/*
+        # The filter parser leaves path segments as strings until PropertyResolver resolves them; the segment type
+        # (PropertyPathExpression::$segments) does not say so yet. Seen from level 4 up (OP32).
+        -
+            identifier: function.impossibleType
+            path: src/Protocol/Parser/PropertyResolver.php
+            reportUnmatched: false

@@ -224,8 +224,8 @@ final class ModelDiscovery
 
         // Resolve names (with attribute overrides)
         $entityAttr = $this->readEntityAttribute($ref);
-        $typeName = $entityAttr?->name ?? $ref->getShortName();
-        $entitySetName = $entityAttr?->entitySet ?? Str::plural($typeName);
+        $typeName = $entityAttr->name ?? $ref->getShortName();
+        $entitySetName = $entityAttr->entitySet ?? Str::plural($typeName);
 
         self::assertUnique($this->typeNames, $modelClass, $typeName, 'entity type');
         self::assertUnique($this->entitySetNames, $modelClass, $entitySetName, 'entity set');

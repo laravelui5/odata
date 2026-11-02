@@ -145,7 +145,7 @@ class OData extends Controller
         // 1. Parse client preference from Prefer header.
         $maxPageSize = null;
         $prefer = $request->header('Prefer', '');
-        if ($prefer !== '' && $prefer !== null) {
+        if ($prefer !== '') {
             if (preg_match('/(?:odata\.)?maxpagesize\s*=\s*(\d+)/i', $prefer, $m)) {
                 $maxPageSize = (int) $m[1];
             }

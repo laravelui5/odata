@@ -40,7 +40,7 @@ final readonly class ODataRequest
         return array_values(
             array_filter(
                 array_map('rawurldecode', explode('/', ltrim($this->path, '/'))),
-                'strlen'
+                static fn (string $segment): bool => $segment !== ''
             )
         );
     }

@@ -60,6 +60,17 @@ carries exactly what `$metadata` declares.
   right one.
 - A virtual expand resolver still receives the **full** parent row, and now the entity type's declared name as
   `$parentEntityType` instead of the model's short class name. The two differ when `#[ODataEntity(name:)]` is set.
+- **The hand-written source is clean at PHPStan level 5** (`OP32`, partly). What the level found, fixed without a
+  break: `ODataResponse`'s buffered error path returned the error response instead of itself; `ProtocolException::
+  toResponse()` documents its `$request` as `Request|null`; the lexer's `maybe…` methods are marked impure (they advance
+  the position, which PHPStan had assumed they do not); `FilterExpression::accept()` dispatches by class; `$compute`'s
+  `year`/`month`/`day` and array shapes in the planner and parser are complete; `CustomQueryOptions` documents that a
+  numeric query key arrives as an int; the three bindings' `getSourceClass()` return `string` (they are final and
+  never returned null; `ResolverBindingInterface` keeps `?string`). `odata:cache` refuses a service that does not extend
+  `ODataService` with a message instead of a fatal error. The analysis itself stays at level 1 until the generated
+  vocabularies (`OP07`, `OP29`) and the tests are done.
+- **Comments on the read gate are current** (`OP33`): `ReadContext` and `ReadMessage` no longer announce pruning and the
+  `sap-messages` header for "the next slice"; `ReadGate` has done both since it shipped.
 - **Docblocks no longer tell the Lodata migration story.** Seven docblocks in six files (`ODataRequest`,
   `EdmBuilderInterface`, `ODataServiceInterface`, `CsdlSerializer`, `FilterParser`, `ExpressionLexer`) compared a class
   with its legacy predecessor or named build steps — text the API reference published, about classes that no longer

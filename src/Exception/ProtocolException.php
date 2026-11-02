@@ -186,9 +186,10 @@ abstract class ProtocolException extends RuntimeException implements Responsable
     }
 
     /**
-     * Convert this exception to a Symfony response
-     * @param  null  $request  Request
-     * @return ODataResponse Response
+     * Convert this exception to a Symfony response.
+     *
+     * @param  \Illuminate\Http\Request|null $request unused; the response depends on the exception alone
+     * @return ODataResponse
      */
     public function toResponse($request = null): ODataResponse
     {
