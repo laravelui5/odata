@@ -13,7 +13,6 @@ use LaravelUi5\OData\Service\Builder\EdmBuilder;
 use LaravelUi5\OData\Service\Cache\EdmxWriter;
 use LaravelUi5\OData\Service\Contracts\ColumnFacetResolverInterface;
 use LaravelUi5\OData\Service\Discovery\ColumnFacetsAsDeclared;
-use LaravelUi5\OData\Service\Discovery\Attributes\ODataProperty;
 use LaravelUi5\OData\Service\Discovery\ModelDiscovery;
 use LaravelUi5\OData\Service\Serialization\CsdlSerializer;
 use LaravelUi5\OData\Tests\TestCase;
@@ -26,23 +25,6 @@ class ColumnFacetsPrice extends Model
     protected $table = 'column_facets_prices';
     public $timestamps = false;
     protected $guarded = [];
-}
-
-/**
- * Same table; `note` is declared non-nullable through the attribute, carried on
- * a hooked property so the attribute bag is not shadowed.
- */
-class ColumnFacetsOverride extends Model
-{
-    protected $table = 'column_facets_prices';
-    public $timestamps = false;
-    protected $guarded = [];
-
-    #[ODataProperty(nullable: false)]
-    public ?string $note {
-        get => $this->getAttribute('note');
-        set(?string $value) { $this->setAttribute('note', $value); }
-    }
 }
 
 /** Stands in for a package cast that marks a column as a unit price (the SDK's price cast). */
@@ -72,58 +54,6 @@ class ColumnFacetsCastPrice extends Model
     }
 }
 
-/** Same cast, plus a literal Scale on the attribute — the attribute wins over a resolver. */
-class ColumnFacetsCastPriceWithAttribute extends ColumnFacetsCastPrice
-{
-    #[ODataProperty(scale: 2)]
-    public ?string $amount {
-        get => $this->getAttribute('amount');
-        set(?string $value) { $this->setAttribute('amount', $value); }
-    }
-}
-
-/** A literal Precision/Scale override on the attribute. */
-class ColumnFacetsLiteralScale extends Model
-{
-    protected $table = 'column_facets_prices';
-    public $timestamps = false;
-    protected $guarded = [];
-
-    #[ODataProperty(precision: 15, scale: 3)]
-    public ?string $amount {
-        get => $this->getAttribute('amount');
-        set(?string $value) { $this->setAttribute('amount', $value); }
-    }
-}
-
-/** Scale above Precision — refused at schema build. */
-class ColumnFacetsScaleTooLarge extends Model
-{
-    protected $table = 'column_facets_prices';
-    public $timestamps = false;
-    protected $guarded = [];
-
-    #[ODataProperty(precision: 4, scale: 6)]
-    public ?string $amount {
-        get => $this->getAttribute('amount');
-        set(?string $value) { $this->setAttribute('amount', $value); }
-    }
-}
-
-/** Scale on a string column — refused at schema build. */
-class ColumnFacetsScaleOnString extends Model
-{
-    protected $table = 'column_facets_prices';
-    public $timestamps = false;
-    protected $guarded = [];
-
-    #[ODataProperty(scale: 2)]
-    public ?string $code {
-        get => $this->getAttribute('code');
-        set(?string $value) { $this->setAttribute('code', $value); }
-    }
-}
-
 /**
  * Announces the installation's price decimals on every column cast as a unit price,
  * and records what it was asked.
@@ -140,6 +70,23 @@ class ColumnFacetsInstallationResolver implements ColumnFacetResolverInterface
         $this->calls[] = [$modelClass, $column, $cast];
 
         return $cast === ColumnFacetsUnitPriceCast::class ? $facets->withScale($this->priceDecimals) : $facets;
+    }
+}
+
+/**
+ * Answers per model and column, as a host's resolver may: facets the column schema does not say. Replaces the
+ * removed `#[ODataProperty(nullable:, precision:, scale:)]` (OP38).
+ */
+class ColumnFacetsPerModel implements ColumnFacetResolverInterface
+{
+    /** @param array<class-string<Model>, array<string, \Closure(TypeFacets): TypeFacets>> $answers */
+    public function __construct(private readonly array $answers) {}
+
+    public function resolve(string $modelClass, string $column, ?string $cast, TypeFacets $facets): TypeFacets
+    {
+        $answer = $this->answers[$modelClass][$column] ?? null;
+
+        return $answer !== null ? $answer($facets) : $facets;
     }
 }
 
@@ -261,8 +208,11 @@ describe('ModelDiscovery → type facets from the column schema', function () {
         expect($property->getFacets())->toBeNull();
     });
 
-    it('lets #[ODataProperty(nullable:)] win over the column', function () {
-        $type = facetsEntityType(discoverFacetsEdmx([ColumnFacetsOverride::class]));
+    it('lets a resolver declare a nullable column non-nullable', function () {
+        $resolver = new ColumnFacetsPerModel([
+            ColumnFacetsPrice::class => ['note' => fn (TypeFacets $f) => $f->withNullable(false)],
+        ]);
+        $type = facetsEntityType(discoverFacetsEdmx([ColumnFacetsPrice::class], $resolver));
 
         expect($type->getProperty('note')->getFacets()->isNullable())->toBeFalse()
             ->and($type->getProperty('note')->getFacets()->getMaxLength())->toBe(255);
@@ -333,8 +283,11 @@ describe('ModelDiscovery → facet overrides', function () {
         expect(app(ColumnFacetResolverInterface::class))->toBeInstanceOf(ColumnFacetsInstallationResolver::class);
     });
 
-    it('takes Precision and Scale from the attribute', function () {
-        $facets = facetsEntityType(discoverFacetsEdmx([ColumnFacetsLiteralScale::class]))
+    it('lets a resolver answer Precision and Scale for one model', function () {
+        $resolver = new ColumnFacetsPerModel([
+            ColumnFacetsPrice::class => ['amount' => fn (TypeFacets $f) => $f->withPrecision(15)->withScale(3)],
+        ]);
+        $facets = facetsEntityType(discoverFacetsEdmx([ColumnFacetsPrice::class], $resolver))
             ->getProperty('amount')->getFacets();
 
         expect($facets->getPrecision())->toBe(15)
@@ -361,20 +314,16 @@ describe('ModelDiscovery → facet overrides', function () {
         expect($facets->getScale())->toBe(5);
     });
 
-    it('lets the attribute win over the resolver', function () {
-        $resolver = new ColumnFacetsInstallationResolver(priceDecimals: 4);
-        $facets   = facetsEntityType(discoverFacetsEdmx([ColumnFacetsCastPriceWithAttribute::class], $resolver))
-            ->getProperty('amount')->getFacets();
-
-        expect($facets->getScale())->toBe(2);
-    });
-
     it('refuses a Scale above the Precision', function () {
-        discoverFacetsEdmx([ColumnFacetsScaleTooLarge::class]);
+        discoverFacetsEdmx([ColumnFacetsPrice::class], new ColumnFacetsPerModel([
+            ColumnFacetsPrice::class => ['amount' => fn (TypeFacets $f) => $f->withPrecision(4)->withScale(6)],
+        ]));
     })->throws(LogicException::class, 'Scale 6 exceeds Precision 4');
 
     it('refuses a Scale on a type that cannot carry one', function () {
-        discoverFacetsEdmx([ColumnFacetsScaleOnString::class]);
+        discoverFacetsEdmx([ColumnFacetsPrice::class], new ColumnFacetsPerModel([
+            ColumnFacetsPrice::class => ['code' => fn (TypeFacets $f) => $f->withScale(2)],
+        ]));
     })->throws(LogicException::class, 'Scale is only valid on Edm.Decimal');
 
     it('freezes the resolved Scale into the cache and serves it warm as cold', function () {

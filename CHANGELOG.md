@@ -38,16 +38,38 @@ carries exactly what `$metadata` declares.
   (before: declared, missing on the wire), and two models resolving to the same entity type or entity set (before: every
   request answered 500 with *"The following entity sets have no resolver bound"*). Both messages name the classes.
 - `#[ODataEntity]` carries only the names now: `name` and `entitySet`.
+- **BREAKING: `#[ODataProperty]`, `#[ODataIgnore]` and `#[ODataNavigation]` are removed** (`OP38`). They needed a declared
+  PHP property, which shadows Eloquent's attribute bag, and two of them did not work: a `name:` rename was declared in
+  `$metadata` but never reached the wire, `$select` or `$filter`. A discovered model is now described by its table, its
+  casts, its `$hidden`/`$visible` and its class attributes; a rename, another type or a cut is a custom entity set.
+  **Upgrade, per attribute:**
+  - `#[ODataIgnore]` on a column or relation → put it in the model's `$hidden`.
+  - `#[ODataProperty(nullable:, precision:, scale:)]` → a `ColumnFacetResolverInterface`; it receives the model class
+    and can answer per model.
+  - `#[ODataProperty(type:)]` → a cast.
+  - `#[ODataProperty(name:)]`, `#[ODataNavigation(name:)]` → a custom entity set (both were broken).
+  - A vocabulary attribute on a hooked property → `#[ODataAnnotate]` on the class (below); the hooked property can go.
+- **BREAKING: `AttributeReader::readProperty()` is removed** with the hook idiom it served.
 - `PropertyResolver` takes the name of the query option it resolves for (default `$filter`), so its error names the
   right one.
 - A virtual expand resolver still receives the **full** parent row, and now the entity type's declared name as
   `$parentEntityType` instead of the model's short class name. The two differ when `#[ODataEntity(name:)]` is set.
-
 - **Docblocks no longer tell the Lodata migration story.** Seven docblocks in six files (`ODataRequest`,
   `EdmBuilderInterface`, `ODataServiceInterface`, `CsdlSerializer`, `FilterParser`, `ExpressionLexer`) compared a class
   with its legacy predecessor or named build steps — text the API reference published, about classes that no longer
   exist. They now say what the class does; the history moved to a `//` line, which ApiGen does not render. Comments
   only.
+
+### Added
+
+- **`#[ODataAnnotate]`** (`OP35`, `OP38`) — annotates one property of a discovered model, written on the class:
+  `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`, repeatable, any number of typed annotations per
+  attribute. The property must be one the entity type declares, or discovery fails loud.
+- **`ColumnAnnotationResolverInterface`** (`OP35`) — the annotation forward-exit of discovery, beside the facet and
+  expression exits: `annotations(string $modelClass, string $column)` per declared column, at schema build, so a cached
+  service keeps what it saw. Default `ColumnsUnannotated` answers nothing; bound with `bindIf`. On the same term and
+  qualifier the model's `#[ODataAnnotate]` wins. First consumer: the LaravelUi5 SDK, `Core.IsLanguageDependent` on
+  translated fields.
 
 ## [3.2.0] – 2026-10-23
 

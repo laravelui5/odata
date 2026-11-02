@@ -10,6 +10,7 @@ use LaravelUi5\OData\ODataService;
 use LaravelUi5\OData\Service\Contracts\EdmBuilderInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
+use LaravelUi5\OData\Service\Discovery\Attributes\ODataAnnotate;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataEntity;
 use LaravelUi5\OData\Service\Serialization\CsdlSerializer;
 use LaravelUi5\OData\Tests\TestCase;
@@ -35,6 +36,12 @@ uses(TestCase::class);
 
 /** A code-list set: one key, the key annotated with paths to scale, text and standard code. */
 #[ODataEntity(name: 'Currency', entitySet: 'Currencies')]
+#[ODataAnnotate(
+    'code',
+    new UnitSpecificScale(EdmPrimitiveType::Int16, new Path('decimals')),
+    new Text(new Path('name')),
+    new StandardCode(new Path('iso')),
+)]
 class CodeListCurrency extends Model
 {
     protected $table = 'code_list_currencies';
@@ -43,35 +50,17 @@ class CodeListCurrency extends Model
     public $incrementing = false;
     public $timestamps = false;
     protected $guarded = [];
-
-    #[UnitSpecificScale(EdmPrimitiveType::Int16, new Path('decimals'))]
-    #[Text(new Path('name'))]
-    #[StandardCode(new Path('iso'))]
-    public ?string $code {
-        get => $this->getAttribute('code');
-        set(?string $value) { $this->setAttribute('code', $value); }
-    }
 }
 
 /** A business entity: amount and quantity point at their currency and unit. */
 #[ODataEntity(name: 'Order', entitySet: 'Orders')]
+#[ODataAnnotate('amount', new ISOCurrency(new Path('currency')))]
+#[ODataAnnotate('quantity', new Unit(new Path('unit')))]
 class CodeListOrder extends Model
 {
     protected $table = 'code_list_orders';
     public $timestamps = false;
     protected $guarded = [];
-
-    #[ISOCurrency(new Path('currency'))]
-    public ?string $amount {
-        get => $this->getAttribute('amount');
-        set(?string $value) { $this->setAttribute('amount', $value); }
-    }
-
-    #[Unit(new Path('unit'))]
-    public ?string $quantity {
-        get => $this->getAttribute('quantity');
-        set(?string $value) { $this->setAttribute('quantity', $value); }
-    }
 }
 
 final class CodeListService extends ODataService

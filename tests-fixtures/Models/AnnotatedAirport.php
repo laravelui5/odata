@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Fixtures\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use LaravelUi5\OData\Service\Discovery\Attributes\ODataAnnotate;
 use LaravelUi5\OData\Vocabularies\Common\V1\Label;
 use LaravelUi5\OData\Vocabularies\Core\V1\Description;
 use LaravelUi5\OData\Vocabularies\Ui\V1\Hidden;
@@ -12,37 +13,20 @@ use LaravelUi5\OData\Vocabularies\Ui\V1\LineItem;
 use LaravelUi5\OData\Vocabularies\Ui\V1\SelectionFields;
 
 /**
- * Test fixture: an Airport model annotated with OData vocabulary attributes.
+ * Test fixture: an Airport model annotated with OData vocabulary attributes, all on the class.
  *
- * Uses PHP 8.4 property hooks to combine Eloquent attribute access with
- * vocabulary annotations on real PHP properties. Unannotated columns
- * continue through __get() as usual.
+ * Type-level terms sit on the class directly; a column's terms go through #[ODataAnnotate], which names the
+ * column. The model declares no PHP property, so Eloquent's attribute bag stays untouched.
  */
 #[Description('An airport with IATA code')]
 #[SelectionFields(['code', 'name'])]
 #[LineItem(['code', 'name'])]
+#[ODataAnnotate('code', new Label('IATA Code'), new Description('The IATA airport code'))]
+#[ODataAnnotate('name', new Label('Airport Name'))]
+#[ODataAnnotate('country_id', new Hidden())]
 class AnnotatedAirport extends Model
 {
     protected $table = 'airports';
     public $timestamps = false;
     protected $guarded = [];
-
-    #[Label('IATA Code')]
-    #[Description('The IATA airport code')]
-    public ?string $code {
-        get => $this->getAttribute('code');
-        set(?string $value) { $this->setAttribute('code', $value); }
-    }
-
-    #[Label('Airport Name')]
-    public ?string $name {
-        get => $this->getAttribute('name');
-        set(?string $value) { $this->setAttribute('name', $value); }
-    }
-
-    #[Hidden]
-    public ?int $country_id {
-        get => $this->getAttribute('country_id');
-        set(?int $value) { $this->setAttribute('country_id', $value); }
-    }
 }

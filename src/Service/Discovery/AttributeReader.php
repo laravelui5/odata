@@ -9,7 +9,6 @@ use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionParameter;
-use ReflectionProperty;
 
 /**
  * Reads PHP #[Attribute] annotations that implement TypedAnnotationInterface
@@ -39,19 +38,6 @@ final readonly class AttributeReader
      * @return list<AnnotationInterface>
      */
     public function readClass(ReflectionClass $reflection): array
-    {
-        return $this->extract(
-            $reflection->getAttributes(TypedAnnotationInterface::class, ReflectionAttribute::IS_INSTANCEOF),
-        );
-    }
-
-    /**
-     * Reads property-level vocabulary annotations.
-     * Covers: Property, NavigationProperty.
-     *
-     * @return list<AnnotationInterface>
-     */
-    public function readProperty(ReflectionProperty $reflection): array
     {
         return $this->extract(
             $reflection->getAttributes(TypedAnnotationInterface::class, ReflectionAttribute::IS_INSTANCEOF),

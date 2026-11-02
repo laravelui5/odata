@@ -11,9 +11,11 @@ use LaravelUi5\OData\Console\ClearCommand;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use LaravelUi5\OData\Driver\Sql\ColumnsAsNamed;
 use LaravelUi5\OData\Service\Contracts\ColumnExpressionResolverInterface;
+use LaravelUi5\OData\Service\Contracts\ColumnAnnotationResolverInterface;
 use LaravelUi5\OData\Service\Contracts\ColumnFacetResolverInterface;
 use LaravelUi5\OData\Service\Contracts\ReadAuthorizerInterface;
 use LaravelUi5\OData\Service\Discovery\ColumnFacetsAsDeclared;
+use LaravelUi5\OData\Service\Discovery\ColumnsUnannotated;
 use LaravelUi5\OData\Service\AllowAllReadAuthorizer;
 
 class ODataServiceProvider extends ServiceProvider
@@ -39,6 +41,10 @@ class ODataServiceProvider extends ServiceProvider
         // The facet forward-exit of model discovery. bindIf: a package that binds its own
         // resolver (the SDK announces installation decimals) wins regardless of provider order.
         $this->app->bindIf(ColumnFacetResolverInterface::class, ColumnFacetsAsDeclared::class);
+
+        // The annotation forward-exit of model discovery. bindIf: a package that binds its own
+        // (the SDK, for translated columns) wins regardless of provider order.
+        $this->app->bindIf(ColumnAnnotationResolverInterface::class, ColumnsUnannotated::class);
 
         // The expression forward-exit of query execution. bindIf for the same reason: a package that
         // binds its own (the SDK, for translated columns) wins regardless of provider order.

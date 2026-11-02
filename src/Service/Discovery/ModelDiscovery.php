@@ -28,9 +28,10 @@ use LaravelUi5\OData\Edm\Type\TypeFacets;
 use LaravelUi5\OData\Service\Contracts\ColumnFacetResolverInterface;
 use LaravelUi5\OData\Service\Contracts\EdmBuilderInterface;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataEntity;
-use LaravelUi5\OData\Service\Discovery\Attributes\ODataIgnore;
-use LaravelUi5\OData\Service\Discovery\Attributes\ODataNavigation;
-use LaravelUi5\OData\Service\Discovery\Attributes\ODataProperty;
+use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
+use LaravelUi5\OData\Service\Contracts\ColumnAnnotationResolverInterface;
+use LaravelUi5\OData\Service\Discovery\Attributes\ODataAnnotate;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -68,10 +69,15 @@ final class ModelDiscovery
 
     private readonly ColumnFacetResolverInterface $facetResolver;
 
-    public function __construct(?ColumnFacetResolverInterface $facetResolver = null)
-    {
-        $this->attributeReader = new AttributeReader();
-        $this->facetResolver   = $facetResolver ?? app(ColumnFacetResolverInterface::class);
+    private readonly ColumnAnnotationResolverInterface $annotationResolver;
+
+    public function __construct(
+        ?ColumnFacetResolverInterface      $facetResolver = null,
+        ?ColumnAnnotationResolverInterface $annotationResolver = null,
+    ) {
+        $this->attributeReader    = new AttributeReader();
+        $this->facetResolver      = $facetResolver ?? app(ColumnFacetResolverInterface::class);
+        $this->annotationResolver = $annotationResolver ?? app(ColumnAnnotationResolverInterface::class);
     }
 
     public function add(string $modelClass): void
@@ -241,6 +247,8 @@ final class ModelDiscovery
             ));
         }
 
+        $annotated = self::readAnnotateAttributes($ref);
+
         foreach ($columns as $column) {
             $colName = $column['name'];
 
@@ -249,47 +257,35 @@ final class ModelDiscovery
                 continue;
             }
 
-            // Check for #[ODataIgnore] on the model property (if it exists)
-            if ($ref->hasProperty($colName) && $this->hasIgnoreAttribute($ref->getProperty($colName))) {
-                continue;
-            }
-
             // Determine OData type: casts override DB type
             $primitiveType = isset($casts[$colName])
                 ? (self::mapCastType($casts[$colName]) ?? self::mapColumnType($column['type_name']))
                 : self::mapColumnType($column['type_name']);
 
-            // Check for #[ODataProperty] overrides
-            $propAttr = $ref->hasProperty($colName)
-                ? $this->readPropertyAttribute($ref->getProperty($colName))
-                : null;
-
-            if ($propAttr?->type !== null) {
-                $enumCase = EdmPrimitiveType::tryFrom($propAttr->type);
-                if ($enumCase !== null) {
-                    $primitiveType = $enumCase;
-                }
-            }
-
-            $propName = $propAttr?->name ?? $colName;
-
-            // Read vocabulary annotations from PHP attributes on the model property
-            $propAnnotations = $ref->hasProperty($colName)
-                ? $this->attributeReader->readProperty($ref->getProperty($colName))
-                : [];
-
             $property = new Property(
-                name: $propName,
+                name: $colName,
                 type: new PrimitiveType($primitiveType),
-                facets: $this->resolveFacets($modelClass, $column, $casts[$colName] ?? null, $primitiveType, $colName === $keyName, $propAttr),
-                annotations: $propAnnotations,
+                facets: $this->resolveFacets($modelClass, $column, $casts[$colName] ?? null, $primitiveType, $colName === $keyName),
+                annotations: self::mergeAnnotations(
+                    $this->annotationResolver->annotations($modelClass, $colName),
+                    $annotated[$colName] ?? [],
+                ),
             );
+            unset($annotated[$colName]);
 
             $properties[] = $property;
 
             if ($colName === $keyName) {
                 $keyProps[] = $property;
             }
+        }
+
+        if ($annotated !== []) {
+            throw new \LogicException(sprintf(
+                '#[ODataAnnotate] on %s names "%s", which entity type "%s" does not declare (no such column, or one the '
+                . 'model never serializes).',
+                $modelClass, implode('", "', array_keys($annotated)), $typeName,
+            ));
         }
 
         $this->properties[$modelClass] = $properties;
@@ -326,11 +322,6 @@ final class ModelDiscovery
                 continue;
             }
             if ($method->getNumberOfRequiredParameters() > 0) {
-                continue;
-            }
-
-            // Check for #[ODataIgnore]
-            if ($method->getAttributes(ODataIgnore::class) !== []) {
                 continue;
             }
 
@@ -387,14 +378,8 @@ final class ModelDiscovery
                 continue;
             }
 
-            // Check for #[ODataNavigation] name override
-            $navAttrs = $method->getAttributes(ODataNavigation::class);
-            $navName = $navAttrs !== []
-                ? ($navAttrs[0]->newInstance()->name ?? $method->getName())
-                : $method->getName();
-
             $navProps[] = new NavigationProperty(
-                name: $navName,
+                name: $method->getName(),
                 targetType: $this->bareTypes[$relatedClass],
                 isCollection: $isCollection,
             );
@@ -467,8 +452,7 @@ final class ModelDiscovery
 
     /**
      * The facets of a discovered column: the schema's, then the bound
-     * {@see ColumnFacetResolverInterface}, then `#[ODataProperty]` — the attribute is local to
-     * one model and wins. A key property is never nullable, whatever any layer says.
+     * {@see ColumnFacetResolverInterface}. A key property is never nullable, whatever either says.
      *
      * Returns null when the result says nothing beyond the spec's defaults, so an
      * unconstrained property serializes exactly as before.
@@ -482,19 +466,9 @@ final class ModelDiscovery
         ?string          $cast,
         EdmPrimitiveType $type,
         bool             $isKey,
-        ?ODataProperty   $attribute,
     ): ?TypeFacets {
         $facets = $this->facetResolver->resolve($modelClass, $column['name'], $cast, self::schemaFacets($column, $type));
 
-        if ($attribute?->nullable !== null) {
-            $facets = $facets->withNullable($attribute->nullable);
-        }
-        if ($attribute?->precision !== null) {
-            $facets = $facets->withPrecision($attribute->precision);
-        }
-        if ($attribute?->scale !== null) {
-            $facets = $facets->withScale($attribute->scale);
-        }
         if ($isKey) {
             $facets = $facets->withNullable(false);
         }
@@ -509,8 +483,7 @@ final class ModelDiscovery
      *
      * The column decides `Nullable`, `Precision`/`Scale` on a `decimal(p,s)` and `MaxLength` on a
      * length-bearing character type. A facet is taken only when the final Edm type can carry it,
-     * so a `#[ODataProperty(type:)]` override never inherits a length or a scale that belongs to
-     * another type.
+     * so a cast to another type never inherits a length or a scale that belongs to the column's.
      *
      * @param array{type_name: string, type: string, nullable: bool} $column
      */
@@ -639,10 +612,43 @@ final class ModelDiscovery
         return $attrs !== [] ? $attrs[0]->newInstance() : null;
     }
 
-    private function readPropertyAttribute(\ReflectionProperty $prop): ?ODataProperty
+    /**
+     * The model's `#[ODataAnnotate]` attributes, by the property they name.
+     *
+     * @return array<string, list<AnnotationInterface>>
+     */
+    private static function readAnnotateAttributes(ReflectionClass $ref): array
     {
-        $attrs = $prop->getAttributes(ODataProperty::class);
-        return $attrs !== [] ? $attrs[0]->newInstance() : null;
+        $byProperty = [];
+        foreach ($ref->getAttributes(ODataAnnotate::class) as $attribute) {
+            $annotate = $attribute->newInstance();
+            foreach ($annotate->annotations as $annotation) {
+                $byProperty[$annotate->property][] = $annotation->toAnnotation();
+            }
+        }
+
+        return $byProperty;
+    }
+
+    /**
+     * The bound resolver's annotations for a column, then the model's own; on the same term and qualifier the
+     * model's attribute wins — it is local to one model.
+     *
+     * @param list<AnnotationInterface|TypedAnnotationInterface> $fromResolver
+     * @param list<AnnotationInterface>                          $fromAttribute
+     * @return list<AnnotationInterface>
+     */
+    private static function mergeAnnotations(array $fromResolver, array $fromAttribute): array
+    {
+        $merged = [];
+        foreach ([$fromResolver, $fromAttribute] as $source) {
+            foreach ($source as $annotation) {
+                $annotation = $annotation instanceof TypedAnnotationInterface ? $annotation->toAnnotation() : $annotation;
+                $merged[$annotation->getTerm() . '#' . ($annotation->getQualifier() ?? '')] = $annotation;
+            }
+        }
+
+        return array_values($merged);
     }
 
     /**
@@ -672,10 +678,5 @@ final class ModelDiscovery
                 $other, $modelClass, $what, $name,
             ));
         }
-    }
-
-    private function hasIgnoreAttribute(\ReflectionProperty $prop): bool
-    {
-        return $prop->getAttributes(ODataIgnore::class) !== [];
     }
 }

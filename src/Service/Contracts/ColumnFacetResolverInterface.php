@@ -16,8 +16,8 @@ use LaravelUi5\OData\Edm\Type\TypeFacets;
  * package that knows such a fact binds its own resolver; the default
  * ({@see \LaravelUi5\OData\Service\Discovery\ColumnFacetsAsDeclared}) returns the facets unchanged.
  *
- * Order per column: the schema's facets → this resolver → `#[ODataProperty(precision:, scale:,
- * nullable:)]`. The attribute is local to one model and wins.
+ * Order per column: the schema's facets → this resolver. The resolver receives the model class, so it can
+ * answer per model. A key property is never nullable, whatever it says.
  *
  * The resolver runs when the schema is **built** — on every request for a cold service, once in
  * `odata:cache` for a cached one. A cached service keeps the value it saw then; when the fact

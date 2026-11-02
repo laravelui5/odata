@@ -5,79 +5,19 @@ declare(strict_types=1);
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
-use LaravelUi5\OData\Fixtures\Models\AnnotatedAirport;
 use LaravelUi5\OData\ODataService;
 use LaravelUi5\OData\Service\Contracts\EdmBuilderInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataEntity;
-use LaravelUi5\OData\Service\Discovery\Attributes\ODataIgnore;
 use LaravelUi5\OData\Tests\TestCase;
 
 /*
- * OP24, decided 2026-10-07: column-level discovery attributes sit on a PHP 8.4
- * property with hooks that delegate to Eloquent's attribute bag.
- * OP41, decided 2026-11-02: what the model never serializes ($hidden, $visible)
- * is not declared — always, no switch.
- *
- * The first block checks the idiom against what a model must keep doing;
- * the second the serialization rules.
+ * OP41, decided 2026-11-02: what the model never serializes ($hidden, $visible) is not declared — always, no switch.
+ * The hook idiom that used to be checked here went with the property attributes (OP38).
  */
 
 uses(TestCase::class);
-
-// ── The hook idiom ───────────────────────────────────────────────────────────
-
-/** The trap the hooks avoid: a plain declared property shadows the attribute bag. */
-class ShadowingAirport extends Model
-{
-    protected $table = 'airports';
-    public $timestamps = false;
-    protected $guarded = [];
-
-    #[ODataIgnore]
-    public $code;
-}
-
-describe('column attributes on hooked properties', function () {
-    it('keeps mass assignment, reads and toArray() on the attribute bag', function () {
-        $airport = AnnotatedAirport::create(['code' => 'VIE', 'name' => 'Vienna']);
-
-        expect($airport->code)->toBe('VIE')
-            ->and($airport->getAttribute('code'))->toBe('VIE')
-            ->and($airport->toArray())->toMatchArray(['code' => 'VIE', 'name' => 'Vienna'])
-            ->and(isset($airport->code))->toBeTrue()
-            ->and(isset($airport->country_id))->toBeFalse();   // null column → not set, as on a plain model
-    });
-
-    it('writes through the hook, tracks dirtiness and persists on save()', function () {
-        $airport = AnnotatedAirport::create(['code' => 'VIE', 'name' => 'Vienna']);
-
-        $airport->name = 'Wien';
-        expect($airport->isDirty('name'))->toBeTrue();
-        $airport->save();
-
-        expect(AnnotatedAirport::find($airport->id)->name)->toBe('Wien');
-    });
-
-    it('fills through fill() and update() like any model', function () {
-        $airport = AnnotatedAirport::create(['code' => 'VIE', 'name' => 'Vienna']);
-        $airport->update(['code' => 'LOWW']);
-
-        expect(AnnotatedAirport::find($airport->id)->code)->toBe('LOWW');
-    });
-
-    it('shows the trap: a plain declared property drops writes on save()', function () {
-        $id = DB::table('airports')->insertGetId(['code' => 'VIE', 'name' => 'Vienna']);
-
-        $airport = ShadowingAirport::find($id);
-        expect($airport->code)->toBeNull();          // the column value never reaches the property
-
-        $airport->code = 'LOWW';
-        $airport->save();
-        expect(DB::table('airports')->where('id', $id)->value('code'))->toBe('VIE');   // write lost
-    });
-});
 
 // ── $hidden and $visible (OP41) ──────────────────────────────────────────────
 

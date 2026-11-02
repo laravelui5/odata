@@ -56,7 +56,7 @@ The entries stay in place under *Pending*; this list is the cut.
 
 ## Pending
 
-### [ ] `OP38` Two surfaces, nothing in between: the property and method attributes go — major
+### [x] `OP38` Two surfaces, nothing in between: the property and method attributes go — major
 
 > **Decided 2026-11-02 (author): an OData major, built straight away, without a deprecating minor first.**
 > `#[ODataProperty]`, `#[ODataIgnore]` and `#[ODataNavigation]` are removed. A discovered model is described by its
@@ -105,6 +105,14 @@ and `$hidden`/`$visible` always apply. The per-column override on a discovered m
   `annotations/applying-annotations` (*Property-level annotations and PHP 8.4 property hooks*). Upgrade notes per
   removed attribute: what replaces it.
 - Chiron: the OData skill teaches what the docs teach.
+
+**Built 2026-11-02** (unreleased, next major), together with `OP35`: the three attribute classes are gone, and with them
+`readPropertyAttribute()`, `hasIgnoreAttribute()`, the `ODataNavigation` lookup, the attribute layer of
+`resolveFacets()` and `AttributeReader::readProperty()`. Tests moved: `ColumnFacetsTest` answers per model through a
+facet resolver (`ColumnFacetsPerModel`), `PropertyHooksAndHiddenTest` became `HiddenAndVisibleTest` without the hook
+block, `AnnotatedAirport` and the code-list models in `CodeListHttpTest` annotate through `#[ODataAnnotate]`. **Still
+open:** the docs (`services/model-discovery`, `annotations/applying-annotations`, upgrade notes) and Chiron — the
+major's docs pass.
 
 ### [ ] `OP01` EDM cache is keyed by class location, not service identity — load-side silent collision
 
@@ -481,7 +489,7 @@ quantity needs `unit`).
 **Target:** Minor (additive). Needed before `mod-sales` part 2 is built; part 1 needs it only for
 `standard_cost`'s currency.
 
-### [ ] `OP35` Discovered columns cannot be annotated from outside — `Core.IsLanguageDependent` for translated fields — from SDK i18n, 2026-10-23
+### [x] `OP35` Discovered columns cannot be annotated from outside — `Core.IsLanguageDependent` for translated fields — from SDK i18n, 2026-10-23
 
 > **Decided 2026-11-02 (author): built in the next major, under the declaration rule** (see *Next major*).
 > - **For a host:** a repeatable class attribute that names the column and carries typed vocabulary objects:
@@ -524,6 +532,12 @@ per-language editor.
 **Target:** ~~Minor (additive). Deferred to the first multilingual project (SDK Foundation D163), with the SDK's
 master-data docs page.~~ **The next major** (author, 2026-11-02): it replaces vocabulary on hooked properties, which
 `OP38` removes.
+
+**Built 2026-11-02** (unreleased, next major): `Attributes\ODataAnnotate`, `Contracts\ColumnAnnotationResolverInterface`,
+default `Discovery\ColumnsUnannotated` (bound with `bindIf`), merged in `ModelDiscovery::mergeAnnotations()`.
+`tests/Service/Discovery/ColumnAnnotationsTest.php` (several annotations and qualifiers, unknown and hidden column fail
+loud, default binding, `bindIf`, one call per declared column, attribute wins, `odata:cache` round trip). The SDK's
+resolver over `TranslatedColumns` follows when the SDK moves to this major.
 
 ### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
 
