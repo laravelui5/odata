@@ -23,6 +23,11 @@ carries exactly what `$metadata` declares.
   and resolved against the set's entity type, on every resolver: `$compute=<undeclared> as x` answers `400` (*Unknown
   property in $compute: …*) instead of handing out the value. Before, the expression was checked against nothing and read
   whatever the row held.
+- **BREAKING: a structured cast goes out as the JSON text `$metadata` declares** (`OP39`). Discovery has always declared
+  an `array`, `json`, `object` or `collection` cast (and `AsArrayObject`/`AsCollection` on a `json` column) as
+  `Edm.String`, but the decoded value went out as a JSON object: `"input":{"x":1}`. `RowCoercion` now writes it back as
+  text, `"input":"{\"x\":1}"`, at every level. OData has no JSON type; a client parses the string. A client that read
+  the object reads a string now. `null` stays `null`; a plain string passes unchanged.
 - `PropertyResolver` takes the name of the query option it resolves for (default `$filter`), so its error names the
   right one.
 - A virtual expand resolver still receives the **full** parent row, and now the entity type's declared name as

@@ -38,6 +38,9 @@ use LaravelUi5\OData\Edm\EdmPrimitiveType;
  *
  *   Edm.Binary — base64url without padding, as the JSON format prescribes.
  *
+ *   Edm.String holding a structured value — an `array`/`json`/`object`/`collection` cast decodes the column, so
+ *   the value is written back as JSON text, the string `$metadata` declares.
+ *
  *   Int64 and Decimal under `IEEE754Compatible=true` — written as JSON strings
  *   so a JavaScript client keeps every digit (a `decimal(19,6)` exceeds what a
  *   double holds). Without the parameter they stay numbers.
@@ -141,6 +144,7 @@ final readonly class RowCoercion
             in_array($type, [
                 EdmPrimitiveType::Decimal, EdmPrimitiveType::Double, EdmPrimitiveType::Single,
             ], true)                                   => self::toNumber(...),
+            $type === EdmPrimitiveType::String         => self::toJsonText(...),
             default                                    => null,
         };
     }
@@ -178,6 +182,19 @@ final readonly class RowCoercion
             return $v;
         }
         return rtrim(strtr(base64_encode($v), '+/', '-_'), '=');
+    }
+
+    /**
+     * A structured value as the JSON text `$metadata` promises. Discovery declares an `array`, `json`, `object` or
+     * `collection` cast (and a `json` column) as `Edm.String`, but the cast hands `toArray()` the decoded value, which
+     * would go out as a JSON object. OData has no JSON type; the client parses the string. Scalars pass unchanged.
+     */
+    private static function toJsonText(mixed $v): mixed
+    {
+        if (is_array($v) || $v instanceof \stdClass || $v instanceof \JsonSerializable) {
+            return json_encode($v, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }
+        return $v;
     }
 
     /** An integral value from a driver string or float; anything else passes unchanged. */

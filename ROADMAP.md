@@ -106,15 +106,6 @@ and `$hidden`/`$visible` always apply. The per-column override on a discovered m
   removed attribute: what replaces it.
 - Chiron: the OData skill teaches what the docs teach.
 
-### [ ] `OP39` A `json` cast goes out as an object where `$metadata` declares `Edm.String`
-
-Same test. `mapCastType` maps `array`, `json`, `collection` and `object` to `Edm.String`, but `toArray()` hands the decoded
-array to the wire: `"input":{"x":1}`. `RowCoercion` has no coercer for `Edm.String`, so the 3.1 rule *the wire carries the
-declared type* does not hold here. OData has no JSON type; the property is a string the client parses.
-
-**Workaround in place:** a cast that serializes to text (`LaravelUi5\Sdk\Audit\Casts\JsonText`, `sdk-db`).
-**Fix:** `RowCoercion` encodes an array under `Edm.String`. Check what that does to a consumer that reads the object today.
-
 ### [ ] `OP41` `#[ODataEntity]` keeps only the names — `$hidden` and `$visible` always apply — major
 
 > **Decided 2026-11-02 (author), after a review of the attribute.**
@@ -591,6 +582,21 @@ unparseable part and a GET answers three parts, the middle one an error.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+### [x] `OP39` A `json` cast goes out as an object where `$metadata` declares `Edm.String`
+
+Same test. `mapCastType` maps `array`, `json`, `collection` and `object` to `Edm.String`, but `toArray()` hands the decoded
+array to the wire: `"input":{"x":1}`. `RowCoercion` has no coercer for `Edm.String`, so the 3.1 rule *the wire carries the
+declared type* does not hold here. OData has no JSON type; the property is a string the client parses.
+
+**Workaround in place:** a cast that serializes to text (`LaravelUi5\Sdk\Audit\Casts\JsonText`, `sdk-db`).
+**Fix:** `RowCoercion` encodes an array under `Edm.String`. Check what that does to a consumer that reads the object today.
+
+**Built 2026-11-02** (unreleased, next major): `RowCoercion` gets an `Edm.String` coercer, `toJsonText()`, that encodes an
+array, a `stdClass` or a `JsonSerializable` and passes everything else. A consumer that read the object reads a string
+now, hence the major. `tests/Driver/Sql/JsonCastOnWireTest.php` (`array`, `object`, `collection`, `AsArrayObject`,
+`json` in an expanded row, `null`, an uncast `json` column). Downstream: the SDK's `JsonText` cast (`sdk-db`) becomes
+redundant once the SDK is on this major; it stays correct either way, since it hands over a string.
 
 ### [x] `OP40` `$compute` reads columns `$metadata` does not declare
 
