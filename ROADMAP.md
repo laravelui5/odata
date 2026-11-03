@@ -473,6 +473,49 @@ unparseable part and a GET answers three parts, the middle one an error.
 
 **Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
 
+### [ ] `OP42` A constant inside a nested collection is dropped from `$metadata` — found 2026-11-03
+
+`CsdlSerializer::appendAnnotationValueAsChild()` writes the items of a collection that stands **inside** another
+collection. It knows records and collections; a constant item falls through both branches and is left out without a
+word. `<Collection><Collection><String>a</String></Collection></Collection>` goes out as
+`<Collection><Collection/></Collection>`. The top-level path (`appendAnnotationValue()`) handles constant items as typed
+child elements (`<String>a</String>`, `<Bool>true</Bool>`); the nested path does not.
+
+No vocabulary term produces the shape: no term or record field in the catalog is typed `Collection(Collection(…))`, so
+the generated classes never reach it. It affects an annotation built by hand. Found while building `OP07` step 6.
+
+**Fix (direction):** one writer for collection items at every depth — the constant branch of `appendAnnotationValue()`
+(kind → element name through `KIND_TO_XML_ATTR`, lexical form through `constantLexical()`) used by the nested path too.
+**Test:** a collection holding a collection of a `String` and a `Bool` serializes both items.
+
+**Target:** Patch.
+
+### [ ] `OP43` Annotations, records and terms cannot carry annotations themselves — found 2026-11-03
+
+CSDL lets an annotation be annotated (§14.2: *"An `edm:Annotation` element MAY contain `edm:Annotation` elements that
+annotate the annotation"*), and a record and its property values too (§14.4.10: `edm:Record` and `edm:PropertyValue`
+each *"MAY contain `edm:Annotation` elements"*).
+The vocabularies use it: 44 `AppliesTo` values in the catalog name `Annotation`, `Record`, `PropertyValue` or `Term` —
+`UI.Importance` and `UI.PartOfPreview` on a `DataField` record of a `LineItem`, `UI.Criticality` on an annotation,
+`Validation.Exclusive` on a `Validation.Minimum`, `Common.ValueListShowValuesImmediately` on a `Common.ValueList`.
+
+Our model has no place for them: `Annotation`, `RecordAnnotationValue` and `PropertyValue` implement no
+`HasAnnotations`, and `CsdlSerializer` writes no annotation below an annotation or record. The generator lists these
+terms with an empty attribute target (`AppliesTo` without a PHP target, see `OP07`), so they exist as classes but cannot
+reach `$metadata`.
+
+`Term` is a different case: annotating a term is the work of a vocabulary's author, and the engine declares no terms of
+its own. That part stays out.
+
+**Fix (direction):** annotations on `Annotation`, `RecordAnnotationValue` and `PropertyValue` (an optional list, as
+`HasAnnotations` gives the model elements), written by `CsdlSerializer` and carried through `odata:cache` (`EdmxWriter`).
+The declaring side follows the value classes of `OP07`: an `AbstractRecord` takes its annotations as a constructor
+argument (`new DataField(value: …, annotations: [new Importance(ImportanceType::High)])`) — the name must not collide
+with a record field, which the generator can check as it does for `Qualifier`. Settle the shape before building; it is
+an addition, so a minor.
+
+**Target:** Minor.
+
 ---
 
 ## Done

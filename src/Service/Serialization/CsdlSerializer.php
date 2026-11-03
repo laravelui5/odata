@@ -50,12 +50,16 @@ final readonly class CsdlSerializer
 
     /**
      * Maps ConstantAnnotationValue kinds to their CSDL XML attribute names.
-     * OData uses 'Int' for all integer kinds; our model uses 'Integer'.
      *
-     * @see OData CSDL XML v4.01 §14.4.1–14.4.11
+     * The vocabulary classes write the CSDL names (`Int`, `Bool`) themselves. The two older kind names stay mapped as a
+     * guard for annotations built by hand or by vocabulary classes generated before OData 4.0: CSDL knows no `Boolean`
+     * attribute, and a client drops what it does not know (OpenUI5 reads an unknown attribute as `undefined`).
+     *
+     * @see OData CSDL XML v4.01 §14.3 (Constant Expressions)
      */
     private const array KIND_TO_XML_ATTR = [
         'Integer' => 'Int',
+        'Boolean' => 'Bool',
     ];
 
     /**
@@ -614,7 +618,7 @@ final readonly class CsdlSerializer
     ): void {
         if ($value instanceof ConstantAnnotationValueInterface) {
             $xmlAttr = self::KIND_TO_XML_ATTR[$value->getKind()] ?? $value->getKind();
-            $annotEl->addAttribute($xmlAttr, $value->getValue());
+            $annotEl->addAttribute($xmlAttr, $this->constantLexical($xmlAttr, $value->getValue()));
             return;
         }
 
@@ -638,7 +642,7 @@ final readonly class CsdlSerializer
                     // Constant items in a collection become typed child elements,
                     // e.g. <String>value</String> rather than attributes.
                     $xmlTag = self::KIND_TO_XML_ATTR[$item->getKind()] ?? $item->getKind();
-                    $collEl->addChild($xmlTag, htmlspecialchars($item->getValue(), ENT_XML1));
+                    $collEl->addChild($xmlTag, htmlspecialchars($this->constantLexical($xmlTag, $item->getValue()), ENT_XML1));
                 } else {
                     // Record or nested Collection items recurse normally.
                     // A child element is added and the value serialised into it.
@@ -648,6 +652,23 @@ final readonly class CsdlSerializer
                 }
             }
         }
+    }
+
+    /**
+     * The lexical form of a constant. A Boolean is `true` or `false` (§14.3.2); the PHP string casts of
+     * `true` and `false` (`"1"`, `""`) that vocabulary classes generated before OData 4.0 wrote are
+     * normalised, since a client reads anything but `true` as false and an empty value is invalid.
+     */
+    private function constantLexical(string $xmlAttr, string $value): string
+    {
+        if ($xmlAttr !== 'Bool') {
+            return $value;
+        }
+        return match (strtolower($value)) {
+            'true', '1'      => 'true',
+            'false', '0', '' => 'false',
+            default          => $value,
+        };
     }
 
     /**

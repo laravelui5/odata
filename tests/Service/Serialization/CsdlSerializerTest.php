@@ -201,6 +201,39 @@ describe('CsdlSerializer::serialize', function () {
             expect($xml)->toContain('<Annotation Term="Some.Term" Int="42"/>');
         });
 
+        it('writes the older kind Boolean as Bool, true and false in their lexical form', function (string $raw, string $bool) {
+            $annotation = new Annotation('Some.Term', null, new RecordAnnotationValue(
+                'Some.Type',
+                new PropertyValue('Flag', new ConstantAnnotationValue('Boolean', $raw)),
+            ));
+
+            $container = makeContainer('DefaultContainer', [], [], [], [$annotation]);
+            $schema    = makeSchema('Test.Service', $container, annotations: [$annotation]);
+            $edmx      = makeEdmx('4.01', [], [$schema->getNamespace() => $schema], $container);
+
+            $xml = (new CsdlSerializer)->serialize($edmx);
+
+            expect($xml)->toContain("<PropertyValue Property=\"Flag\" Bool=\"{$bool}\"/>")
+                ->not->toContain('Boolean=');
+        })->with([
+            'PHP cast of true'  => ['1', 'true'],
+            'PHP cast of false' => ['', 'false'],
+            'already lexical'   => ['false', 'false'],
+        ]);
+
+        it('writes a Bool item of a collection in its lexical form', function () {
+            $annotation = new Annotation('Some.Term', null, new CollectionAnnotationValue(
+                new ConstantAnnotationValue('Boolean', '1'),
+                new ConstantAnnotationValue('Bool', 'false'),
+            ));
+
+            $container = makeContainer('DefaultContainer', [], [], [], [$annotation]);
+            $schema    = makeSchema('Test.Service', $container, annotations: [$annotation]);
+            $edmx      = makeEdmx('4.01', [], [$schema->getNamespace() => $schema], $container);
+
+            expect((new CsdlSerializer)->serialize($edmx))->toContain('<Collection><Bool>true</Bool><Bool>false</Bool></Collection>');
+        });
+
         it('serializes an EnumMember annotation as an inline attribute', function () {
             $annotation = new Annotation('Org.OData.Capabilities.V1.ConformanceLevel', null,
                 new ConstantAnnotationValue('EnumMember', 'Org.OData.Capabilities.V1.ConformanceLevelType/Advanced'));
