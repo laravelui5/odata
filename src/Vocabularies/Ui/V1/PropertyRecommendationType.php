@@ -21,6 +21,12 @@ abstract readonly class PropertyRecommendationType extends AbstractRecord
         'RecommendedFieldIsSuggestion' => ['recommendedFieldIsSuggestion', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param mixed $recommendedFieldValue Recommended value
+     * @param string|Path|null $recommendedFieldDescription Description of the recommended value
+     * @param float|Path|null $recommendedFieldScoreValue Confidence score of the recommended value
+     * @param bool|Path|null $recommendedFieldIsSuggestion Whether the recommended value shall be suggested in the input field
+     */
     public function __construct(
         public mixed $recommendedFieldValue = null,
         public string|Path|null $recommendedFieldDescription = null,

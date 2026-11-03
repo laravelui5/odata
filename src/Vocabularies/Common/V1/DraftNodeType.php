@@ -16,6 +16,10 @@ readonly class DraftNodeType extends AbstractRecord
         'ValidationFunction' => ['validationFunction', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $preparationAction Action that prepares a draft document for later activation
+     * @param string|Path|null $validationFunction Function that validates whether a draft document is ready for activation
+     */
     public function __construct(
         public string|Path|null $preparationAction = null,
         public string|Path|null $validationFunction = null,

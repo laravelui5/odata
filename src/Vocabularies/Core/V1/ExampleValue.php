@@ -15,6 +15,9 @@ readonly class ExampleValue extends AbstractRecord
         'Description' => ['description', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $description Description of the example value
+     */
     public function __construct(
         public string|Path|null $description = null,
     ) {}

@@ -16,6 +16,11 @@ final readonly class DataModificationExceptionType extends ExceptionType
         'responseCode' => ['responseCode', 'Edm.Int16', false],
     ];
 
+    /**
+     * @param MessageType|Path|null $info Information about the exception
+     * @param DataModificationOperationKind|Path|null $failedOperation The kind of modification operation that failed
+     * @param int|Path|null $responseCode Response code of the failed operation, e.g. 424 for a failed dependency
+     */
     public function __construct(
         MessageType|Path|null $info = null,
         public DataModificationOperationKind|Path|null $failedOperation = null,

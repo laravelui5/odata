@@ -24,9 +24,15 @@ readonly class InsertRestrictionsBase extends AbstractRecord
     ];
 
     /**
-     * @param list<CustomParameter>|Path|null $customHeaders
-     * @param list<CustomParameter>|Path|null $customQueryOptions
-     * @param list<HttpResponse>|Path|null $errorResponses
+     * @param bool|Path|null $insertable Entities can be inserted
+     * @param int|Path|null $maxLevels The maximum number of navigation properties that can be traversed when addressing the collection to insert into. A value of -1 indicates there is no restriction.
+     * @param bool|Path|null $typecastSegmentSupported Entities of a specific derived type can be created by specifying a type-cast segment
+     * @param ModificationQueryOptionsType|Path|null $queryOptions Support for query options with insert requests
+     * @param list<CustomParameter>|Path|null $customHeaders Supported or required custom headers
+     * @param list<CustomParameter>|Path|null $customQueryOptions Supported or required custom query options
+     * @param string|Path|null $description A brief description of the request
+     * @param string|Path|null $longDescription A long description of the request
+     * @param list<HttpResponse>|Path|null $errorResponses Possible error responses returned by the request.
      */
     public function __construct(
         public bool|Path|null $insertable = null,

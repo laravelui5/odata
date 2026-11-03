@@ -16,6 +16,10 @@ final readonly class ChartAxisAutoScaleBehaviorType extends AbstractRecord
         'DataScope' => ['dataScope', 'com.sap.vocabularies.UI.v1.ChartAxisAutoScaleDataScopeType', false],
     ];
 
+    /**
+     * @param bool|Path|null $zeroAlwaysVisible Forces the value axis to always display the zero value
+     * @param ChartAxisAutoScaleDataScopeType|Path|null $dataScope Determines the automatic scaling
+     */
     public function __construct(
         public bool|Path|null $zeroAlwaysVisible = null,
         public ChartAxisAutoScaleDataScopeType|Path|null $dataScope = null,

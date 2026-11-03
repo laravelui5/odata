@@ -23,6 +23,14 @@ readonly class CriticalityThresholdsType extends AbstractRecord
         'DeviationRangeHighValue' => ['deviationRangeHighValue', 'Edm.PrimitiveType', false],
     ];
 
+    /**
+     * @param mixed $acceptanceRangeLowValue Lowest value that is considered positive
+     * @param mixed $acceptanceRangeHighValue Highest value that is considered positive
+     * @param mixed $toleranceRangeLowValue Lowest value that is considered neutral
+     * @param mixed $toleranceRangeHighValue Highest value that is considered neutral
+     * @param mixed $deviationRangeLowValue Lowest value that is considered critical
+     * @param mixed $deviationRangeHighValue Highest value that is considered critical
+     */
     public function __construct(
         public mixed $acceptanceRangeLowValue = null,
         public mixed $acceptanceRangeHighValue = null,

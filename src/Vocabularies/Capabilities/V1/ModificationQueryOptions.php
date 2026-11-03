@@ -28,6 +28,14 @@ final readonly class ModificationQueryOptions implements TypedAnnotationInterfac
         FunctionInterface::class,
     ];
 
+    /**
+     * @param bool|Path|null $expandSupported Supports $expand with modification requests
+     * @param bool|Path|null $selectSupported Supports $select with modification requests
+     * @param bool|Path|null $computeSupported Supports $compute with modification requests
+     * @param bool|Path|null $filterSupported Supports $filter with modification requests
+     * @param bool|Path|null $searchSupported Supports $search with modification requests
+     * @param bool|Path|null $sortSupported Supports $orderby with modification requests
+     */
     public function __construct(
         public bool|Path|null $expandSupported = null,
         public bool|Path|null $selectSupported = null,

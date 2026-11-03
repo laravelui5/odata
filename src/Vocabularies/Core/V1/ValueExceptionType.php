@@ -15,6 +15,10 @@ final readonly class ValueExceptionType extends ExceptionType
         'value' => ['value', 'Edm.String', false],
     ];
 
+    /**
+     * @param MessageType|Path|null $info Information about the exception
+     * @param string|Path|null $value String representation of the exact value
+     */
     public function __construct(
         MessageType|Path|null $info = null,
         public string|Path|null $value = null,

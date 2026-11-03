@@ -17,6 +17,12 @@ final readonly class ApiKey extends Authorization
         'Location' => ['location', 'Org.OData.Authorization.V1.KeyLocation', true],
     ];
 
+    /**
+     * @param string|Path|null $name Name that can be used to reference the authorization scheme
+     * @param string|Path|null $description Description of the authorization scheme
+     * @param string|Path|null $keyName The name of the header or query parameter
+     * @param KeyLocation|Path|null $location Whether the API Key is passed in the header or as a query option
+     */
     public function __construct(
         string|Path|null $name = null,
         string|Path|null $description = null,

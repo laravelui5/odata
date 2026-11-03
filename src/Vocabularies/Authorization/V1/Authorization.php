@@ -19,6 +19,10 @@ abstract readonly class Authorization extends AbstractRecord
         'Description' => ['description', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $name Name that can be used to reference the authorization scheme
+     * @param string|Path|null $description Description of the authorization scheme
+     */
     public function __construct(
         public string|Path|null $name = null,
         public string|Path|null $description = null,

@@ -17,7 +17,8 @@ final readonly class PermissionType extends AbstractRecord
     ];
 
     /**
-     * @param list<ScopeType>|Path|null $scopes
+     * @param string|Path|null $schemeName Authorization flow scheme name
+     * @param list<ScopeType>|Path|null $scopes List of scopes that can provide access to the resource
      */
     public function __construct(
         public string|Path|null $schemeName = null,

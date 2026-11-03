@@ -19,6 +19,10 @@ final readonly class MultiLevelExpandSiblingOrder extends AbstractRecord
         'Descending' => ['descending', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param string|Path|null $property Property by which to sort
+     * @param bool|Path|null $descending Sort direction, ascending if not specified otherwise
+     */
     public function __construct(
         public string|Path|null $property = null,
         public bool|Path|null $descending = null,

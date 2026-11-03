@@ -17,6 +17,11 @@ readonly class FilterRestrictionsBase extends AbstractRecord
         'MaxLevels' => ['maxLevels', 'Edm.Int32', false],
     ];
 
+    /**
+     * @param bool|Path|null $filterable $filter is supported
+     * @param bool|Path|null $requiresFilter $filter is required
+     * @param int|Path|null $maxLevels The maximum number of levels (including recursion) that can be traversed in a filter expression. A value of -1 indicates there is no restriction.
+     */
     public function __construct(
         public bool|Path|null $filterable = null,
         public bool|Path|null $requiresFilter = null,

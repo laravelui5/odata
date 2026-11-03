@@ -15,6 +15,9 @@ abstract readonly class ExceptionType extends AbstractRecord
         'info' => ['info', 'Org.OData.Core.V1.MessageType', false],
     ];
 
+    /**
+     * @param MessageType|Path|null $info Information about the exception
+     */
     public function __construct(
         public MessageType|Path|null $info = null,
     ) {}

@@ -16,6 +16,10 @@ final readonly class HttpResponse extends AbstractRecord
         'Description' => ['description', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $statusCode HTTP response status code, for example 400, 403, 501
+     * @param string|Path|null $description Human-readable description of the response
+     */
     public function __construct(
         public string|Path|null $statusCode = null,
         public string|Path|null $description = null,

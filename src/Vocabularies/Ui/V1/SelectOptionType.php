@@ -21,7 +21,9 @@ final readonly class SelectOptionType extends AbstractRecord
     ];
 
     /**
-     * @param list<SelectionRangeType>|Path|null $ranges
+     * @param string|Path|null $propertyName Path to the property
+     * @param string|Path|null $dynamicPropertyName Dynamic property introduced by annotations for which value ranges are specified
+     * @param list<SelectionRangeType>|Path|null $ranges List of value ranges
      */
     public function __construct(
         public string|Path|null $propertyName = null,

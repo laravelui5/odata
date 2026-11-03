@@ -54,6 +54,11 @@ final readonly class GeometryFeature implements TypedAnnotationInterface
         SchemaInterface::class,
     ];
 
+    /**
+     * @param mixed $geometry Location of the Feature
+     * @param Dictionary|Path|null $properties Properties of the Feature
+     * @param string|Path|null $id Commonly used identifer for a Feature
+     */
     public function __construct(
         public mixed $geometry = null,
         public Dictionary|Path|null $properties = null,

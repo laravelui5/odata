@@ -22,6 +22,14 @@ abstract readonly class DataFieldForActionAbstract extends DataFieldAbstract
         'Determining' => ['determining', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param string|Path|null $label A short, human-readable text suitable for labels and captions in UIs
+     * @param CriticalityType|Path|null $criticality Criticality of the data field value
+     * @param CriticalityRepresentationType|Path|null $criticalityRepresentation Decides if criticality is visualized in addition by means of an icon
+     * @param string|Path|null $iconUrl Optional icon
+     * @param bool|Path|null $inline Action should be placed close to (or even inside) the visualized term
+     * @param bool|Path|null $determining Determines whether the action completes a process step (e.g. approve, reject).
+     */
     public function __construct(
         string|Path|null $label = null,
         CriticalityType|Path|null $criticality = null,

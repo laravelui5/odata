@@ -20,7 +20,9 @@ final readonly class CollectionFacet extends Facet
     ];
 
     /**
-     * @param list<Facet>|Path|null $facets
+     * @param string|Path|null $label Facet label
+     * @param string|Path|null $id Unique identifier of a facet. ID should be stable, as long as the perceived semantics of the facet is unchanged.
+     * @param list<Facet>|Path|null $facets Nested facets. An empty collection may be used as a placeholder for content added via extension points.
      */
     public function __construct(
         string|Path|null $label = null,

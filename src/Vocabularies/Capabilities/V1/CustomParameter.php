@@ -24,7 +24,11 @@ final readonly class CustomParameter extends AbstractRecord
     ];
 
     /**
-     * @param list<PrimitiveExampleValue>|Path|null $exampleValues
+     * @param string|Path|null $name Name of the custom parameter
+     * @param string|Path|null $description Description of the custom parameter
+     * @param string|Path|null $documentationURL URL of related documentation
+     * @param bool|Path|null $required true: parameter is required, false or not specified: parameter is optional
+     * @param list<PrimitiveExampleValue>|Path|null $exampleValues Example values for the custom parameter
      */
     public function __construct(
         public string|Path|null $name = null,

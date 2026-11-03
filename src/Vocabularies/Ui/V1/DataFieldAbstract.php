@@ -21,6 +21,12 @@ abstract readonly class DataFieldAbstract extends AbstractRecord
         'IconUrl' => ['iconUrl', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $label A short, human-readable text suitable for labels and captions in UIs
+     * @param CriticalityType|Path|null $criticality Criticality of the data field value
+     * @param CriticalityRepresentationType|Path|null $criticalityRepresentation Decides if criticality is visualized in addition by means of an icon
+     * @param string|Path|null $iconUrl Optional icon
+     */
     public function __construct(
         public string|Path|null $label = null,
         public CriticalityType|Path|null $criticality = null,

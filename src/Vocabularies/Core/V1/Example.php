@@ -38,6 +38,9 @@ final readonly class Example implements TypedAnnotationInterface
         FunctionParameterInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $description Description of the example value
+     */
     public function __construct(
         public string|Path|null $description = null,
         public ?string $qualifier = null,

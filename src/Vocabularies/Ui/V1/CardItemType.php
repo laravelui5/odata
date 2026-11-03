@@ -21,8 +21,9 @@ final readonly class CardItemType extends AbstractRecord
     ];
 
     /**
-     * @param list<DataFieldAbstract>|Path|null $actions
-     * @param list<Facet>|Path|null $details
+     * @param string|Path|null $header Points to a UI.HeaderInfo annotation defining the card header.
+     * @param list<DataFieldAbstract>|Path|null $actions Action items for the card. Supports DataFieldForAction, DataFieldForIntentBasedNavigation, and DataFieldForActionGroup.
+     * @param list<Facet>|Path|null $details Card body content as a collection of facets defining the sections of the card body.
      */
     public function __construct(
         public string|Path|null $header = null,

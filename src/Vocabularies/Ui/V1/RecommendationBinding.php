@@ -16,6 +16,10 @@ final readonly class RecommendationBinding extends AbstractRecord
         'ValueListProperty' => ['valueListProperty', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $localDataProperty Path to editable property for which recommended values exist
+     * @param string|Path|null $valueListProperty Path to property in the collection of recommended values. Format is identical to PropertyPath annotations.
+     */
     public function __construct(
         public string|Path|null $localDataProperty = null,
         public string|Path|null $valueListProperty = null,

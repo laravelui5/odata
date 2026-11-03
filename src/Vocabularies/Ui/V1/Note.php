@@ -28,6 +28,13 @@ final readonly class Note implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $title Title of the note
+     * @param string|Path|null $content Content of the note, as a string
+     * @param string|Path|null $type A type used for grouping notes
+     * @param int|Path|null $maximalLength Type-specific maximal length of the content of the note
+     * @param bool|Path|null $multipleNotes Whether the type allows multiple notes for one object
+     */
     public function __construct(
         public string|Path|null $title = null,
         public string|Path|null $content = null,

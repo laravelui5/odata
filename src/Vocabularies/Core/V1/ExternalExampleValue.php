@@ -15,6 +15,10 @@ final readonly class ExternalExampleValue extends ExampleValue
         'ExternalValue' => ['externalValue', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $description Description of the example value
+     * @param string|Path|null $externalValue Url reference to the value in its literal format
+     */
     public function __construct(
         string|Path|null $description = null,
         public string|Path|null $externalValue = null,

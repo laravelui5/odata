@@ -35,8 +35,9 @@ final readonly class ChangeTracking implements TypedAnnotationInterface
     ];
 
     /**
-     * @param list<string>|Path|null $filterableProperties
-     * @param list<string>|Path|null $expandableProperties
+     * @param bool|Path|null $supported odata.track-changes preference is supported
+     * @param list<string>|Path|null $filterableProperties Change tracking supports filters on these properties
+     * @param list<string>|Path|null $expandableProperties Change tracking supports these properties expanded
      */
     public function __construct(
         public bool|Path|null $supported = null,

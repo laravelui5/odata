@@ -16,7 +16,7 @@ final readonly class AvailableOnAggregatesType extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $requiredProperties
+     * @param list<string>|Path|null $requiredProperties Properties required to apply this function
      */
     public function __construct(
         public array|Path|null $requiredProperties = null,

@@ -17,6 +17,11 @@ final readonly class CallbackProtocol extends AbstractRecord
         'DocumentationUrl' => ['documentationUrl', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $id Protocol Identifier
+     * @param string|Path|null $urlTemplate URL Template including parameters. Parameters are enclosed in curly braces {} as defined in RFC6570
+     * @param string|Path|null $documentationUrl Human readable description of the meaning of the URL Template parameters
+     */
     public function __construct(
         public string|Path|null $id = null,
         public string|Path|null $urlTemplate = null,

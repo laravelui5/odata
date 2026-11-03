@@ -369,8 +369,9 @@ final class VocabularyGenerator
             $own      = $this->types->declaringType($qualifiedName, $prop['name']) === $qualifiedName;
             $promote  = $own ? 'public ' : '';
             $params[] = "        {$promote}{$phpType} \${$property} = null,";
-            if ($docType !== null) {
-                $docParams[] = "     * @param {$docType} \${$property}";
+            $docLine = $this->paramDoc($qualifiedName, $prop['name'], $property, $phpType, $docType);
+            if ($docLine !== null) {
+                $docParams[] = "     * {$docLine}";
             }
             if (!$own) {
                 $handOver[] = "            {$property}: \${$property},";
@@ -451,6 +452,20 @@ PHP;
             return ['mixed', null];
         }
         return ["{$itemType}|{$path}|null", null];
+    }
+
+    /**
+     * The @param line of a record field: its type where PHP cannot say it (lists), and the vocabulary's
+     * description of the field. Null when there is neither.
+     */
+    private function paramDoc(string $qualifiedType, string $field, string $property, string $phpType, ?string $docType): ?string
+    {
+        $description = str_replace('*/', '* /', $this->types->propertyDescription($qualifiedType, $field));
+        if ($docType === null && $description === '') {
+            return null;
+        }
+        $line = '@param ' . ($docType ?? $phpType) . " \${$property}";
+        return $description !== '' ? "{$line} {$description}" : $line;
     }
 
     /** The CSDL type a record field is written with: type definitions resolved, collections kept. */
@@ -741,8 +756,9 @@ PHP;
             }
             [$phpType, $docType] = $this->fieldPhpType($prop['type'], $imports);
             $lines[] = "        public {$phpType} \${$property} = null,";
-            if ($docType !== null) {
-                $docParams[] = " * @param {$docType} \${$property}";
+            $docLine = $this->paramDoc($innerType, $prop['name'], $property, $phpType, $docType);
+            if ($docLine !== null) {
+                $docParams[] = " * {$docLine}";
             }
         }
         $docblock = $docParams !== [] ? "/**\n" . implode("\n", $docParams) . "\n */" : '';

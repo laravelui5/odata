@@ -19,8 +19,10 @@ readonly class ApplySupportedBase extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $transformations
-     * @param list<string>|Path|null $customAggregationMethods
+     * @param list<string>|Path|null $transformations Transformations that can be used in `$apply`
+     * @param list<string>|Path|null $customAggregationMethods Qualified names of custom aggregation methods that can be used in `aggregate(...with...)`
+     * @param RollupType|Path|null $rollup The service supports rollup hierarchies in a `groupby` transformation
+     * @param bool|Path|null $from The service supports the `from` keyword in an `aggregate` transformation
      */
     public function __construct(
         public array|Path|null $transformations = null,

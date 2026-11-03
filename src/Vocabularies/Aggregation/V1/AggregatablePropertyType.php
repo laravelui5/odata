@@ -18,7 +18,9 @@ final readonly class AggregatablePropertyType extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $supportedAggregationMethods
+     * @param string|Path|null $property Aggregatable property
+     * @param list<string>|Path|null $supportedAggregationMethods Standard and custom aggregation methods that can be applied to the property. If omitted, all aggregation methods can be applied
+     * @param string|Path|null $recommendedAggregationMethod Recommended method for aggregating values of the property
      */
     public function __construct(
         public string|Path|null $property = null,

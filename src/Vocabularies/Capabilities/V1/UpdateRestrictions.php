@@ -33,14 +33,23 @@ final readonly class UpdateRestrictions implements TypedAnnotationInterface
     ];
 
     /**
-     * @param HttpMethod|list<HttpMethod>|Path|null $updateMethod
-     * @param list<PermissionType>|Path|null $permissions
-     * @param list<CustomParameter>|Path|null $customHeaders
-     * @param list<CustomParameter>|Path|null $customQueryOptions
-     * @param list<HttpResponse>|Path|null $errorResponses
-     * @param list<string>|Path|null $nonUpdatableProperties
-     * @param list<string>|Path|null $nonUpdatableNavigationProperties
-     * @param list<string>|Path|null $requiredProperties
+     * @param bool|Path|null $updatable Entities can be updated
+     * @param bool|Path|null $upsertable Entities can be upserted
+     * @param bool|Path|null $deltaUpdateSupported Entities can be inserted, updated, and deleted via a PATCH request with a delta payload
+     * @param HttpMethod|list<HttpMethod>|Path|null $updateMethod Supported HTTP Methods (PUT or PATCH) for updating an entity. If null, PATCH SHOULD be supported and PUT MAY be supported.
+     * @param bool|Path|null $filterSegmentSupported Members of collections can be updated via a PATCH request with a `/$filter(...)/$each` segment
+     * @param bool|Path|null $typecastSegmentSupported Members of collections can be updated via a PATCH request with a type-cast segment and a `/$each` segment
+     * @param int|Path|null $maxLevels The maximum number of navigation properties that can be traversed when addressing the collection or entity to update. A value of -1 indicates there is no restriction.
+     * @param list<PermissionType>|Path|null $permissions Required permissions. One of the specified sets of scopes is required to perform the update.
+     * @param ModificationQueryOptionsType|Path|null $queryOptions Support for query options with update requests
+     * @param list<CustomParameter>|Path|null $customHeaders Supported or required custom headers
+     * @param list<CustomParameter>|Path|null $customQueryOptions Supported or required custom query options
+     * @param string|Path|null $description A brief description of the request
+     * @param string|Path|null $longDescription A long description of the request
+     * @param list<HttpResponse>|Path|null $errorResponses Possible error responses returned by the request.
+     * @param list<string>|Path|null $nonUpdatableProperties These structural properties cannot be specified on update
+     * @param list<string>|Path|null $nonUpdatableNavigationProperties These navigation properties do not allow rebinding
+     * @param list<string>|Path|null $requiredProperties These structural properties must be specified on update
      */
     public function __construct(
         public bool|Path|null $updatable = null,

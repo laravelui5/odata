@@ -59,6 +59,9 @@ const GENERATOR_UI_XML = <<<'XML'
   <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/Common.xml">
     <edmx:Include Namespace="com.sap.vocabularies.Common.v1" Alias="Common" />
   </edmx:Reference>
+  <edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Core.V1.xml">
+    <edmx:Include Namespace="Org.OData.Core.V1" Alias="Core" />
+  </edmx:Reference>
   <edmx:DataServices>
     <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="com.sap.vocabularies.UI.v1" Alias="UI">
       <EnumType Name="ProbeCriticality"><Member Name="Neutral" Value="0" /><Member Name="Positive" Value="3" /></EnumType>
@@ -70,7 +73,9 @@ const GENERATOR_UI_XML = <<<'XML'
       </ComplexType>
       <ComplexType Name="ProbeFieldWithUrl" BaseType="UI.ProbeField">
         <Property Name="Value" Type="Edm.PrimitiveType" Nullable="false" />
-        <Property Name="Url" Type="Edm.String" Nullable="false" />
+        <Property Name="Url" Type="Edm.String" Nullable="false">
+          <Annotation Term="Core.Description" String="Target of the hyperlink */ closed early" />
+        </Property>
         <Property Name="Items" Type="Collection(UI.ProbeAbstract)" />
       </ComplexType>
       <EnumType Name="ProbeFlags" IsFlags="true"><Member Name="Read" Value="1" /><Member Name="Write" Value="2" /></EnumType>
@@ -330,4 +335,14 @@ it('maps the AppliesTo values of the standard, Collection and Member included', 
         ->toContain('FunctionImportInterface::class,')
         ->and(array_values(array_filter($this->lines, static fn(string $l) => str_contains($l, 'WARN'))))
         ->toBe(["  WARN: Org.OData.Core.V1.ProbeImportTerm: AppliesTo value 'Bogus' is not defined by CSDL — skipped."]);
+});
+
+it('writes the vocabulary\'s field descriptions as @param lines', function () {
+    $this->generator->run();
+
+    $line = '@param string|Path|null $url Target of the hyperlink * / closed early';
+    expect(($this->read)('Ui/V1/ProbeFieldWithUrl.php'))->toContain("     * {$line}\n")
+        ->and(($this->read)('Ui/V1/ProbeVariant.php'))->toContain("     * {$line}\n")
+        // A field without a description and with a type PHP can say gets no line.
+        ->and(($this->read)('Ui/V1/ProbeFieldWithUrl.php'))->not->toContain('@param string|Path|null $label');
 });

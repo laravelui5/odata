@@ -24,6 +24,16 @@ final readonly class DataFieldForAction extends DataFieldForActionAbstract
         'InvocationGrouping' => ['invocationGrouping', 'com.sap.vocabularies.UI.v1.OperationGroupingType', false],
     ];
 
+    /**
+     * @param string|Path|null $label A short, human-readable text suitable for labels and captions in UIs
+     * @param CriticalityType|Path|null $criticality Criticality of the data field value
+     * @param CriticalityRepresentationType|Path|null $criticalityRepresentation Decides if criticality is visualized in addition by means of an icon
+     * @param string|Path|null $iconUrl Optional icon
+     * @param bool|Path|null $inline Action should be placed close to (or even inside) the visualized term
+     * @param bool|Path|null $determining Determines whether the action completes a process step (e.g. approve, reject).
+     * @param string|Path|null $action Name of an Action, Function, ActionImport, or FunctionImport in scope
+     * @param OperationGroupingType|Path|null $invocationGrouping Expresses how invocations of this action on multiple instances should be grouped
+     */
     public function __construct(
         string|Path|null $label = null,
         CriticalityType|Path|null $criticality = null,

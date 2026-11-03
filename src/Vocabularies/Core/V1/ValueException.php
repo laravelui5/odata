@@ -54,6 +54,10 @@ final readonly class ValueException implements TypedAnnotationInterface
         SchemaInterface::class,
     ];
 
+    /**
+     * @param MessageType|Path|null $info Information about the exception
+     * @param string|Path|null $value String representation of the exact value
+     */
     public function __construct(
         public MessageType|Path|null $info = null,
         public string|Path|null $value = null,

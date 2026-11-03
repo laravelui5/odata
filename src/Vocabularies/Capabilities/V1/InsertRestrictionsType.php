@@ -27,13 +27,19 @@ final readonly class InsertRestrictionsType extends InsertRestrictionsBase
     ];
 
     /**
-     * @param list<CustomParameter>|Path|null $customHeaders
-     * @param list<CustomParameter>|Path|null $customQueryOptions
-     * @param list<HttpResponse>|Path|null $errorResponses
-     * @param list<string>|Path|null $nonInsertableProperties
-     * @param list<string>|Path|null $nonInsertableNavigationProperties
-     * @param list<string>|Path|null $requiredProperties
-     * @param list<PermissionType>|Path|null $permissions
+     * @param bool|Path|null $insertable Entities can be inserted
+     * @param int|Path|null $maxLevels The maximum number of navigation properties that can be traversed when addressing the collection to insert into. A value of -1 indicates there is no restriction.
+     * @param bool|Path|null $typecastSegmentSupported Entities of a specific derived type can be created by specifying a type-cast segment
+     * @param ModificationQueryOptionsType|Path|null $queryOptions Support for query options with insert requests
+     * @param list<CustomParameter>|Path|null $customHeaders Supported or required custom headers
+     * @param list<CustomParameter>|Path|null $customQueryOptions Supported or required custom query options
+     * @param string|Path|null $description A brief description of the request
+     * @param string|Path|null $longDescription A long description of the request
+     * @param list<HttpResponse>|Path|null $errorResponses Possible error responses returned by the request.
+     * @param list<string>|Path|null $nonInsertableProperties These structural properties cannot be specified on insert
+     * @param list<string>|Path|null $nonInsertableNavigationProperties These navigation properties do not allow deep inserts
+     * @param list<string>|Path|null $requiredProperties These structural properties must be specified on insert
+     * @param list<PermissionType>|Path|null $permissions Required permissions. One of the specified sets of scopes is required to perform the insert.
      */
     public function __construct(
         bool|Path|null $insertable = null,

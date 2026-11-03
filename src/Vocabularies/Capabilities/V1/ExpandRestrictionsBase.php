@@ -17,6 +17,11 @@ readonly class ExpandRestrictionsBase extends AbstractRecord
         'MaxLevels' => ['maxLevels', 'Edm.Int32', false],
     ];
 
+    /**
+     * @param bool|Path|null $expandable $expand is supported
+     * @param bool|Path|null $streamsExpandable $expand is supported for stream properties and media streams
+     * @param int|Path|null $maxLevels The maximum number of levels that can be expanded in a expand expression. A value of -1 indicates there is no restriction.
+     */
     public function __construct(
         public bool|Path|null $expandable = null,
         public bool|Path|null $streamsExpandable = null,

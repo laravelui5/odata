@@ -34,6 +34,18 @@ final readonly class SelectSupport implements TypedAnnotationInterface
         NavigationPropertyInterface::class,
     ];
 
+    /**
+     * @param bool|Path|null $supported Supports $select
+     * @param bool|Path|null $instanceAnnotationsSupported Supports instance annotations in $select list
+     * @param bool|Path|null $expandable $expand within $select is supported
+     * @param bool|Path|null $filterable $filter within $select is supported
+     * @param bool|Path|null $searchable $search within $select is supported
+     * @param bool|Path|null $topSupported $top within $select is supported
+     * @param bool|Path|null $skipSupported $skip within $select is supported
+     * @param bool|Path|null $computeSupported $compute within $select is supported
+     * @param bool|Path|null $countable $count within $select is supported
+     * @param bool|Path|null $sortable $orderby within $select is supported
+     */
     public function __construct(
         public bool|Path|null $supported = null,
         public bool|Path|null $instanceAnnotationsSupported = null,

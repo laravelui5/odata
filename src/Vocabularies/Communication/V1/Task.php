@@ -28,6 +28,14 @@ final readonly class Task implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $summary Short description of the task
+     * @param string|Path|null $description More complete description of the task
+     * @param string|Path|null $due Date and time that a to-do is expected to be completed
+     * @param string|Path|null $completed Date and time that a to-do was actually completed
+     * @param int|Path|null $percentcomplete Percent completion of a to-do, e.g. 50 for half done
+     * @param int|Path|null $priority Relative priority, 0 = undefined, 1 = highest, 9 = lowest
+     */
     public function __construct(
         public string|Path|null $summary = null,
         public string|Path|null $description = null,

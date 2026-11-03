@@ -15,6 +15,10 @@ final readonly class SemanticObjectMappingType extends SemanticObjectMappingAbst
         'LocalProperty' => ['localProperty', 'Edm.PropertyPath', true],
     ];
 
+    /**
+     * @param string|Path|null $semanticObjectProperty Name of the Semantic Object property
+     * @param string|Path|null $localProperty Path to a local property that provides the value for the Semantic Object property
+     */
     public function __construct(
         string|Path|null $semanticObjectProperty = null,
         public string|Path|null $localProperty = null,

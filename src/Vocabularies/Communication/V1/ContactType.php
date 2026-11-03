@@ -33,11 +33,24 @@ final readonly class ContactType extends AbstractRecord
     ];
 
     /**
-     * @param list<AddressType>|Path|null $adr
-     * @param list<PhoneNumberType>|Path|null $tel
-     * @param list<EmailAddressType>|Path|null $email
-     * @param list<GeoDataType>|Path|null $geo
-     * @param list<UrlType>|Path|null $url
+     * @param string|Path|null $fn Full name
+     * @param NameType|Path|null $n Name
+     * @param string|Path|null $nickname Nickname
+     * @param string|Path|null $photo Image or photograph
+     * @param string|Path|null $bday Birthday
+     * @param string|Path|null $anniversary Date of marriage, or equivalent
+     * @param GenderType|Path|null $gender Sex and gender identity
+     * @param string|Path|null $title Position or job title
+     * @param string|Path|null $role Function or part played in a particular situation
+     * @param string|Path|null $org Organization Name defined by X.520
+     * @param string|Path|null $orgunit Organization Unit defined by X.520
+     * @param KindType|Path|null $kind Kind of contact
+     * @param string|Path|null $note Supplemental information or a comment associated with the contact
+     * @param list<AddressType>|Path|null $adr Addresses
+     * @param list<PhoneNumberType>|Path|null $tel Phone numbers
+     * @param list<EmailAddressType>|Path|null $email Email addresses
+     * @param list<GeoDataType>|Path|null $geo Geographic locations
+     * @param list<UrlType>|Path|null $url URLs
      */
     public function __construct(
         public string|Path|null $fn = null,

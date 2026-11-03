@@ -31,7 +31,8 @@ final readonly class SearchRestrictions implements TypedAnnotationInterface
     ];
 
     /**
-     * @param SearchExpressions|list<SearchExpressions>|Path|null $unsupportedExpressions
+     * @param bool|Path|null $searchable $search is supported
+     * @param SearchExpressions|list<SearchExpressions>|Path|null $unsupportedExpressions Expressions not supported in $search
      */
     public function __construct(
         public bool|Path|null $searchable = null,

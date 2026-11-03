@@ -31,7 +31,12 @@ final readonly class KPI implements TypedAnnotationInterface
     ];
 
     /**
-     * @param list<DataPointType>|Path|null $additionalDataPoints
+     * @param string|Path|null $id Optional identifier to reference this instance from an external context
+     * @param string|Path|null $shortDescription Very short description
+     * @param SelectionVariantType|Path|null $selectionVariant Selection variant, either specified inline or referencing another annotation via Path
+     * @param DataPointType|Path|null $dataPoint Data point, either specified inline or referencing another annotation via Path
+     * @param list<DataPointType>|Path|null $additionalDataPoints Additional data points, either specified inline or referencing another annotation via Path
+     * @param KPIDetailType|Path|null $detail Contains information about KPI details, especially drill-down presentations
      */
     public function __construct(
         public string|Path|null $id = null,

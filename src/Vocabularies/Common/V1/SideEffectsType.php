@@ -28,14 +28,16 @@ final readonly class SideEffectsType extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $sourceProperties
-     * @param list<string>|Path|null $sourceEntities
-     * @param list<string>|Path|null $sourceEntitiesInserted
-     * @param list<string>|Path|null $sourceEntitiesUpdated
-     * @param list<string>|Path|null $sourceEntitiesDeleted
-     * @param list<string>|Path|null $sourceEvents
-     * @param list<string>|Path|null $targetProperties
-     * @param list<string>|Path|null $targetEntities
+     * @param list<string>|Path|null $sourceProperties Changes to the values of one or more of these structural properties may affect the targets
+     * @param list<string>|Path|null $sourceEntities Changes to one or more of these entities may affect the targets. An null value means the annotation target.
+     * @param list<string>|Path|null $sourceEntitiesInserted Creating one or more of these entities may affect the targets.
+     * @param list<string>|Path|null $sourceEntitiesUpdated Updating one or more of these entities may affect the targets.
+     * @param list<string>|Path|null $sourceEntitiesDeleted Deleting one or more of these entities may affect the targets.
+     * @param list<string>|Path|null $sourceEvents When the service raises one or more of these "events for side effects", the targets may be affected
+     * @param list<string>|Path|null $targetProperties These structural properties may be affected if the value of one of the sources changes
+     * @param list<string>|Path|null $targetEntities These entities will be affected if the value of one of the sources changes. All affected entities need to be explicitly listed. A null value means the annotation target.
+     * @param string|Path|null $triggerAction Bound action to trigger side-effects after modifying an entity
+     * @param bool|Path|null $discretionary Indicates whether the client can decide if a side-effect should be triggered or not
      */
     public function __construct(
         public array|Path|null $sourceProperties = null,

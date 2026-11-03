@@ -18,6 +18,9 @@ final readonly class SAPObjectNodeTypeType extends AbstractRecord
         'Name' => ['name', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $name The name of the SAP Object Node Type
+     */
     public function __construct(
         public string|Path|null $name = null,
     ) {}

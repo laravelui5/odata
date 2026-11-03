@@ -28,6 +28,16 @@ final readonly class MediaResource implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $url URL of media resource
+     * @param mixed $stream Stream of media resource
+     * @param string|Path|null $contentType Content type, such as application/pdf, video/x-flv, image/jpeg
+     * @param int|Path|null $byteSize Resource size in bytes
+     * @param string|Path|null $changedAt Date of last change
+     * @param ImageType|Path|null $thumbnail Thumbnail image
+     * @param DataField|Path|null $title Resource title
+     * @param DataField|Path|null $description Resource description
+     */
     public function __construct(
         public string|Path|null $url = null,
         public mixed $stream = null,

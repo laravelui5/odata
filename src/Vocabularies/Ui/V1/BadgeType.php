@@ -20,6 +20,14 @@ final readonly class BadgeType extends AbstractRecord
         'SecondaryInfo' => ['secondaryInfo', 'com.sap.vocabularies.UI.v1.DataField', false],
     ];
 
+    /**
+     * @param DataField|Path|null $headLine Headline
+     * @param DataField|Path|null $title Title
+     * @param string|Path|null $imageUrl Image URL for an instance of the entity type. If the property has a valid value, it can be used for the visualization of the instance. If it is not available or not valid the value of the property `TypeImageUrl` can be used instead.
+     * @param string|Path|null $typeImageUrl Image URL for the entity type
+     * @param DataField|Path|null $mainInfo Main information on the business card
+     * @param DataField|Path|null $secondaryInfo Additional information on the business card
+     */
     public function __construct(
         public DataField|Path|null $headLine = null,
         public DataField|Path|null $title = null,

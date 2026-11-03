@@ -29,7 +29,17 @@ final readonly class DataFieldForIntentBasedNavigation extends DataFieldForActio
     ];
 
     /**
-     * @param list<SemanticObjectMappingType>|Path|null $mapping
+     * @param string|Path|null $label A short, human-readable text suitable for labels and captions in UIs
+     * @param CriticalityType|Path|null $criticality Criticality of the data field value
+     * @param CriticalityRepresentationType|Path|null $criticalityRepresentation Decides if criticality is visualized in addition by means of an icon
+     * @param string|Path|null $iconUrl Optional icon
+     * @param bool|Path|null $inline Action should be placed close to (or even inside) the visualized term
+     * @param bool|Path|null $determining Determines whether the action completes a process step (e.g. approve, reject).
+     * @param string|Path|null $semanticObject Name of the Semantic Object
+     * @param string|Path|null $action Name of the Action on the Semantic Object. If not specified, let user choose which of the available actions to trigger.
+     * @param bool|Path|null $navigationAvailable The navigation intent is for that user with the selected context and parameters available
+     * @param bool|Path|null $requiresContext Determines whether a context needs to be passed to the target of this navigation.
+     * @param list<SemanticObjectMappingType>|Path|null $mapping Maps properties of the annotated entity type to properties of the Semantic Object
      */
     public function __construct(
         string|Path|null $label = null,

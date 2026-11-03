@@ -54,6 +54,11 @@ final readonly class DataModificationException implements TypedAnnotationInterfa
         SchemaInterface::class,
     ];
 
+    /**
+     * @param MessageType|Path|null $info Information about the exception
+     * @param DataModificationOperationKind|Path|null $failedOperation The kind of modification operation that failed
+     * @param int|Path|null $responseCode Response code of the failed operation, e.g. 424 for a failed dependency
+     */
     public function __construct(
         public MessageType|Path|null $info = null,
         public DataModificationOperationKind|Path|null $failedOperation = null,

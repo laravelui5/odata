@@ -22,6 +22,10 @@ final readonly class ReferentialConstraintType extends AbstractRecord
         'ReferencedProperty' => ['referencedProperty', 'Edm.PropertyPath', true],
     ];
 
+    /**
+     * @param string|Path|null $property The path to the property is evaluated relative to the type containing the navigation property
+     * @param string|Path|null $referencedProperty The path to the referenced property MUST start with a segment containing the navigation property
+     */
     public function __construct(
         public string|Path|null $property = null,
         public string|Path|null $referencedProperty = null,

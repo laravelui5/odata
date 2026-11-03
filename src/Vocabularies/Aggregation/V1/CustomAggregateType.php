@@ -16,6 +16,10 @@ final readonly class CustomAggregateType extends AbstractRecord
         'Type' => ['type', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $name Name of the dynamic property that can be used in the `aggregate` transformation
+     * @param string|Path|null $type Qualified name of a primitive type. The aggregated value will be of that type
+     */
     public function __construct(
         public string|Path|null $name = null,
         public string|Path|null $type = null,

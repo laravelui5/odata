@@ -28,6 +28,11 @@ final readonly class AggregatedProperty implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $name Name of the dynamic property holding the aggregated value.
+     * @param string|Path|null $aggregationMethod Name of the standard or custom aggregation method to be applied.
+     * @param string|Path|null $aggregatableProperty Property whose values shall be aggregated.
+     */
     public function __construct(
         public string|Path|null $name = null,
         public string|Path|null $aggregationMethod = null,

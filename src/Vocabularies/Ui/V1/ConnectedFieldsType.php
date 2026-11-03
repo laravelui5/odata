@@ -21,6 +21,11 @@ final readonly class ConnectedFieldsType extends AbstractRecord
         'Data' => ['data', 'Org.OData.Core.V1.Dictionary', true],
     ];
 
+    /**
+     * @param string|Path|null $label Label for the connected fields
+     * @param string|Path|null $template Template for representing the connected fields
+     * @param Dictionary|Path|null $data Dictionary of template variables
+     */
     public function __construct(
         public string|Path|null $label = null,
         public string|Path|null $template = null,

@@ -26,7 +26,17 @@ final readonly class CollectionPropertyRestrictionsType extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $filterFunctions
+     * @param string|Path|null $collectionProperty Restricted Collection-valued property
+     * @param list<string>|Path|null $filterFunctions List of functions and operators supported in filter expressions
+     * @param FilterRestrictionsType|Path|null $filterRestrictions Restrictions on filter expressions
+     * @param SearchRestrictionsType|Path|null $searchRestrictions Restrictions on search expressions
+     * @param SortRestrictionsType|Path|null $sortRestrictions Restrictions on orderby expressions
+     * @param bool|Path|null $topSupported Supports $top
+     * @param bool|Path|null $skipSupported Supports $skip
+     * @param SelectSupportType|Path|null $selectSupport Support for $select
+     * @param bool|Path|null $insertable Members can be inserted into this collection
+     * @param bool|Path|null $updatable Members of this ordered collection can be updated by ordinal
+     * @param bool|Path|null $deletable Members of this ordered collection can be deleted by ordinal
      */
     public function __construct(
         public string|Path|null $collectionProperty = null,

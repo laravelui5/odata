@@ -18,7 +18,10 @@ abstract readonly class OAuthAuthorization extends Authorization
     ];
 
     /**
-     * @param list<AuthorizationScope>|Path|null $scopes
+     * @param string|Path|null $name Name that can be used to reference the authorization scheme
+     * @param string|Path|null $description Description of the authorization scheme
+     * @param list<AuthorizationScope>|Path|null $scopes Available scopes
+     * @param string|Path|null $refreshUrl Refresh Url
      */
     public function __construct(
         string|Path|null $name = null,

@@ -18,6 +18,9 @@ abstract readonly class SemanticObjectMappingAbstract extends AbstractRecord
         'SemanticObjectProperty' => ['semanticObjectProperty', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $semanticObjectProperty Name of the Semantic Object property
+     */
     public function __construct(
         public string|Path|null $semanticObjectProperty = null,
     ) {}

@@ -22,6 +22,13 @@ final readonly class AnalyticalContextType extends AbstractRecord
         'AccumulativeMeasure' => ['accumulativeMeasure', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param string|Path|null $property Property that is part of the analytical context
+     * @param string|Path|null $dynamicProperty Dynamic property introduced by annotations that is part of the analytical context
+     * @param bool|Path|null $dimension The property holds the key of a dimension
+     * @param bool|Path|null $measure The property holds the numeric value of a measure
+     * @param bool|Path|null $accumulativeMeasure The measure has non-negative and additive values; it can be used in whole-part charts, e.g. the Donut
+     */
     public function __construct(
         public string|Path|null $property = null,
         public string|Path|null $dynamicProperty = null,

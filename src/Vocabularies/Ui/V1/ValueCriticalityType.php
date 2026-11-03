@@ -19,6 +19,9 @@ final readonly class ValueCriticalityType extends AbstractRecord
         'Criticality' => ['criticality', 'com.sap.vocabularies.UI.v1.CriticalityType', false],
     ];
 
+    /**
+     * @param mixed $value MUST be a fixed value of primitive type
+     */
     public function __construct(
         public mixed $value = null,
         public CriticalityType|Path|null $criticality = null,

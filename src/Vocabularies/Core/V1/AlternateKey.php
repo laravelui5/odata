@@ -16,7 +16,7 @@ final readonly class AlternateKey extends AbstractRecord
     ];
 
     /**
-     * @param list<PropertyRef>|Path|null $key
+     * @param list<PropertyRef>|Path|null $key The set of properties that make up this key
      */
     public function __construct(
         public array|Path|null $key = null,

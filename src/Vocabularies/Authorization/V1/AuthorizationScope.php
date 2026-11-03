@@ -17,6 +17,11 @@ final readonly class AuthorizationScope extends AbstractRecord
         'Description' => ['description', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $scope Scope name
+     * @param string|Path|null $grant Identity that has access to the scope or can grant access to the scope.
+     * @param string|Path|null $description Description of the scope
+     */
     public function __construct(
         public string|Path|null $scope = null,
         public string|Path|null $grant = null,

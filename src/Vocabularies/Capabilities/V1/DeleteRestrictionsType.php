@@ -25,11 +25,17 @@ final readonly class DeleteRestrictionsType extends DeleteRestrictionsBase
     ];
 
     /**
-     * @param list<PermissionType>|Path|null $permissions
-     * @param list<CustomParameter>|Path|null $customHeaders
-     * @param list<CustomParameter>|Path|null $customQueryOptions
-     * @param list<HttpResponse>|Path|null $errorResponses
-     * @param list<string>|Path|null $nonDeletableNavigationProperties
+     * @param bool|Path|null $deletable Entities can be deleted
+     * @param int|Path|null $maxLevels The maximum number of navigation properties that can be traversed when addressing the collection to delete from or the entity to delete. A value of -1 indicates there is no restriction.
+     * @param bool|Path|null $filterSegmentSupported Members of collections can be deleted via a DELETE request with a `/$filter(...)/$each` segment
+     * @param bool|Path|null $typecastSegmentSupported Members of collections can be deleted via a DELETE request with a type-cast segment and a `/$each` segment
+     * @param list<PermissionType>|Path|null $permissions Required permissions. One of the specified sets of scopes is required to perform the delete.
+     * @param list<CustomParameter>|Path|null $customHeaders Supported or required custom headers
+     * @param list<CustomParameter>|Path|null $customQueryOptions Supported or required custom query options
+     * @param string|Path|null $description A brief description of the request
+     * @param string|Path|null $longDescription A long description of the request
+     * @param list<HttpResponse>|Path|null $errorResponses Possible error responses returned by the request.
+     * @param list<string>|Path|null $nonDeletableNavigationProperties These navigation properties do not allow DeleteLink requests
      */
     public function __construct(
         bool|Path|null $deletable = null,

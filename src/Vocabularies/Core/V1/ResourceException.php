@@ -54,6 +54,10 @@ final readonly class ResourceException implements TypedAnnotationInterface
         SchemaInterface::class,
     ];
 
+    /**
+     * @param MessageType|Path|null $info Information about the exception
+     * @param string|Path|null $retryLink A GET request to this URL retries retrieving the problematic instance
+     */
     public function __construct(
         public MessageType|Path|null $info = null,
         public string|Path|null $retryLink = null,

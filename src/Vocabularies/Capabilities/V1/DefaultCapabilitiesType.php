@@ -30,6 +30,24 @@ final readonly class DefaultCapabilitiesType extends AbstractRecord
         'ReadRestrictions' => ['readRestrictions', 'Org.OData.Capabilities.V1.ReadRestrictionsType', false],
     ];
 
+    /**
+     * @param ChangeTrackingBase|Path|null $changeTracking Change tracking capabilities
+     * @param CountRestrictionsBase|Path|null $countRestrictions Restrictions on /$count path suffix and $count=true system query option
+     * @param bool|Path|null $indexableByKey Supports key values according to OData URL conventions
+     * @param bool|Path|null $topSupported Supports $top
+     * @param bool|Path|null $skipSupported Supports $skip
+     * @param bool|Path|null $computeSupported Supports $compute
+     * @param SelectSupportType|Path|null $selectSupport Support for $select and nested query options within $select
+     * @param FilterRestrictionsBase|Path|null $filterRestrictions Restrictions on filter expressions
+     * @param SortRestrictionsBase|Path|null $sortRestrictions Restrictions on orderby expressions
+     * @param ExpandRestrictionsBase|Path|null $expandRestrictions Restrictions on expand expressions
+     * @param SearchRestrictionsType|Path|null $searchRestrictions Restrictions on search expressions
+     * @param InsertRestrictionsBase|Path|null $insertRestrictions Restrictions on insert operations
+     * @param UpdateRestrictionsBase|Path|null $updateRestrictions Restrictions on update operations
+     * @param DeleteRestrictionsBase|Path|null $deleteRestrictions Restrictions on delete operations
+     * @param OperationRestrictionsType|Path|null $operationRestrictions Restrictions for function or action operations
+     * @param ReadRestrictionsType|Path|null $readRestrictions Restrictions for retrieving a collection of entities, retrieving a singleton instance
+     */
     public function __construct(
         public ChangeTrackingBase|Path|null $changeTracking = null,
         public CountRestrictionsBase|Path|null $countRestrictions = null,

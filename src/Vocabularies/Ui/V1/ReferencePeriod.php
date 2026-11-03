@@ -20,6 +20,11 @@ final readonly class ReferencePeriod extends AbstractRecord
         'End' => ['end', 'Edm.DateTimeOffset', false],
     ];
 
+    /**
+     * @param string|Path|null $description Short description of the reference period
+     * @param string|Path|null $start Start of the reference period
+     * @param string|Path|null $end End of the reference period
+     */
     public function __construct(
         public string|Path|null $description = null,
         public string|Path|null $start = null,

@@ -19,6 +19,10 @@ final readonly class Link extends AbstractRecord
         'href' => ['href', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $rel Link relation type, see [IANA Link Relations](http://www.iana.org/assignments/link-relations/link-relations.xhtml)
+     * @param string|Path|null $href URL of related information
+     */
     public function __construct(
         public string|Path|null $rel = null,
         public string|Path|null $href = null,

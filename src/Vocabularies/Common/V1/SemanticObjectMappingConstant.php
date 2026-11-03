@@ -15,6 +15,10 @@ final readonly class SemanticObjectMappingConstant extends SemanticObjectMapping
         'Constant' => ['constant', 'Edm.PrimitiveType', true],
     ];
 
+    /**
+     * @param string|Path|null $semanticObjectProperty Name of the Semantic Object property
+     * @param mixed $constant Constant value for the Semantic Object property
+     */
     public function __construct(
         string|Path|null $semanticObjectProperty = null,
         public mixed $constant = null,

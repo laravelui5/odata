@@ -21,8 +21,10 @@ final readonly class ChartDimensionAttributeType extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $valuesForSequentialColorLevels
-     * @param list<string>|Path|null $emphasizedValues
+     * @param int|Path|null $hierarchyLevel For a dimension with a hierarchy, members are selected from this level. The root node of the hierarchy is at level 0.
+     * @param list<string>|Path|null $valuesForSequentialColorLevels All values in this collection should be assigned to levels of the same color.
+     * @param list<string>|Path|null $emphasizedValues All values in this collection should be emphasized.
+     * @param EmphasisLabelType|Path|null $emphasisLabels Assign a label to values with an emphasized representation. This is required, if more than one emphasized value has been specified.
      */
     public function __construct(
         public string|Path|null $dimension = null,

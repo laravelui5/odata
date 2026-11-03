@@ -48,8 +48,25 @@ final readonly class NavigationPropertyAggregationCapabilities extends Navigatio
     ];
 
     /**
-     * @param list<string>|Path|null $filterFunctions
-     * @param list<CustomAggregateType>|Path|null $customAggregates
+     * @param string|Path|null $navigationProperty Navigation properties can be navigated
+     * @param NavigationType|Path|null $navigability Supported navigability of this navigation property
+     * @param list<string>|Path|null $filterFunctions List of functions and operators supported in filter expressions
+     * @param FilterRestrictionsType|Path|null $filterRestrictions Restrictions on filter expressions
+     * @param SearchRestrictionsType|Path|null $searchRestrictions Restrictions on search expressions
+     * @param SortRestrictionsType|Path|null $sortRestrictions Restrictions on orderby expressions
+     * @param bool|Path|null $topSupported Supports $top
+     * @param bool|Path|null $skipSupported Supports $skip
+     * @param SelectSupportType|Path|null $selectSupport Support for $select
+     * @param bool|Path|null $indexableByKey Supports key values according to OData URL conventions
+     * @param InsertRestrictionsType|Path|null $insertRestrictions Restrictions on insert operations
+     * @param DeepInsertSupportType|Path|null $deepInsertSupport Deep Insert Support of the annotated resource (the whole service, an entity set, or a collection-valued resource)
+     * @param UpdateRestrictionsType|Path|null $updateRestrictions Restrictions on update operations
+     * @param DeepUpdateSupportType|Path|null $deepUpdateSupport Deep Update Support of the annotated resource (the whole service, an entity set, or a collection-valued resource)
+     * @param DeleteRestrictionsType|Path|null $deleteRestrictions Restrictions on delete operations
+     * @param bool|Path|null $optimisticConcurrencyControl Data modification (including insert) along this navigation property requires the use of ETags
+     * @param ReadRestrictionsType|Path|null $readRestrictions Restrictions for retrieving entities
+     * @param ApplySupportedType|Path|null $applySupported Support for `$apply`
+     * @param list<CustomAggregateType>|Path|null $customAggregates Supported custom aggregates
      */
     public function __construct(
         string|Path|null $navigationProperty = null,

@@ -28,6 +28,9 @@ final readonly class SAPObjectNodeType implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $name The name of the SAP Object Node Type
+     */
     public function __construct(
         public string|Path|null $name = null,
         public ?string $qualifier = null,

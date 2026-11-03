@@ -29,7 +29,7 @@ final readonly class CallbackSupported implements TypedAnnotationInterface
     ];
 
     /**
-     * @param list<CallbackProtocol>|Path|null $callbackProtocols
+     * @param list<CallbackProtocol>|Path|null $callbackProtocols List of supported callback protocols, e.g. `http` or `wss`
      */
     public function __construct(
         public array|Path|null $callbackProtocols = null,

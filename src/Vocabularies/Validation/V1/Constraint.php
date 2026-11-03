@@ -36,6 +36,10 @@ final readonly class Constraint implements TypedAnnotationInterface
         ComplexTypeInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $failureMessage Human-readable message that can be shown to end users if the constraint is not fulfilled
+     * @param bool|Path|null $condition Value MUST be a dynamic expression that evaluates to true if and only if the constraint is fulfilled
+     */
     public function __construct(
         public string|Path|null $failureMessage = null,
         public bool|Path|null $condition = null,

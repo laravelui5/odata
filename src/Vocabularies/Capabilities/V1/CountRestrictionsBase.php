@@ -15,6 +15,9 @@ readonly class CountRestrictionsBase extends AbstractRecord
         'Countable' => ['countable', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param bool|Path|null $countable Instances can be counted in requests targeting a collection
+     */
     public function __construct(
         public bool|Path|null $countable = null,
     ) {}

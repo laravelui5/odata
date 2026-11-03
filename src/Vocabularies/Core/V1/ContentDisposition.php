@@ -30,6 +30,10 @@ final readonly class ContentDisposition implements TypedAnnotationInterface
         PropertyInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $type The disposition type of the binary or stream value, see [RFC 6266, Disposition Type](https://datatracker.ietf.org/doc/html/rfc6266#section-4.2)
+     * @param string|Path|null $filename The proposed filename for downloading the binary or stream value, see [RFC 6266, Disposition Parameter: 'Filename'](https://datatracker.ietf.org/doc/html/rfc6266#section-4.3)
+     */
     public function __construct(
         public string|Path|null $type = null,
         public string|Path|null $filename = null,

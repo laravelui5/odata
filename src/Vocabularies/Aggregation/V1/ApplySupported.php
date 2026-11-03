@@ -35,10 +35,13 @@ final readonly class ApplySupported implements TypedAnnotationInterface
     ];
 
     /**
-     * @param list<string>|Path|null $transformations
-     * @param list<string>|Path|null $customAggregationMethods
-     * @param list<mixed>|Path|null $groupableProperties
-     * @param list<AggregatablePropertyType>|Path|null $aggregatableProperties
+     * @param list<string>|Path|null $transformations Transformations that can be used in `$apply`
+     * @param list<string>|Path|null $customAggregationMethods Qualified names of custom aggregation methods that can be used in `aggregate(...with...)`
+     * @param RollupType|Path|null $rollup The service supports rollup hierarchies in a `groupby` transformation
+     * @param bool|Path|null $from The service supports the `from` keyword in an `aggregate` transformation
+     * @param bool|Path|null $propertyRestrictions Only properties marked as `Groupable` can be used in the `groupby` transformation, and only those marked as `Aggregatable` can be used in the `aggregate` transformation
+     * @param list<mixed>|Path|null $groupableProperties A non-empty collection indicates that only the listed properties of the annotated target are supported by the `groupby` transformation
+     * @param list<AggregatablePropertyType>|Path|null $aggregatableProperties A non-empty collection indicates that only the listed properties of the annotated target can be used in the `aggregate` transformation, optionally restricted to the specified aggregation methods
      */
     public function __construct(
         public array|Path|null $transformations = null,

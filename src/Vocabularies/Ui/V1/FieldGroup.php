@@ -33,7 +33,8 @@ final readonly class FieldGroup implements TypedAnnotationInterface
     ];
 
     /**
-     * @param list<DataFieldAbstract>|Path|null $data
+     * @param string|Path|null $label Label for the field group
+     * @param list<DataFieldAbstract>|Path|null $data Collection of data fields
      */
     public function __construct(
         public string|Path|null $label = null,

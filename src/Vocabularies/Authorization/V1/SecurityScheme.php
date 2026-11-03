@@ -17,7 +17,8 @@ final readonly class SecurityScheme extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $requiredScopes
+     * @param string|Path|null $authorization The name of a required authorization scheme
+     * @param list<string>|Path|null $requiredScopes The names of scopes required from this authorization scheme
      */
     public function __construct(
         public string|Path|null $authorization = null,

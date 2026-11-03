@@ -29,10 +29,15 @@ final readonly class Message implements TypedAnnotationInterface
     ];
 
     /**
-     * @param list<string>|Path|null $to
-     * @param list<string>|Path|null $cc
-     * @param list<string>|Path|null $bcc
-     * @param list<string>|Path|null $keywords
+     * @param string|Path|null $from Author(s) of the message
+     * @param string|Path|null $sender Agent responsible for the actual transmission of the message, e.g. a secretary
+     * @param list<string>|Path|null $to List of primary recipients
+     * @param list<string>|Path|null $cc List of other recipients (carbon copy)
+     * @param list<string>|Path|null $bcc List of recipients whose addresses are not to be revealed (blind carbon copy)
+     * @param string|Path|null $subject Topic of the message
+     * @param string|Path|null $body Main part of the message
+     * @param list<string>|Path|null $keywords List of important words and phrases that might be useful for the recipient
+     * @param string|Path|null $received Date and time the message was received
      */
     public function __construct(
         public string|Path|null $from = null,

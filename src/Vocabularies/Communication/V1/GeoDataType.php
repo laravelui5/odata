@@ -17,7 +17,8 @@ final readonly class GeoDataType extends AbstractRecord
     ];
 
     /**
-     * @param ContactInformationType|list<ContactInformationType>|Path|null $type
+     * @param string|Path|null $uri This SHOULD use the geo: URL schema defined in RFC5870 which encodes the same information as an Edm.GeographyPoint
+     * @param ContactInformationType|list<ContactInformationType>|Path|null $type Address type
      */
     public function __construct(
         public string|Path|null $uri = null,

@@ -19,6 +19,10 @@ final readonly class NumberFormat extends AbstractRecord
         'NumberOfFractionalDigits' => ['numberOfFractionalDigits', 'Edm.Byte', false],
     ];
 
+    /**
+     * @param float|Path|null $scaleFactor Display value in *ScaleFactor* units, e.g. 1000 for k (kilo), 1e6 for M (Mega)
+     * @param int|Path|null $numberOfFractionalDigits Number of fractional digits of the scaled value to be visualized
+     */
     public function __construct(
         public float|Path|null $scaleFactor = null,
         public int|Path|null $numberOfFractionalDigits = null,

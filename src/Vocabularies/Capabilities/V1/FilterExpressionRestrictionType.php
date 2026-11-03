@@ -16,6 +16,10 @@ final readonly class FilterExpressionRestrictionType extends AbstractRecord
         'AllowedExpressions' => ['allowedExpressions', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $property Path to the restricted property
+     * @param string|Path|null $allowedExpressions Allowed subset of expressions
+     */
     public function __construct(
         public string|Path|null $property = null,
         public string|Path|null $allowedExpressions = null,

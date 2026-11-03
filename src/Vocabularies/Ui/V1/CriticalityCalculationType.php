@@ -27,7 +27,16 @@ final readonly class CriticalityCalculationType extends CriticalityThresholdsTyp
     ];
 
     /**
-     * @param list<LevelThresholdsType>|Path|null $constantThresholds
+     * @param mixed $acceptanceRangeLowValue Lowest value that is considered positive
+     * @param mixed $acceptanceRangeHighValue Highest value that is considered positive
+     * @param mixed $toleranceRangeLowValue Lowest value that is considered neutral
+     * @param mixed $toleranceRangeHighValue Highest value that is considered neutral
+     * @param mixed $deviationRangeLowValue Lowest value that is considered critical
+     * @param mixed $deviationRangeHighValue Highest value that is considered critical
+     * @param mixed $referenceValue Reference value for the calculation, e.g. number of sales for the last year
+     * @param bool|Path|null $isRelativeDifference Calculate with a relative difference
+     * @param ImprovementDirectionType|Path|null $improvementDirection Describes in which direction the value improves
+     * @param list<LevelThresholdsType>|Path|null $constantThresholds List of thresholds depending on the aggregation level as a set of constant values
      */
     public function __construct(
         mixed $acceptanceRangeLowValue = null,

@@ -17,8 +17,9 @@ final readonly class CountRestrictionsType extends CountRestrictionsBase
     ];
 
     /**
-     * @param list<string>|Path|null $nonCountableProperties
-     * @param list<string>|Path|null $nonCountableNavigationProperties
+     * @param bool|Path|null $countable Instances can be counted in requests targeting a collection
+     * @param list<string>|Path|null $nonCountableProperties Members of these collection properties cannot be counted
+     * @param list<string>|Path|null $nonCountableNavigationProperties Members of these navigation properties cannot be counted
      */
     public function __construct(
         bool|Path|null $countable = null,

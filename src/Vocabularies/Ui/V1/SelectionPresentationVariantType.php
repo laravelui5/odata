@@ -18,6 +18,12 @@ final readonly class SelectionPresentationVariantType extends AbstractRecord
         'PresentationVariant' => ['presentationVariant', 'com.sap.vocabularies.UI.v1.PresentationVariantType', true],
     ];
 
+    /**
+     * @param string|Path|null $id Optional identifier to reference this variant from an external context
+     * @param string|Path|null $text Name of the bundling variant
+     * @param SelectionVariantType|Path|null $selectionVariant Selection variant, either specified inline or referencing another annotation via Path
+     * @param PresentationVariantType|Path|null $presentationVariant Presentation variant, either specified inline or referencing another annotation via Path
+     */
     public function __construct(
         public string|Path|null $id = null,
         public string|Path|null $text = null,

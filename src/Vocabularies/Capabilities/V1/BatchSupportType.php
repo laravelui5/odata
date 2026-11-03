@@ -22,7 +22,13 @@ final readonly class BatchSupportType extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $supportedFormats
+     * @param bool|Path|null $supported Service supports requests to $batch
+     * @param bool|Path|null $continueOnErrorSupported Service supports the `continue-on-error` preference
+     * @param bool|Path|null $referencesInRequestBodiesSupported Service supports Content-ID referencing in request bodies
+     * @param bool|Path|null $referencesAcrossChangeSetsSupported Service supports Content-ID referencing across change sets
+     * @param bool|Path|null $etagReferencesSupported Service supports referencing Etags from previous requests
+     * @param bool|Path|null $requestDependencyConditionsSupported Service supports the `if` member in JSON batch requests
+     * @param list<string>|Path|null $supportedFormats Media types of supported formats for $batch
      */
     public function __construct(
         public bool|Path|null $supported = null,

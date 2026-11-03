@@ -30,6 +30,13 @@ final readonly class Interval implements TypedAnnotationInterface
         ComplexTypeInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $label A short, human-readable text suitable for labels and captions in UIs
+     * @param string|Path|null $lowerBoundary Property holding the lower interval boundary
+     * @param bool|Path|null $lowerBoundaryIncluded The lower boundary value is included in the interval
+     * @param string|Path|null $upperBoundary Property holding the upper interval boundary
+     * @param bool|Path|null $upperBoundaryIncluded The upper boundary value is included in the interval
+     */
     public function __construct(
         public string|Path|null $label = null,
         public string|Path|null $lowerBoundary = null,

@@ -169,6 +169,39 @@ XML));
         ->toBe(['Action' => true, 'Inline' => false, 'Targets' => false, 'Label' => false]);
 });
 
+it('reads the description of a property, the most derived one first', function () {
+    $model = new VocabularyTypeModel();
+    $model->load(vocabularyEntry('test.Ui.v1', 'Ui'), vocabularyXpath(<<<'XML'
+<Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="test.Ui.v1" Alias="Ui">
+  <ComplexType Name="Field">
+    <Property Name="Value" Type="Edm.Untyped">
+      <Annotation Term="CoreAlias.Description" String="The   value,
+        on two lines" />
+    </Property>
+    <Property Name="Label" Type="Edm.String">
+      <Annotation Term="CoreAlias.Description"><String>A label</String></Annotation>
+    </Property>
+    <Property Name="Plain" Type="Edm.String" />
+  </ComplexType>
+  <ComplexType Name="FieldWithUrl" BaseType="Ui.Field">
+    <Property Name="Value" Type="Edm.PrimitiveType">
+      <Annotation Term="CoreAlias.Description" String="A primitive value" />
+    </Property>
+  </ComplexType>
+</Schema>
+XML, <<<'XML'
+<edmx:Reference Uri="https://example.test/Core.xml">
+  <edmx:Include Namespace="Org.OData.Core.V1" Alias="CoreAlias" />
+</edmx:Reference>
+XML));
+
+    expect($model->propertyDescription('test.Ui.v1.Field', 'Value'))->toBe('The value, on two lines')
+        ->and($model->propertyDescription('test.Ui.v1.Field', 'Label'))->toBe('A label')
+        ->and($model->propertyDescription('test.Ui.v1.Field', 'Plain'))->toBe('')
+        ->and($model->propertyDescription('test.Ui.v1.FieldWithUrl', 'Value'))->toBe('A primitive value')
+        ->and($model->propertyDescription('test.Ui.v1.FieldWithUrl', 'Label'))->toBe('A label');
+});
+
 it('resolves a type definition through a chain into another vocabulary', function () {
     expect(loadedTypeModel()->resolve('test.Ui.v1.Flag'))->toBe('Edm.Boolean');
 });

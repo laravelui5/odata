@@ -20,7 +20,11 @@ final readonly class MessageType extends AbstractRecord
     ];
 
     /**
-     * @param list<MessageType>|Path|null $details
+     * @param string|Path|null $code Machine-readable, language-independent message code
+     * @param string|Path|null $message Human-readable, language-dependent message text
+     * @param string|Path|null $severity Severity of the message
+     * @param string|Path|null $target A path to the target of the message detail, relative to the annotated instance
+     * @param list<MessageType>|Path|null $details List of detail messages
      */
     public function __construct(
         public string|Path|null $code = null,

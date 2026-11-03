@@ -20,8 +20,8 @@ final readonly class MultiLevelExpandLevel extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $dimensionProperties
-     * @param list<string>|Path|null $additionalProperties
+     * @param list<string>|Path|null $dimensionProperties A list of property names that define a combination of dimension values
+     * @param list<string>|Path|null $additionalProperties A possibly empty list of names of additional properties of the dimensions that occur in `DimensionProperties`
      */
     public function __construct(
         public array|Path|null $dimensionProperties = null,

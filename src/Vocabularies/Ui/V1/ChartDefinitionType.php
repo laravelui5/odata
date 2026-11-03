@@ -25,12 +25,16 @@ final readonly class ChartDefinitionType extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $measures
-     * @param list<string>|Path|null $dynamicMeasures
-     * @param list<ChartMeasureAttributeType>|Path|null $measureAttributes
-     * @param list<string>|Path|null $dimensions
-     * @param list<ChartDimensionAttributeType>|Path|null $dimensionAttributes
-     * @param list<DataFieldAbstract>|Path|null $actions
+     * @param string|Path|null $title Title of the chart
+     * @param string|Path|null $description Short description
+     * @param ChartType|Path|null $chartType Chart type
+     * @param ChartAxisScalingType|Path|null $axisScaling Describes the scale of the chart value axes
+     * @param list<string>|Path|null $measures Measures of the chart, e.g. size and color in a bubble chart
+     * @param list<string>|Path|null $dynamicMeasures Dynamic properties introduced by annotations and used as measures of the chart
+     * @param list<ChartMeasureAttributeType>|Path|null $measureAttributes Describes Attributes for Measures. All Measures used in this collection must also be part of the Measures Property.
+     * @param list<string>|Path|null $dimensions Dimensions of the chart, e.g. x- and y-axis of a bubble chart
+     * @param list<ChartDimensionAttributeType>|Path|null $dimensionAttributes Describes Attributes for Dimensions. All Dimensions used in this collection must also be part of the Dimensions Property.
+     * @param list<DataFieldAbstract>|Path|null $actions Available actions and action groups
      */
     public function __construct(
         public string|Path|null $title = null,

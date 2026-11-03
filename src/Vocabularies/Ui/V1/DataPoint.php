@@ -29,6 +29,27 @@ final readonly class DataPoint implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $title Title of the data point
+     * @param string|Path|null $description Short description
+     * @param string|Path|null $longDescription Full description
+     * @param mixed $value Numeric value
+     * @param mixed $targetValue Target value
+     * @param mixed $forecastValue Forecast value
+     * @param float|Path|null $minimumValue Minimum value (for output rendering)
+     * @param float|Path|null $maximumValue Maximum value (for output rendering)
+     * @param NumberFormat|Path|null $valueFormat Number format
+     * @param VisualizationType|Path|null $visualization Preferred visualization
+     * @param mixed $sampleSize Sample size used for the determination of the data point; should contain just integer value as Edm.Byte, Edm.SByte, Edm.Intxx, and Edm.Decimal with scale 0.
+     * @param ReferencePeriod|Path|null $referencePeriod Reference period
+     * @param CriticalityType|Path|null $criticality Service-calculated criticality, alternative to CriticalityCalculation
+     * @param string|Path|null $criticalityLabels Custom labels for the criticality legend. Annotation path MUST end in UI.CriticalityLabels
+     * @param CriticalityRepresentationType|Path|null $criticalityRepresentation Decides if criticality is visualized in addition by means of an icon
+     * @param CriticalityCalculationType|Path|null $criticalityCalculation Parameters for client-calculated criticality, alternative to Criticality
+     * @param TrendType|Path|null $trend Service-calculated trend, alternative to TrendCalculation
+     * @param TrendCalculationType|Path|null $trendCalculation Parameters for client-calculated trend, alternative to Trend
+     * @param ContactType|Path|null $responsible Contact person
+     */
     public function __construct(
         public string|Path|null $title = null,
         public string|Path|null $description = null,

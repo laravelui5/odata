@@ -20,10 +20,11 @@ final readonly class OperationRestrictionsType extends AbstractRecord
     ];
 
     /**
-     * @param list<PermissionType>|Path|null $permissions
-     * @param list<CustomParameter>|Path|null $customHeaders
-     * @param list<CustomParameter>|Path|null $customQueryOptions
-     * @param list<HttpResponse>|Path|null $errorResponses
+     * @param bool|Path|null $filterSegmentSupported Bound action or function can be invoked on a collection-valued binding parameter path with a `/$filter(...)` segment
+     * @param list<PermissionType>|Path|null $permissions Required permissions. One of the specified sets of scopes is required to invoke an action or function
+     * @param list<CustomParameter>|Path|null $customHeaders Supported or required custom headers
+     * @param list<CustomParameter>|Path|null $customQueryOptions Supported or required custom query options
+     * @param list<HttpResponse>|Path|null $errorResponses Possible error responses returned by the request.
      */
     public function __construct(
         public bool|Path|null $filterSegmentSupported = null,

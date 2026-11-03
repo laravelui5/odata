@@ -20,9 +20,12 @@ final readonly class FilterRestrictionsType extends FilterRestrictionsBase
     ];
 
     /**
-     * @param list<string>|Path|null $requiredProperties
-     * @param list<string>|Path|null $nonFilterableProperties
-     * @param list<FilterExpressionRestrictionType>|Path|null $filterExpressionRestrictions
+     * @param bool|Path|null $filterable $filter is supported
+     * @param bool|Path|null $requiresFilter $filter is required
+     * @param int|Path|null $maxLevels The maximum number of levels (including recursion) that can be traversed in a filter expression. A value of -1 indicates there is no restriction.
+     * @param list<string>|Path|null $requiredProperties These properties must be specified in the $filter clause (properties of derived types are not allowed here)
+     * @param list<string>|Path|null $nonFilterableProperties These structural properties cannot be used in filter expressions
+     * @param list<FilterExpressionRestrictionType>|Path|null $filterExpressionRestrictions These properties only allow a subset of filter expressions. A valid filter expression for a single property can be enclosed in parentheses and combined by `and` with valid expressions for other properties.
      */
     public function __construct(
         bool|Path|null $filterable = null,

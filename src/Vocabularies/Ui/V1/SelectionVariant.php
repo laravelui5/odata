@@ -31,8 +31,11 @@ final readonly class SelectionVariant implements TypedAnnotationInterface
     ];
 
     /**
-     * @param list<ParameterAbstract>|Path|null $parameters
-     * @param list<SelectOptionType>|Path|null $selectOptions
+     * @param string|Path|null $id May contain identifier to reference this instance from an external context
+     * @param string|Path|null $text Name of the selection variant
+     * @param list<ParameterAbstract>|Path|null $parameters Parameters of the selection variant
+     * @param string|Path|null $filterExpression Filter string for query part of URL, without `$filter=`
+     * @param list<SelectOptionType>|Path|null $selectOptions ABAP Select Options Pattern
      */
     public function __construct(
         public string|Path|null $id = null,

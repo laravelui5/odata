@@ -18,6 +18,10 @@ final readonly class Parameter extends ParameterAbstract
         'PropertyValue' => ['propertyValue', 'Edm.PrimitiveType', true],
     ];
 
+    /**
+     * @param string|Path|null $propertyName Path to a key property of a parameter entity type
+     * @param mixed $propertyValue Value for the key property
+     */
     public function __construct(
         public string|Path|null $propertyName = null,
         public mixed $propertyValue = null,

@@ -16,6 +16,11 @@ final readonly class ValueListParameterIn extends ValueListParameter
         'InitialValueIsSignificant' => ['initialValueIsSignificant', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param string|Path|null $valueListProperty Path to property in the value list . Format is identical to PropertyPath annotations.
+     * @param string|Path|null $localDataProperty Path to property that is used to filter the value list with `eq` comparison
+     * @param bool|Path|null $initialValueIsSignificant Initial value, e.g. empty string, is a valid and significant value
+     */
     public function __construct(
         string|Path|null $valueListProperty = null,
         public string|Path|null $localDataProperty = null,

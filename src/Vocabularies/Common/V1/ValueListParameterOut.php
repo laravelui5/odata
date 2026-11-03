@@ -15,6 +15,10 @@ final readonly class ValueListParameterOut extends ValueListParameter
         'LocalDataProperty' => ['localDataProperty', 'Edm.PropertyPath', true],
     ];
 
+    /**
+     * @param string|Path|null $valueListProperty Path to property in the value list . Format is identical to PropertyPath annotations.
+     * @param string|Path|null $localDataProperty Path to property that is filled from response
+     */
     public function __construct(
         string|Path|null $valueListProperty = null,
         public string|Path|null $localDataProperty = null,

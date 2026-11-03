@@ -19,6 +19,10 @@ final readonly class ItemsOfType extends AbstractRecord
         'target' => ['target', 'Edm.NavigationPropertyPath', true],
     ];
 
+    /**
+     * @param string|Path|null $path A path to a single- or collection-valued navigation property
+     * @param string|Path|null $target A path to a collection-valued navigation property
+     */
     public function __construct(
         public string|Path|null $path = null,
         public string|Path|null $target = null,

@@ -22,6 +22,11 @@ final readonly class ChartMeasureAttributeType extends AbstractRecord
         'UseSequentialColorLevels' => ['useSequentialColorLevels', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param string|Path|null $dynamicMeasure Dynamic property introduced by an annotation and used as a measure in a chart
+     * @param string|Path|null $dataPoint Annotation path MUST end in @UI.DataPoint and the data point's Value MUST be the same property as in Measure
+     * @param bool|Path|null $useSequentialColorLevels All measures for which this setting is true should be assigned to levels of the same color.
+     */
     public function __construct(
         public string|Path|null $measure = null,
         public string|Path|null $dynamicMeasure = null,

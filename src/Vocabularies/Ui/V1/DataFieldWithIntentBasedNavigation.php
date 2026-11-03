@@ -26,7 +26,14 @@ final readonly class DataFieldWithIntentBasedNavigation extends DataField
     ];
 
     /**
-     * @param list<SemanticObjectMappingType>|Path|null $mapping
+     * @param string|Path|null $label A short, human-readable text suitable for labels and captions in UIs
+     * @param CriticalityType|Path|null $criticality Criticality of the data field value
+     * @param CriticalityRepresentationType|Path|null $criticalityRepresentation Decides if criticality is visualized in addition by means of an icon
+     * @param string|Path|null $iconUrl Optional icon
+     * @param mixed $value The data field's value
+     * @param string|Path|null $semanticObject Name of the Semantic Object
+     * @param string|Path|null $action Name of the Action on the Semantic Object. If not specified, let user choose which of the available actions to trigger.
+     * @param list<SemanticObjectMappingType>|Path|null $mapping Maps properties of the annotated entity type to properties of the Semantic Object
      */
     public function __construct(
         string|Path|null $label = null,

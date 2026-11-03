@@ -16,6 +16,11 @@ final readonly class OpenIDConnect extends Authorization
         'IssuerUrl' => ['issuerUrl', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $name Name that can be used to reference the authorization scheme
+     * @param string|Path|null $description Description of the authorization scheme
+     * @param string|Path|null $issuerUrl Issuer location for the OpenID Provider. Configuration information can be obtained by appending `/.well-known/openid-configuration` to this Url.
+     */
     public function __construct(
         string|Path|null $name = null,
         string|Path|null $description = null,

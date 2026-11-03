@@ -19,6 +19,13 @@ final readonly class NameType extends AbstractRecord
         'suffix' => ['suffix', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $surname Surname or family name
+     * @param string|Path|null $given Given name
+     * @param string|Path|null $additional Additional names
+     * @param string|Path|null $prefix Honorific prefix(es)
+     * @param string|Path|null $suffix Honorific suffix(es)
+     */
     public function __construct(
         public string|Path|null $surname = null,
         public string|Path|null $given = null,

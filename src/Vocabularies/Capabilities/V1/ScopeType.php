@@ -16,6 +16,10 @@ final readonly class ScopeType extends AbstractRecord
         'RestrictedProperties' => ['restrictedProperties', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $scope Name of the scope.
+     * @param string|Path|null $restrictedProperties Comma-separated string value of all properties that will be included or excluded when using the scope.
+     */
     public function __construct(
         public string|Path|null $scope = null,
         public string|Path|null $restrictedProperties = null,

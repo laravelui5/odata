@@ -17,7 +17,8 @@ final readonly class EmailAddressType extends AbstractRecord
     ];
 
     /**
-     * @param ContactInformationType|list<ContactInformationType>|Path|null $type
+     * @param string|Path|null $address Email address
+     * @param ContactInformationType|list<ContactInformationType>|Path|null $type Address type
      */
     public function __construct(
         public string|Path|null $address = null,

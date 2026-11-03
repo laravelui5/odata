@@ -27,7 +27,18 @@ final readonly class AddressType extends AbstractRecord
     ];
 
     /**
-     * @param ContactInformationType|list<ContactInformationType>|Path|null $type
+     * @param string|Path|null $building Building identifier
+     * @param string|Path|null $street Street address
+     * @param string|Path|null $district Territorial administrative organization in a large city
+     * @param string|Path|null $locality City or similar
+     * @param string|Path|null $region State, province, or similar
+     * @param string|Path|null $code Postal code
+     * @param string|Path|null $country Country name
+     * @param string|Path|null $pobox Post office box
+     * @param string|Path|null $ext Extended address (e.g., apartment or suite number)
+     * @param string|Path|null $careof An intermediary who is responsible for transferring a piece of mail between the postal system and the final addressee
+     * @param string|Path|null $label Delivery address label; plain-text string representing the formatted address, may contain line breaks
+     * @param ContactInformationType|list<ContactInformationType>|Path|null $type Address type
      */
     public function __construct(
         public string|Path|null $building = null,

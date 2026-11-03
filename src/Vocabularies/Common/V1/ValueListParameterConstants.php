@@ -16,7 +16,8 @@ final readonly class ValueListParameterConstants extends ValueListParameter
     ];
 
     /**
-     * @param list<mixed>|Path|null $constants
+     * @param string|Path|null $valueListProperty Path to property in the value list . Format is identical to PropertyPath annotations.
+     * @param list<mixed>|Path|null $constants List of constant values that are used to filter the value list with `eq` comparisons connected by `or` operators, using the same representation as property default values, see [CSDL XML, 7.2.7 Default Value](https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_DefaultValue). Initial values are significant.
      */
     public function __construct(
         string|Path|null $valueListProperty = null,

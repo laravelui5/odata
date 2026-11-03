@@ -21,6 +21,12 @@ final readonly class SortOrderType extends AbstractRecord
         'Descending' => ['descending', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param string|Path|null $property Sort property
+     * @param string|Path|null $dynamicProperty Dynamic property introduced by an annotation and used as sort property
+     * @param mixed $expression Dynamic expression whose primitive result value is used to sort the instances
+     * @param bool|Path|null $descending Sort direction, ascending if not specified otherwise
+     */
     public function __construct(
         public string|Path|null $property = null,
         public string|Path|null $dynamicProperty = null,

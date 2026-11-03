@@ -21,7 +21,9 @@ final readonly class RecommendationListType extends AbstractRecord
     ];
 
     /**
-     * @param list<RecommendationBinding>|Path|null $binding
+     * @param string|Path|null $collectionPath Resource path of a collection of recommended values
+     * @param string|Path|null $rankProperty Name of the property within the collection of recommended values that describes the rank of the recommendation
+     * @param list<RecommendationBinding>|Path|null $binding List of pairs of a local property and recommended value property
      */
     public function __construct(
         public string|Path|null $collectionPath = null,

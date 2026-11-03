@@ -23,7 +23,15 @@ final readonly class DraftRootType extends DraftNodeType
     ];
 
     /**
-     * @param list<string>|Path|null $additionalNewActions
+     * @param string|Path|null $preparationAction Action that prepares a draft document for later activation
+     * @param string|Path|null $validationFunction Function that validates whether a draft document is ready for activation
+     * @param string|Path|null $activationAction Action that activates a draft document
+     * @param string|Path|null $discardAction Action that discards a draft document
+     * @param string|Path|null $editAction Action that creates an edit draft
+     * @param string|Path|null $resumeAction Action that resumes a draft document. The action re-acquires the exclusive lock if needed and checks if the related active document was not changed concurrently
+     * @param string|Path|null $newAction Action that creates a new draft
+     * @param list<string>|Path|null $additionalNewActions Additional actions beside the default POST or standard `NewAction`that create a new draft
+     * @param string|Path|null $shareAction Action that shares a draft document with other users and restricts access to the listed users in their specified roles
      */
     public function __construct(
         string|Path|null $preparationAction = null,

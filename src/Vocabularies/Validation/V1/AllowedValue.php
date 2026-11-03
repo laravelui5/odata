@@ -15,6 +15,9 @@ final readonly class AllowedValue extends AbstractRecord
         'Value' => ['value', 'Edm.PrimitiveType', false],
     ];
 
+    /**
+     * @param mixed $value An allowed value for the property, parameter, or type definition
+     */
     public function __construct(
         public mixed $value = null,
     ) {}

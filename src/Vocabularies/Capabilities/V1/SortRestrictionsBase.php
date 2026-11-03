@@ -15,6 +15,9 @@ readonly class SortRestrictionsBase extends AbstractRecord
         'Sortable' => ['sortable', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param bool|Path|null $sortable $orderby is supported
+     */
     public function __construct(
         public bool|Path|null $sortable = null,
     ) {}

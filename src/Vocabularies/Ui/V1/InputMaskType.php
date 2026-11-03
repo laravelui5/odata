@@ -18,7 +18,9 @@ final readonly class InputMaskType extends AbstractRecord
     ];
 
     /**
-     * @param list<InputMaskRuleType>|Path|null $rules
+     * @param string|Path|null $mask The mask to be applied to the property or the parameter
+     * @param string|Path|null $placeholderSymbol A single character symbol to be shown where the user can type a character
+     * @param list<InputMaskRuleType>|Path|null $rules Rules that define valid values for one symbol in the mask
      */
     public function __construct(
         public string|Path|null $mask = null,

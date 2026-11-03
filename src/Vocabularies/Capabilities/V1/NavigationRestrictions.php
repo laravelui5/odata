@@ -33,7 +33,8 @@ final readonly class NavigationRestrictions implements TypedAnnotationInterface
     ];
 
     /**
-     * @param list<NavigationPropertyRestriction>|Path|null $restrictedProperties
+     * @param NavigationType|Path|null $navigability Default navigability for all navigation properties of the annotation target. Individual navigation properties can override this value via `RestrictedProperties/Navigability`.
+     * @param list<NavigationPropertyRestriction>|Path|null $restrictedProperties List of navigation properties with restrictions
      */
     public function __construct(
         public NavigationType|Path|null $navigability = null,

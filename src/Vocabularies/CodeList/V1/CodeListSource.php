@@ -19,6 +19,10 @@ final readonly class CodeListSource extends AbstractRecord
         'CollectionPath' => ['collectionPath', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $url URL of a CSDL document describing an entity set for a code list
+     * @param string|Path|null $collectionPath Name of the entity set for the code list
+     */
     public function __construct(
         public string|Path|null $url = null,
         public string|Path|null $collectionPath = null,

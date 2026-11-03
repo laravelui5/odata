@@ -20,6 +20,12 @@ final readonly class IntervalParameter extends ParameterAbstract
         'PropertyValueTo' => ['propertyValueTo', 'Edm.PrimitiveType', true],
     ];
 
+    /**
+     * @param string|Path|null $propertyNameFrom Path to the 'from' property of a parameter entity type
+     * @param mixed $propertyValueFrom Value for the 'from' property
+     * @param string|Path|null $propertyNameTo Path to the 'to' property of a parameter entity type
+     * @param mixed $propertyValueTo Value for the 'to' property
+     */
     public function __construct(
         public string|Path|null $propertyNameFrom = null,
         public mixed $propertyValueFrom = null,

@@ -19,6 +19,9 @@ final readonly class CriticalityLabelType extends AbstractRecord
         'Label' => ['label', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $label Criticality label
+     */
     public function __construct(
         public CriticalityType|Path|null $criticality = null,
         public string|Path|null $label = null,

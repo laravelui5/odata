@@ -17,7 +17,8 @@ final readonly class PhoneNumberType extends AbstractRecord
     ];
 
     /**
-     * @param PhoneType|list<PhoneType>|Path|null $type
+     * @param string|Path|null $uri This SHOULD use the tel: URL schema defined in RFC3966
+     * @param PhoneType|list<PhoneType>|Path|null $type Telephone type
      */
     public function __construct(
         public string|Path|null $uri = null,

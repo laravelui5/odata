@@ -18,9 +18,10 @@ final readonly class SortRestrictionsType extends SortRestrictionsBase
     ];
 
     /**
-     * @param list<string>|Path|null $ascendingOnlyProperties
-     * @param list<string>|Path|null $descendingOnlyProperties
-     * @param list<string>|Path|null $nonSortableProperties
+     * @param bool|Path|null $sortable $orderby is supported
+     * @param list<string>|Path|null $ascendingOnlyProperties These properties can only be used for sorting in Ascending order
+     * @param list<string>|Path|null $descendingOnlyProperties These properties can only be used for sorting in Descending order
+     * @param list<string>|Path|null $nonSortableProperties These structural properties cannot be used in orderby expressions
      */
     public function __construct(
         bool|Path|null $sortable = null,

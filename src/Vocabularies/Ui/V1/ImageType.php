@@ -21,6 +21,12 @@ final readonly class ImageType extends AbstractRecord
         'Height' => ['height', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $url URL of image
+     * @param mixed $stream Stream of image
+     * @param string|Path|null $width Width of image
+     * @param string|Path|null $height Height of image
+     */
     public function __construct(
         public string|Path|null $url = null,
         public mixed $stream = null,

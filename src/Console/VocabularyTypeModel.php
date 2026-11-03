@@ -46,6 +46,9 @@ final class VocabularyTypeModel
      */
     private array $complexTypes = [];
 
+    /** @var array<string, array<string, string>> qualified complex type → property → its `Core.Description` */
+    private array $propertyDescriptions = [];
+
     /**
      * Reads the schema of one vocabulary document: its alias map, type definitions, enum types and complex types.
      *
@@ -114,8 +117,13 @@ final class VocabularyTypeModel
                 continue;
             }
             $properties = [];
+            $qualified  = $namespace . '.' . $node->getAttribute('Name');
             foreach ($xpath->query('edm:Property', $node) as $property) {
                 if ($property instanceof DOMElement) {
+                    $description = $this->description($property, $xpath, $namespace);
+                    if ($description !== '') {
+                        $this->propertyDescriptions[$qualified][$property->getAttribute('Name')] = $description;
+                    }
                     $type     = $this->qualify($property->getAttribute('Type'), $namespace);
                     $nullable = strtolower($property->getAttribute('Nullable') ?: 'true') !== 'false';
                     $properties[] = [
@@ -130,7 +138,7 @@ final class VocabularyTypeModel
                 }
             }
             $baseType = $node->getAttribute('BaseType');
-            $this->complexTypes[$namespace . '.' . $node->getAttribute('Name')] = [
+            $this->complexTypes[$qualified] = [
                 'name'       => $node->getAttribute('Name'),
                 'namespace'  => $namespace,
                 'baseType'   => $baseType !== '' ? $this->qualify($baseType, $namespace) : null,
@@ -233,6 +241,21 @@ final class VocabularyTypeModel
     }
 
     /**
+     * The `Core.Description` of a property of `$qualifiedName`, from the most derived type that describes it
+     * (a redeclaration may say more than the base); '' when none does.
+     */
+    public function propertyDescription(string $qualifiedName, string $property): string
+    {
+        foreach ([$qualifiedName, ...$this->ancestors($qualifiedName)] as $type) {
+            if (isset($this->propertyDescriptions[$type][$property])) {
+                return $this->propertyDescriptions[$type][$property];
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * The type that first declares a property of `$qualifiedName`, itself or a base type; null when none does.
      */
     public function declaringType(string $qualifiedName, string $property): ?string
@@ -331,6 +354,24 @@ final class VocabularyTypeModel
         $dot = strrpos($qualifiedName, '.');
 
         return $dot === false ? $qualifiedName : substr($qualifiedName, $dot + 1);
+    }
+
+    /** The `Core.Description` annotated on an element, as one line; '' when it has none. */
+    private function description(DOMElement $element, DOMXPath $xpath, string $namespace): string
+    {
+        foreach ($xpath->query('edm:Annotation', $element) as $annotation) {
+            if (!$annotation instanceof DOMElement
+                || $this->qualify($annotation->getAttribute('Term'), $namespace) !== 'Org.OData.Core.V1.Description') {
+                continue;
+            }
+            $text = $annotation->hasAttribute('String')
+                ? $annotation->getAttribute('String')
+                : (string) $xpath->query('edm:String', $annotation)->item(0)?->textContent;
+
+            return trim((string) preg_replace('/\s+/', ' ', $text));
+        }
+
+        return '';
     }
 
     private function isKnown(string $type): bool

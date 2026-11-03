@@ -15,6 +15,10 @@ final readonly class PrimitiveExampleValue extends ExampleValue
         'Value' => ['value', 'Edm.PrimitiveType', true],
     ];
 
+    /**
+     * @param string|Path|null $description Description of the example value
+     * @param mixed $value Example value for the custom parameter
+     */
     public function __construct(
         string|Path|null $description = null,
         public mixed $value = null,

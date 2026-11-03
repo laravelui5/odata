@@ -54,6 +54,12 @@ final readonly class Application implements TypedAnnotationInterface
         SchemaInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $component Software component of service implementation
+     * @param string|Path|null $serviceRepository ...
+     * @param string|Path|null $serviceId ...
+     * @param string|Path|null $serviceVersion ...
+     */
     public function __construct(
         public string|Path|null $component = null,
         public string|Path|null $serviceRepository = null,

@@ -27,7 +27,18 @@ final readonly class EventData extends AbstractRecord
     ];
 
     /**
-     * @param list<string>|Path|null $categories
+     * @param string|Path|null $summary Short description of the event
+     * @param string|Path|null $description More complete description
+     * @param list<string>|Path|null $categories Categories or subtypes of the event
+     * @param string|Path|null $dtstart Start date and time of the event
+     * @param string|Path|null $dtend Date and time by which the event ends, alternative to duration
+     * @param string|Path|null $duration Duration of the event, alternative to dtend
+     * @param string|Path|null $class Access classification, e.g. PUBLIC, PRIVATE, CONFIDENTIAL
+     * @param string|Path|null $status Confirmation status, e.g. CONFIRMED, TENTATIVE, CANCELLED
+     * @param string|Path|null $location Intended venue of the event
+     * @param bool|Path|null $transp Time transparency for busy time searches, true = free, false = blocked
+     * @param bool|Path|null $wholeday Wholeday event
+     * @param string|Path|null $fbtype Free or busy time type, e.g. FREE, BUSY, BUSY-TENTATIVE
      */
     public function __construct(
         public string|Path|null $summary = null,

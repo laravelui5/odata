@@ -23,6 +23,14 @@ final readonly class TrendCalculationType extends AbstractRecord
         'StrongDownDifference' => ['strongDownDifference', 'Edm.Decimal', true],
     ];
 
+    /**
+     * @param mixed $referenceValue Reference value for the calculation, e.g. number of sales for the last year
+     * @param bool|Path|null $isRelativeDifference Calculate with a relative difference
+     * @param float|Path|null $upDifference Threshold for Up
+     * @param float|Path|null $strongUpDifference Threshold for StrongUp
+     * @param float|Path|null $downDifference Threshold for Down
+     * @param float|Path|null $strongDownDifference Threshold for StrongDown
+     */
     public function __construct(
         public mixed $referenceValue = null,
         public bool|Path|null $isRelativeDifference = null,

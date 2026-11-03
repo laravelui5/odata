@@ -29,6 +29,12 @@ final readonly class GeoLocation implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param float|Path|null $latitude Geographic latitude
+     * @param float|Path|null $longitude Geographic longitude
+     * @param mixed $location A point in a round-earth coordinate system
+     * @param AddressType|Path|null $address vCard-style address
+     */
     public function __construct(
         public float|Path|null $latitude = null,
         public float|Path|null $longitude = null,

@@ -15,6 +15,9 @@ final readonly class OptionalParameterType extends AbstractRecord
         'DefaultValue' => ['defaultValue', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $defaultValue Default value for an optional parameter of primitive or enumeration type, using the same rules as the `cast` function in URLs.
+     */
     public function __construct(
         public string|Path|null $defaultValue = null,
     ) {}

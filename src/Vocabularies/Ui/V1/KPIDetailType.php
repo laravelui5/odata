@@ -19,7 +19,10 @@ final readonly class KPIDetailType extends AbstractRecord
     ];
 
     /**
-     * @param list<PresentationVariantType>|Path|null $alternativePresentationVariants
+     * @param PresentationVariantType|Path|null $defaultPresentationVariant Presentation variant, either specified inline or referencing another annotation via Path
+     * @param list<PresentationVariantType>|Path|null $alternativePresentationVariants A list of alternative presentation variants, either specified inline or referencing another annotation via Path
+     * @param string|Path|null $semanticObject Name of the Semantic Object. If not specified, use Semantic Object annotated at the property referenced in KPI/DataPoint/Value
+     * @param string|Path|null $action Name of the Action on the Semantic Object. If not specified, let user choose which of the available actions to trigger.
      */
     public function __construct(
         public PresentationVariantType|Path|null $defaultPresentationVariant = null,

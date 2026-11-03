@@ -16,6 +16,11 @@ final readonly class ValueListParameterConstant extends ValueListParameter
         'InitialValueIsSignificant' => ['initialValueIsSignificant', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param string|Path|null $valueListProperty Path to property in the value list . Format is identical to PropertyPath annotations.
+     * @param mixed $constant Constant value that is used to filter the value list with `eq` comparison, using the same representation as property default values, see [CSDL XML, 7.2.7 Default Value](https://docs.oasis-open.org/odata/odata-csdl-xml/v4.01/odata-csdl-xml-v4.01.html#sec_DefaultValue)
+     * @param bool|Path|null $initialValueIsSignificant Initial value, e.g. empty string, is a valid and significant value
+     */
     public function __construct(
         string|Path|null $valueListProperty = null,
         public mixed $constant = null,

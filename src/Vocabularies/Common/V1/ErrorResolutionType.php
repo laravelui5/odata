@@ -17,6 +17,11 @@ final readonly class ErrorResolutionType extends AbstractRecord
         'AdditionalNote' => ['additionalNote', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $analysis Short hint on how to analyze this error
+     * @param string|Path|null $note Note for error resolution
+     * @param string|Path|null $additionalNote Additional note for error resolution
+     */
     public function __construct(
         public string|Path|null $analysis = null,
         public string|Path|null $note = null,

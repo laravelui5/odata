@@ -17,7 +17,8 @@ final readonly class UrlType extends AbstractRecord
     ];
 
     /**
-     * @param ContactInformationType|list<ContactInformationType>|Path|null $type
+     * @param string|Path|null $uri This MUST use the URL schema defined in RFC3986
+     * @param ContactInformationType|list<ContactInformationType>|Path|null $type URL type
      */
     public function __construct(
         public string|Path|null $uri = null,

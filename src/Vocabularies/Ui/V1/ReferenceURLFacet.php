@@ -20,6 +20,12 @@ final readonly class ReferenceURLFacet extends Facet
         'UrlContentType' => ['urlContentType', 'Edm.String', false],
     ];
 
+    /**
+     * @param string|Path|null $label Facet label
+     * @param string|Path|null $id Unique identifier of a facet. ID should be stable, as long as the perceived semantics of the facet is unchanged.
+     * @param string|Path|null $url URL of referenced information
+     * @param string|Path|null $urlContentType Media type of referenced information
+     */
     public function __construct(
         string|Path|null $label = null,
         string|Path|null $id = null,

@@ -21,6 +21,12 @@ final readonly class SelectionRangeType extends AbstractRecord
         'High' => ['high', 'Edm.PrimitiveType', false],
     ];
 
+    /**
+     * @param SelectionRangeSignType|Path|null $sign Include or exclude values
+     * @param SelectionRangeOptionType|Path|null $option Comparison operator
+     * @param mixed $low Single value or lower interval boundary
+     * @param mixed $high Upper interval boundary
+     */
     public function __construct(
         public SelectionRangeSignType|Path|null $sign = null,
         public SelectionRangeOptionType|Path|null $option = null,

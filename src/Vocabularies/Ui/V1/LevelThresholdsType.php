@@ -24,7 +24,13 @@ final readonly class LevelThresholdsType extends CriticalityThresholdsType
     ];
 
     /**
-     * @param list<string>|Path|null $aggregationLevel
+     * @param mixed $acceptanceRangeLowValue Lowest value that is considered positive
+     * @param mixed $acceptanceRangeHighValue Highest value that is considered positive
+     * @param mixed $toleranceRangeLowValue Lowest value that is considered neutral
+     * @param mixed $toleranceRangeHighValue Highest value that is considered neutral
+     * @param mixed $deviationRangeLowValue Lowest value that is considered critical
+     * @param mixed $deviationRangeHighValue Highest value that is considered critical
+     * @param list<string>|Path|null $aggregationLevel An unordered tuple of dimensions, i.e. properties which are intended to be used for grouping in aggregating requests. In analytical UIs, e.g. an analytical chart, the aggregation level typically corresponds to the visible dimensions.
      */
     public function __construct(
         mixed $acceptanceRangeLowValue = null,

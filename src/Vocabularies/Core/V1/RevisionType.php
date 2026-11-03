@@ -17,6 +17,11 @@ final readonly class RevisionType extends AbstractRecord
         'Description' => ['description', 'Edm.String', true],
     ];
 
+    /**
+     * @param string|Path|null $version The schema version with which this revision was first published
+     * @param RevisionKind|Path|null $kind The kind of revision
+     * @param string|Path|null $description Text describing the reason for the revision
+     */
     public function __construct(
         public string|Path|null $version = null,
         public RevisionKind|Path|null $kind = null,

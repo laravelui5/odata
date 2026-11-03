@@ -28,6 +28,9 @@ final readonly class OptionalParameter implements TypedAnnotationInterface
         FunctionParameterInterface::class,
     ];
 
+    /**
+     * @param string|Path|null $defaultValue Default value for an optional parameter of primitive or enumeration type, using the same rules as the `cast` function in URLs.
+     */
     public function __construct(
         public string|Path|null $defaultValue = null,
         public ?string $qualifier = null,

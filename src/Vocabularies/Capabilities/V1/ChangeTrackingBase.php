@@ -15,6 +15,9 @@ readonly class ChangeTrackingBase extends AbstractRecord
         'Supported' => ['supported', 'Edm.Boolean', false],
     ];
 
+    /**
+     * @param bool|Path|null $supported odata.track-changes preference is supported
+     */
     public function __construct(
         public bool|Path|null $supported = null,
     ) {}
