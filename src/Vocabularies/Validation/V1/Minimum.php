@@ -38,11 +38,11 @@ final readonly class Minimum implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         if ($this->value === null) {
             throw new LogicException('The term Org.OData.Validation.V1.Minimum requires a value.');
         }
-        return AnnotationValueWriter::write($this->value, $this->type?->value ?? 'Edm.PrimitiveType');
+        return AnnotationValueWriter::write($this->value, $this->type->value ?? 'Edm.PrimitiveType');
     }
 }

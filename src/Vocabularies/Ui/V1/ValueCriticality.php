@@ -36,7 +36,7 @@ final readonly class ValueCriticality implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return AnnotationValueWriter::write($this->value, 'Collection(com.sap.vocabularies.UI.v1.ValueCriticalityType)');
     }

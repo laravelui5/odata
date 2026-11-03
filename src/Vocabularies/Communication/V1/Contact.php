@@ -70,7 +70,7 @@ final readonly class Contact implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new ContactType(
             fn: $this->fn,

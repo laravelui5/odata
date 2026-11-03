@@ -6,6 +6,11 @@ use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use LaravelUi5\OData\Fixtures\AnnotationDiscoveryServiceRegistry;
 use LaravelUi5\OData\Tests\TestCase;
 
+use function LaravelUi5\OData\Tests\Vocabularies\csdlSchemaErrors;
+use function LaravelUi5\OData\Tests\Vocabularies\csdlXpath;
+use function LaravelUi5\OData\Tests\Vocabularies\elementsAt;
+use function LaravelUi5\OData\Tests\Vocabularies\recordAttributes;
+
 /**
  * Tier-4 HTTP round-trip tests for annotation discovery.
  *
@@ -45,27 +50,13 @@ describe('Annotation discovery $metadata', function () {
     });
 
     it('serializes LineItem as a collection of typed DataField records', function () {
-        $doc = new DOMDocument();
-        $doc->loadXML($this->get('/odata/$metadata')->streamedContent());
-        $xpath = new DOMXPath($doc);
-        $xpath->registerNamespace('edm', 'http://docs.oasis-open.org/odata/ns/edm');
-
-        $records = iterator_to_array($xpath->query(
+        $xpath   = csdlXpath($this->get('/odata/$metadata')->streamedContent());
+        $records = elementsAt(
+            $xpath,
             '//edm:EntityType[@Name="AnnotatedAirport"]'
             . '/edm:Annotation[@Term="com.sap.vocabularies.UI.v1.LineItem"]/edm:Collection/edm:Record',
-        ));
-        // Property → "Kind=value" for the attribute-notation values of a record.
-        $fields = static function (DOMElement $record) use ($xpath): array {
-            $fields = [];
-            foreach ($xpath->query('edm:PropertyValue', $record) as $pv) {
-                foreach ($pv->attributes as $attribute) {
-                    if ($attribute->name !== 'Property') {
-                        $fields[$pv->getAttribute('Property')] = "{$attribute->name}={$attribute->value}";
-                    }
-                }
-            }
-            return $fields;
-        };
+        );
+        $fields = static fn(DOMElement $record): array => recordAttributes($xpath, $record);
 
         expect($records)->toHaveCount(2)
             ->and($records[0]->getAttribute('Type'))->toBe('com.sap.vocabularies.UI.v1.DataField')
@@ -78,16 +69,7 @@ describe('Annotation discovery $metadata', function () {
     });
 
     it('serves a $metadata document that validates against the OASIS CSDL schema', function () {
-        $doc = new DOMDocument();
-        $doc->loadXML($this->get('/odata/$metadata')->streamedContent());
-
-        libxml_use_internal_errors(true);
-        libxml_clear_errors();
-        $valid  = $doc->schemaValidate(dirname(__DIR__, 2) . '/schemas/csdl.xsd');
-        $errors = array_map(static fn(LibXMLError $e) => trim($e->message), libxml_get_errors());
-        libxml_clear_errors();
-
-        expect($errors)->toBe([])->and($valid)->toBeTrue();
+        expect(csdlSchemaErrors($this->get('/odata/$metadata')->streamedContent()))->toBe([]);
     });
 
     it('includes Label annotation on property', function () {

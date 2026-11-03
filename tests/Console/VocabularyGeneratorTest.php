@@ -4,7 +4,16 @@ declare(strict_types=1);
 
 use LaravelUi5\OData\Console\VocabularyGenerator;
 use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\CollectionAnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\ConstantAnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\PropertyValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\RecordAnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
+
+use function LaravelUi5\OData\Tests\Vocabularies\narrow;
 
 /*
  * The generator end to end, offline: the catalog's URIs answered by fixture vocabularies.
@@ -105,8 +114,8 @@ beforeEach(function () {
             . '<edmx:DataServices><Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="empty.'
             . basename($uri, '.xml') . '"/></edmx:DataServices></edmx:Edmx>',
     };
-    $this->lines     = [];
-    $this->generator = new VocabularyGenerator($this->outputRoot, fn(string $l) => $this->lines[] = $l, $fetcher);
+    $this->lines     = new ArrayObject();
+    $this->generator = new VocabularyGenerator($this->outputRoot, fn(string $l) => $this->lines->append($l), $fetcher);
     $this->read      = fn(string $path): string => (string) file_get_contents("{$this->outputRoot}/Vocabularies/{$path}");
 });
 
@@ -162,7 +171,7 @@ it('reads every vocabulary before generating a single one', function () {
 
 it('refuses an unknown alias', function () {
     expect($this->generator->run('Nope'))->toBeFalse()
-        ->and($this->lines)->toContain('ERROR: Unknown vocabulary alias: Nope');
+        ->and($this->lines->getArrayCopy())->toContain('ERROR: Unknown vocabulary alias: Nope');
 });
 
 it('writes complex types as a class hierarchy, across vocabularies', function () {
@@ -208,37 +217,80 @@ function withGeneratedProbes(string $outputRoot, Closure $test): void
     }
 }
 
-/** A generated class, built by reflection: it exists only once generated. */
-function makeGenerated(string $class, array $args = []): object
+/**
+ * A generated term, built by reflection: it exists only once generated.
+ *
+ * @param array<int|string, mixed> $args
+ */
+function makeGeneratedTerm(string $class, array $args = []): TypedAnnotationInterface
 {
-    return (new ReflectionClass('LaravelUi5\\OData\\Vocabularies\\' . $class))->newInstanceArgs($args);
+    return narrow(
+        TypedAnnotationInterface::class,
+        (new ReflectionClass('LaravelUi5\\OData\\Vocabularies\\' . $class))->newInstanceArgs($args),
+    );
+}
+
+/**
+ * A generated record class, built by reflection: it exists only once generated.
+ *
+ * @param array<int|string, mixed> $args
+ */
+function makeGeneratedRecord(string $class, array $args = []): AbstractRecord
+{
+    return narrow(
+        AbstractRecord::class,
+        (new ReflectionClass('LaravelUi5\\OData\\Vocabularies\\' . $class))->newInstanceArgs($args),
+    );
+}
+
+/** The value a term writes, which the test expects to be there. */
+function writtenValue(TypedAnnotationInterface $term): AnnotationValueInterface
+{
+    return narrow(AnnotationValueInterface::class, $term->toAnnotation()->getValue());
+}
+
+/** The constant a term writes, as "Kind=value". */
+function writtenConstant(TypedAnnotationInterface $term): string
+{
+    $constant = narrow(ConstantAnnotationValueInterface::class, writtenValue($term));
+
+    return $constant->getKind() . '=' . $constant->getValue();
+}
+
+/** The record a term writes. */
+function writtenRecord(TypedAnnotationInterface $term): RecordAnnotationValueInterface
+{
+    return narrow(RecordAnnotationValueInterface::class, writtenValue($term));
+}
+
+/** @return list<string> the property names of a record, in order */
+function recordProperties(RecordAnnotationValueInterface $record): array
+{
+    return array_map(static fn(PropertyValueInterface $pv) => $pv->getProperty(), $record->getPropertyValues());
 }
 
 it('writes record classes that load and write their records', function () {
     $this->generator->run();
 
     withGeneratedProbes($this->outputRoot, function () {
-        $class    = 'LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeFieldWithUrl';
-        $field    = 'LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeField';
         $positive = constant('LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeCriticality::Positive');
-        $make     = static fn(string $c, array $args) => (new ReflectionClass($c))->newInstanceArgs($args);
-        $record   = $make($class, [
+        $record   = makeGeneratedRecord('Ui\\V1\\ProbeFieldWithUrl', [
             'label'       => 'Code',
             'criticality' => $positive,
             'value'       => 'code',
             'url'         => 'https://example.test',
-            'items'       => [$make($field, ['value' => true])],
+            'items'       => [makeGeneratedRecord('Ui\\V1\\ProbeField', ['value' => true])],
         ])->toRecord();
+        $criticality = narrow(ConstantAnnotationValueInterface::class, $record->getPropertyValue('Criticality')?->getValue());
+        $items       = narrow(CollectionAnnotationValueInterface::class, $record->getPropertyValue('Items')?->getValue());
 
         expect($record->getType())->toBe('com.sap.vocabularies.UI.v1.ProbeFieldWithUrl')
-            ->and(array_map(static fn($pv) => $pv->getProperty(), $record->getPropertyValues()))
-            ->toBe(['Label', 'Criticality', 'Value', 'Url', 'Items'])
-            ->and($record->getPropertyValue('Criticality')->getValue()->getValue())
-            ->toBe('com.sap.vocabularies.UI.v1.ProbeCriticality/Positive')
-            ->and($record->getPropertyValue('Items')->getValue()->getItems()[0]->getType())
+            ->and(recordProperties($record))->toBe(['Label', 'Criticality', 'Value', 'Url', 'Items'])
+            ->and($criticality->getValue())->toBe('com.sap.vocabularies.UI.v1.ProbeCriticality/Positive')
+            ->and(narrow(RecordAnnotationValueInterface::class, $items->getItems()[0])->getType())
             ->toBe('com.sap.vocabularies.UI.v1.ProbeField');
 
-        expect(fn() => $make($class, ['value' => 'code'])->toRecord())
+        expect(fn() => makeGeneratedRecord('Ui\\V1\\ProbeFieldWithUrl', ['value' => 'code'])->toRecord())
             ->toThrow(LogicException::class, 'requires the field Url');
     });
 });
@@ -247,34 +299,36 @@ it('writes every term value through the value writer', function () {
     $this->generator->run();
 
     withGeneratedProbes($this->outputRoot, function () {
-        $value = static fn(object $term) => $term->toAnnotation()->getValue();
-
-        $lineItem = $value(makeGenerated('Ui\\V1\\ProbeLineItem', [[makeGenerated('Ui\\V1\\ProbeField', ['value' => new Path('code')])]]));
-        expect($lineItem->getItems()[0]->getType())->toBe('com.sap.vocabularies.UI.v1.ProbeField')
-            ->and($lineItem->getItems()[0]->getPropertyValue('Value')->getValue()->getKind())->toBe('Path');
+        $lineItem = narrow(CollectionAnnotationValueInterface::class, writtenValue(makeGeneratedTerm(
+            'Ui\\V1\\ProbeLineItem',
+            [[makeGeneratedRecord('Ui\\V1\\ProbeField', ['value' => new Path('code')])]],
+        )));
+        $field = narrow(RecordAnnotationValueInterface::class, $lineItem->getItems()[0]);
+        expect($field->getType())->toBe('com.sap.vocabularies.UI.v1.ProbeField')
+            ->and(narrow(ConstantAnnotationValueInterface::class, $field->getPropertyValue('Value')?->getValue())->getKind())
+            ->toBe('Path');
 
         $positive = constant('LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeCriticality::Positive');
         $read     = constant('LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeFlags::Read');
         $write    = constant('LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeFlags::Write');
-        $constant = static fn(object $term) => $value($term)->getKind() . '=' . $value($term)->getValue();
 
-        expect($constant(makeGenerated('Ui\\V1\\ProbeCriticalityTerm', [$positive])))
+        expect(writtenConstant(makeGeneratedTerm('Ui\\V1\\ProbeCriticalityTerm', [$positive])))
             ->toBe('EnumMember=com.sap.vocabularies.UI.v1.ProbeCriticality/Positive')
-            ->and($constant(makeGenerated('Ui\\V1\\ProbeCriticalityTerm', [new Path('crit')])))->toBe('Path=crit')
-            ->and($constant(makeGenerated('Ui\\V1\\ProbeFlagsTerm', [[$read, $write]])))
+            ->and(writtenConstant(makeGeneratedTerm('Ui\\V1\\ProbeCriticalityTerm', [new Path('crit')])))->toBe('Path=crit')
+            ->and(writtenConstant(makeGeneratedTerm('Ui\\V1\\ProbeFlagsTerm', [[$read, $write]])))
             ->toBe('EnumMember=com.sap.vocabularies.UI.v1.ProbeFlags/Read com.sap.vocabularies.UI.v1.ProbeFlags/Write')
-            ->and($constant(makeGenerated('Ui\\V1\\ProbeMinimum', [0])))->toBe('Int=0')
-            ->and($constant(makeGenerated('Ui\\V1\\ProbeMinimum', ['2026-01-01', EdmPrimitiveType::Date])))
+            ->and(writtenConstant(makeGeneratedTerm('Ui\\V1\\ProbeMinimum', [0])))->toBe('Int=0')
+            ->and(writtenConstant(makeGeneratedTerm('Ui\\V1\\ProbeMinimum', ['2026-01-01', EdmPrimitiveType::Date])))
             ->toBe('Date=2026-01-01')
-            ->and($constant(makeGenerated('Ui\\V1\\ProbePath', ['code'])))->toBe('PropertyPath=code')
+            ->and(writtenConstant(makeGeneratedTerm('Ui\\V1\\ProbePath', ['code'])))->toBe('PropertyPath=code')
             // A value path where a SAP client reads one (CodeList.StandardCode through …/$Path).
-            ->and($constant(makeGenerated('Ui\\V1\\ProbePath', [new Path('code')])))->toBe('Path=code')
-            ->and($value(makeGenerated('Ui\\V1\\ProbeDefaulted')))->toBeNull()
-            ->and($value(makeGenerated('Ui\\V1\\ProbeCriticalityTerm')))->toBeNull();
+            ->and(writtenConstant(makeGeneratedTerm('Ui\\V1\\ProbePath', [new Path('code')])))->toBe('Path=code')
+            ->and(makeGeneratedTerm('Ui\\V1\\ProbeDefaulted')->toAnnotation()->getValue())->toBeNull()
+            ->and(makeGeneratedTerm('Ui\\V1\\ProbeCriticalityTerm')->toAnnotation()->getValue())->toBeNull();
 
-        expect(fn() => makeGenerated('Ui\\V1\\ProbeMinimum')->toAnnotation())
+        expect(fn() => makeGeneratedTerm('Ui\\V1\\ProbeMinimum')->toAnnotation())
             ->toThrow(LogicException::class, 'The term com.sap.vocabularies.UI.v1.ProbeMinimum requires a value.')
-            ->and(fn() => makeGenerated('Ui\\V1\\ProbeLineItem', [['code']])->toAnnotation())
+            ->and(fn() => makeGeneratedTerm('Ui\\V1\\ProbeLineItem', [['code']])->toAnnotation())
             ->toThrow(LogicException::class, 'takes a record or an enumeration member, string given');
     });
 
@@ -295,12 +349,11 @@ it('gives a term of one concrete record the record\'s fields and builds it throu
         ->toContain("'ID' => ['id', 'Edm.String', false],");
 
     withGeneratedProbes($this->outputRoot, function () {
-        $record = makeGenerated('Ui\\V1\\ProbeVariant', ['value' => 'code', 'url' => 'https://example.test', 'label' => 'Code'])
-            ->toAnnotation()->getValue();
+        $record = writtenRecord(makeGeneratedTerm('Ui\\V1\\ProbeVariant', ['value' => 'code', 'url' => 'https://example.test', 'label' => 'Code']));
         expect($record->getType())->toBe('com.sap.vocabularies.UI.v1.ProbeFieldWithUrl')
-            ->and(array_map(static fn($pv) => $pv->getProperty(), $record->getPropertyValues()))->toBe(['Label', 'Value', 'Url']);
+            ->and(recordProperties($record))->toBe(['Label', 'Value', 'Url']);
 
-        expect(fn() => makeGenerated('Ui\\V1\\ProbeVariant', ['value' => 'code'])->toAnnotation())
+        expect(fn() => makeGeneratedTerm('Ui\\V1\\ProbeVariant', ['value' => 'code'])->toAnnotation())
             ->toThrow(LogicException::class, 'requires the field Url');
     });
 });
@@ -311,11 +364,10 @@ it('gives a term of an abstract record type a record of any type deriving from i
     expect(($this->read)('Ui/V1/ProbeDefault.php'))->toContain('public ProbeAbstract|Path|null $value = null,');
 
     withGeneratedProbes($this->outputRoot, function () {
-        $record = makeGenerated('Ui\\V1\\ProbeDefault', [makeGenerated('Ui\\V1\\ProbeField', ['value' => 1])])
-            ->toAnnotation()->getValue();
+        $record = writtenRecord(makeGeneratedTerm('Ui\\V1\\ProbeDefault', [makeGeneratedRecord('Ui\\V1\\ProbeField', ['value' => 1])]));
         expect($record->getType())->toBe('com.sap.vocabularies.UI.v1.ProbeField');
 
-        expect(fn() => makeGenerated('Ui\\V1\\ProbeDefault')->toAnnotation())
+        expect(fn() => makeGeneratedTerm('Ui\\V1\\ProbeDefault')->toAnnotation())
             ->toThrow(LogicException::class, 'The term com.sap.vocabularies.UI.v1.ProbeDefault requires a value.');
     });
 });
@@ -333,7 +385,7 @@ it('maps the AppliesTo values of the standard, Collection and Member included', 
     // FunctionImport and Record are CSDL values without a PHP target: no attribute, no warning. Bogus is not CSDL.
     expect(($this->read)('Core/V1/ProbeImportTerm.php'))->not->toContain('#[Attribute')
         ->toContain('FunctionImportInterface::class,')
-        ->and(array_values(array_filter($this->lines, static fn(string $l) => str_contains($l, 'WARN'))))
+        ->and(array_values(preg_grep('/WARN/', $this->lines->getArrayCopy()) ?: []))
         ->toBe(["  WARN: Org.OData.Core.V1.ProbeImportTerm: AppliesTo value 'Bogus' is not defined by CSDL — skipped."]);
 });
 

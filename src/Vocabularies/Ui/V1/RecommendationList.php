@@ -44,7 +44,7 @@ final readonly class RecommendationList implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new RecommendationListType(
             collectionPath: $this->collectionPath,

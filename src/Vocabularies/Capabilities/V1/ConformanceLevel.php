@@ -33,7 +33,7 @@ final readonly class ConformanceLevel implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         if ($this->value === null) {
             throw new LogicException('The term Org.OData.Capabilities.V1.ConformanceLevel requires a value.');

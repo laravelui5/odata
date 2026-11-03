@@ -38,7 +38,7 @@ final readonly class SemanticObjectUnavailableActions implements TypedAnnotation
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return AnnotationValueWriter::write($this->value, 'Collection(Edm.String)');
     }

@@ -33,7 +33,7 @@ final readonly class IsFiscalYearQuarter implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): null
     {
         return null;
     }

@@ -41,7 +41,7 @@ final readonly class ConnectedFields implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new ConnectedFieldsType(
             label: $this->label,

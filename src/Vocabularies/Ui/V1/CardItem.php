@@ -40,7 +40,7 @@ final readonly class CardItem implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new CardItemType(
             header: $this->header,

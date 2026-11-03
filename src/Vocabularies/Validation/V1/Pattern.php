@@ -37,7 +37,7 @@ final readonly class Pattern implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         if ($this->value === null) {
             throw new LogicException('The term Org.OData.Validation.V1.Pattern requires a value.');

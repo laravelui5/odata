@@ -31,7 +31,7 @@ final readonly class ExpandAfterConcatSupported implements TypedAnnotationInterf
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): null
     {
         return null;
     }

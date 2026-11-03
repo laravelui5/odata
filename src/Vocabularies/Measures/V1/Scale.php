@@ -37,7 +37,7 @@ final readonly class Scale implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         if ($this->value === null) {
             throw new LogicException('The term Org.OData.Measures.V1.Scale requires a value.');

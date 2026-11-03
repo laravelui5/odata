@@ -44,7 +44,7 @@ final readonly class SelectionPresentationVariant implements TypedAnnotationInte
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new SelectionPresentationVariantType(
             id: $this->id,

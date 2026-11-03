@@ -49,7 +49,7 @@ final readonly class CriticalityCalculation implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new CriticalityCalculationType(
             acceptanceRangeLowValue: $this->acceptanceRangeLowValue,

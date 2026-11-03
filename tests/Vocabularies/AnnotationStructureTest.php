@@ -23,6 +23,8 @@ use LaravelUi5\OData\Vocabularies\Validation\V1\Minimum;
 use function LaravelUi5\OData\Tests\Vocabularies\annotatedCsdl;
 use function LaravelUi5\OData\Tests\Vocabularies\csdlSchemaErrors;
 use function LaravelUi5\OData\Tests\Vocabularies\csdlXpath;
+use function LaravelUi5\OData\Tests\Vocabularies\elementAt;
+use function LaravelUi5\OData\Tests\Vocabularies\elementsAt;
 use function LaravelUi5\OData\Tests\Vocabularies\recordAttributes;
 
 /*
@@ -34,10 +36,8 @@ use function LaravelUi5\OData\Tests\Vocabularies\recordAttributes;
 function termAnnotation(DOMXPath $xpath, string $term, ?string $property = null): DOMElement
 {
     $on = $property !== null ? "/edm:Property[@Name='{$property}']" : '';
-    $nodes = $xpath->query("//edm:EntityType[@Name='Airport']{$on}/edm:Annotation[@Term='{$term}']");
-    expect($nodes->length)->toBe(1);
 
-    return $nodes->item(0);
+    return elementAt($xpath, "//edm:EntityType[@Name='Airport']{$on}/edm:Annotation[@Term='{$term}']");
 }
 
 describe('a collection of records', function () {
@@ -48,10 +48,7 @@ describe('a collection of records', function () {
             new DataFieldWithUrl(value: new Path('name'), url: 'https://example.test'),
         ])]);
         $xpath   = csdlXpath($xml);
-        $records = iterator_to_array($xpath->query(
-            'edm:Collection/edm:Record',
-            termAnnotation($xpath, 'com.sap.vocabularies.UI.v1.LineItem'),
-        ));
+        $records = elementsAt($xpath, 'edm:Collection/edm:Record', termAnnotation($xpath, 'com.sap.vocabularies.UI.v1.LineItem'));
 
         expect(array_map(static fn(DOMElement $r) => $r->getAttribute('Type'), $records))->toBe([
             'com.sap.vocabularies.UI.v1.DataField',
@@ -69,10 +66,6 @@ describe('a collection of records', function () {
             ->and(recordAttributes($xpath, $records[2]))->toBe(['Value' => 'Path=name', 'Url' => 'String=https://example.test'])
             ->and(csdlSchemaErrors($xml))->toBe([]);
     });
-
-    it('fails loud on a string where the collection takes records', function () {
-        new LineItem(['code'])->toAnnotation();
-    })->throws(LogicException::class, 'A com.sap.vocabularies.UI.v1.DataFieldAbstract takes a record or an enumeration member, string given.');
 });
 
 describe('a term of one record', function () {
@@ -83,14 +76,14 @@ describe('a term of one record', function () {
             includeGrandTotal: false,
         )]);
         $xpath  = csdlXpath($xml);
-        $record = $xpath->query('edm:Record', termAnnotation($xpath, 'com.sap.vocabularies.UI.v1.PresentationVariant'))->item(0);
-        $sort   = $xpath->query("edm:PropertyValue[@Property='SortOrder']/edm:Collection/edm:Record", $record);
+        $record = elementAt($xpath, 'edm:Record', termAnnotation($xpath, 'com.sap.vocabularies.UI.v1.PresentationVariant'));
+        $sort   = elementsAt($xpath, "edm:PropertyValue[@Property='SortOrder']/edm:Collection/edm:Record", $record);
 
         expect($record->getAttribute('Type'))->toBe('com.sap.vocabularies.UI.v1.PresentationVariantType')
             ->and(recordAttributes($xpath, $record))->toBe(['MaxItems' => 'Int=10', 'IncludeGrandTotal' => 'Bool=false'])
-            ->and($sort->length)->toBe(1)
-            ->and($sort->item(0)->getAttribute('Type'))->toBe('com.sap.vocabularies.Common.v1.SortOrderType')
-            ->and(recordAttributes($xpath, $sort->item(0)))->toBe(['Property' => 'PropertyPath=code', 'Descending' => 'Bool=true'])
+            ->and($sort)->toHaveCount(1)
+            ->and($sort[0]->getAttribute('Type'))->toBe('com.sap.vocabularies.Common.v1.SortOrderType')
+            ->and(recordAttributes($xpath, $sort[0]))->toBe(['Property' => 'PropertyPath=code', 'Descending' => 'Bool=true'])
             ->and(csdlSchemaErrors($xml))->toBe([]);
     });
 
@@ -109,9 +102,9 @@ describe('an enumeration', function () {
         $xpath = csdlXpath($xml);
         $on    = "//edm:Property[@Name='code']/edm:Annotation";
 
-        expect($xpath->query("{$on}[@Qualifier='Static']")->item(0)->getAttribute('EnumMember'))
+        expect(elementAt($xpath, "{$on}[@Qualifier='Static']")->getAttribute('EnumMember'))
             ->toBe('com.sap.vocabularies.Common.v1.FieldControlType/Mandatory')
-            ->and($xpath->query("{$on}[@Qualifier='Dynamic']")->item(0)->getAttribute('Path'))->toBe('fieldControl')
+            ->and(elementAt($xpath, "{$on}[@Qualifier='Dynamic']")->getAttribute('Path'))->toBe('fieldControl')
             ->and(termAnnotation($xpath, 'Org.OData.Core.V1.Permissions', 'code')->getAttribute('EnumMember'))
             ->toBe('Org.OData.Core.V1.Permission/Read Org.OData.Core.V1.Permission/Write')
             ->and(csdlSchemaErrors($xml))->toBe([]);
@@ -128,8 +121,8 @@ describe('a model path and a primitive type', function () {
         $xpath = csdlXpath($xml);
         $on    = "//edm:Property[@Name='code']/edm:Annotation[@Term='com.sap.vocabularies.CodeList.v1.StandardCode']";
 
-        expect($xpath->query("{$on}[@Qualifier='Model']")->item(0)->getAttribute('PropertyPath'))->toBe('iso')
-            ->and($xpath->query("{$on}[@Qualifier='Ui5']")->item(0)->getAttribute('Path'))->toBe('iso')
+        expect(elementAt($xpath, "{$on}[@Qualifier='Model']")->getAttribute('PropertyPath'))->toBe('iso')
+            ->and(elementAt($xpath, "{$on}[@Qualifier='Ui5']")->getAttribute('Path'))->toBe('iso')
             ->and(csdlSchemaErrors($xml))->toBe([]);
     });
 
@@ -141,8 +134,8 @@ describe('a model path and a primitive type', function () {
         $xpath = csdlXpath($xml);
         $on    = "//edm:Property[@Name='code']/edm:Annotation[@Term='Org.OData.Validation.V1.Minimum']";
 
-        expect($xpath->query("{$on}[@Qualifier='Number']")->item(0)->getAttribute('Int'))->toBe('0')
-            ->and($xpath->query("{$on}[@Qualifier='Day']")->item(0)->getAttribute('Date'))->toBe('2026-01-01')
+        expect(elementAt($xpath, "{$on}[@Qualifier='Number']")->getAttribute('Int'))->toBe('0')
+            ->and(elementAt($xpath, "{$on}[@Qualifier='Day']")->getAttribute('Date'))->toBe('2026-01-01')
             ->and(csdlSchemaErrors($xml))->toBe([]);
     });
 

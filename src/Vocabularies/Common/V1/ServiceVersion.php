@@ -33,7 +33,7 @@ final readonly class ServiceVersion implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         if ($this->value === null) {
             throw new LogicException('The term com.sap.vocabularies.Common.v1.ServiceVersion requires a value.');

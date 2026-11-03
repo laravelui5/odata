@@ -64,7 +64,7 @@ final readonly class ResourceException implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new ResourceExceptionType(
             info: $this->info,

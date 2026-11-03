@@ -39,7 +39,7 @@ final readonly class ResourcePath implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         if ($this->value === null) {
             throw new LogicException('The term Org.OData.Core.V1.ResourcePath requires a value.');

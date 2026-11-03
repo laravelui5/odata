@@ -43,7 +43,7 @@ final readonly class GeoLocation implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new GeoLocationType(
             latitude: $this->latitude,

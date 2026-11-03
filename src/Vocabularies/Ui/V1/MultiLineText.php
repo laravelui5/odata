@@ -35,7 +35,7 @@ final readonly class MultiLineText implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): null
     {
         return null;
     }

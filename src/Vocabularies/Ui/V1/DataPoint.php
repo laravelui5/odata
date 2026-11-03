@@ -73,7 +73,7 @@ final readonly class DataPoint implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new DataPointType(
             title: $this->title,

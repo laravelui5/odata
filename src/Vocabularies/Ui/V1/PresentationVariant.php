@@ -65,7 +65,7 @@ final readonly class PresentationVariant implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new PresentationVariantType(
             id: $this->id,

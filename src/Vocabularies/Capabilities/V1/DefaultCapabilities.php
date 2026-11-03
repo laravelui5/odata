@@ -64,7 +64,7 @@ final readonly class DefaultCapabilities implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new DefaultCapabilitiesType(
             changeTracking: $this->changeTracking,

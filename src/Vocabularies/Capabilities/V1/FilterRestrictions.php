@@ -48,7 +48,7 @@ final readonly class FilterRestrictions implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new FilterRestrictionsType(
             filterable: $this->filterable,

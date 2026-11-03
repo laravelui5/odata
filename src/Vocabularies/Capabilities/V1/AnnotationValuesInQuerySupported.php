@@ -29,7 +29,7 @@ final readonly class AnnotationValuesInQuerySupported implements TypedAnnotation
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): null
     {
         return null;
     }

@@ -38,7 +38,7 @@ final readonly class AlternateKeys implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return AnnotationValueWriter::write($this->value, 'Collection(Org.OData.Core.V1.AlternateKey)');
     }

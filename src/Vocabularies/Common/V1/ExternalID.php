@@ -42,6 +42,6 @@ final readonly class ExternalID implements TypedAnnotationInterface
         if ($this->value === null) {
             return null;
         }
-        return AnnotationValueWriter::write($this->value, $this->type?->value ?? 'Edm.PrimitiveType');
+        return AnnotationValueWriter::write($this->value, $this->type->value ?? 'Edm.PrimitiveType');
     }
 }

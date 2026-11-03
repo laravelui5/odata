@@ -9,6 +9,8 @@ use LaravelUi5\OData\Edm\Contracts\Annotation\CollectionAnnotationValueInterface
 use LaravelUi5\OData\Edm\Contracts\Annotation\ConstantAnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\RecordAnnotationValueInterface;
 
+use function LaravelUi5\OData\Tests\Vocabularies\narrow;
+
 /*
  * Records of vocabulary complex types and the value writer behind them (OP07, step 2). The classes below have the
  * shape the generator writes.
@@ -124,14 +126,16 @@ it('takes a Path in a field of any type', function () {
 });
 
 it('nests records in a collection field', function () {
-    $nested = (new RecordTestField(value: 'x', nested: [new RecordTestField(value: true)]))->toRecord()
-        ->getPropertyValue('Nested')->getValue();
+    $nested = narrow(
+        CollectionAnnotationValueInterface::class,
+        (new RecordTestField(value: 'x', nested: [new RecordTestField(value: true)]))->toRecord()
+            ->getPropertyValue('Nested')?->getValue(),
+    );
+    $item = narrow(RecordAnnotationValueInterface::class, $nested->getItems()[0] ?? null);
 
-    expect($nested)->toBeInstanceOf(CollectionAnnotationValueInterface::class)
-        ->and($nested->getItems())->toHaveCount(1)
-        ->and($nested->getItems()[0])->toBeInstanceOf(RecordAnnotationValueInterface::class)
-        ->and($nested->getItems()[0]->getType())->toBe('test.Ui.v1.Field')
-        ->and(recordFields($nested->getItems()[0]))->toBe(['Value' => 'Bool=true']);
+    expect($nested->getItems())->toHaveCount(1)
+        ->and($item->getType())->toBe('test.Ui.v1.Field')
+        ->and(recordFields($item))->toBe(['Value' => 'Bool=true']);
 });
 
 it('fails loud when a required field is not set', function () {

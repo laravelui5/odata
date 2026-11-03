@@ -46,7 +46,7 @@ final readonly class ModificationQueryOptions implements TypedAnnotationInterfac
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new ModificationQueryOptionsType(
             expandSupported: $this->expandSupported,

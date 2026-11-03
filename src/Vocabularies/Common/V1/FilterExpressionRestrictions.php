@@ -34,7 +34,7 @@ final readonly class FilterExpressionRestrictions implements TypedAnnotationInte
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return AnnotationValueWriter::write($this->value, 'Collection(com.sap.vocabularies.Common.v1.FilterExpressionRestrictionType)');
     }

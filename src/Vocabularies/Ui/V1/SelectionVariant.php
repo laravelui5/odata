@@ -46,7 +46,7 @@ final readonly class SelectionVariant implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new SelectionVariantType(
             id: $this->id,

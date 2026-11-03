@@ -36,11 +36,11 @@ final readonly class UnitSpecificPrecision implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         if ($this->value === null) {
             throw new LogicException('The term com.sap.vocabularies.Common.v1.UnitSpecificPrecision requires a value.');
         }
-        return AnnotationValueWriter::write($this->value, $this->type?->value ?? 'Edm.PrimitiveType');
+        return AnnotationValueWriter::write($this->value, $this->type->value ?? 'Edm.PrimitiveType');
     }
 }

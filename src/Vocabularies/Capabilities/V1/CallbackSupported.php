@@ -36,7 +36,7 @@ final readonly class CallbackSupported implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         return (new CallbackType(
             callbackProtocols: $this->callbackProtocols,

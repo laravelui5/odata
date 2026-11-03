@@ -39,7 +39,7 @@ final readonly class DefaultValuesFunction implements TypedAnnotationInterface
         public ?string $qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): AnnotationValueInterface
     {
         if ($this->value === null) {
             throw new LogicException('The term com.sap.vocabularies.Common.v1.DefaultValuesFunction requires a value.');

@@ -572,7 +572,6 @@ PHP;
         $imports      = new VocabularyImports($phpNs, $name);
 
         // ── Use statements ────────────────────────────────────────────────────
-        $imports->reference('LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\AnnotationValueInterface');
         $imports->reference('LaravelUi5\\OData\\Edm\\Contracts\\AnnotationTargetInterface');
         $imports->reference('LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\TypedAnnotationInterface');
         $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\TypedAnnotationTrait');
@@ -599,12 +598,21 @@ PHP;
         // ── Constructor + buildAnnotationValue ────────────────────────────────
         // A term of one concrete record takes the record's fields; an abstract record type (UI.DataFieldDefault)
         // takes a record of any type deriving from it, like a collection element does.
+        // The return type says what the body does: a marker writes no value, a record or a collection always one,
+        // a single value only when it is set or required.
+        $valueInterface = $imports->reference('LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\AnnotationValueInterface');
         if ($isComplex && !$isCollection && !$this->types->isAbstract($innerType)) {
             [$ctorParams, $ctorDocblock] = $this->recordTermCtorParams($fullyQualified, $innerType, $imports);
-            $buildBody = $this->recordTermBody($innerType, $imports);
+            $buildBody  = $this->recordTermBody($innerType, $imports);
+            $returnType = $valueInterface;
         } else {
             [$ctorParams, $ctorDocblock] = $this->buildTermCtorParams($rawType, $innerType, $isCollection, $imports);
-            $buildBody = $this->buildAnnotationValueBody($fullyQualified, $rawType, $innerType, $isCollection, $nullable, $imports);
+            $buildBody  = $this->buildAnnotationValueBody($fullyQualified, $rawType, $innerType, $isCollection, $nullable, $imports);
+            $returnType = match (true) {
+                $this->isMarkerTerm($rawType, $innerType, $isCollection) => 'null',
+                $isCollection, !$nullable                                 => $valueInterface,
+                default                                                   => "?{$valueInterface}",
+            };
         }
 
         // ── Class docblock ────────────────────────────────────────────────────
@@ -635,7 +643,7 @@ namespace {$phpNs};
 {$ctorParams}        public ?string \$qualifier = null,
     ) {}
 
-    protected function buildAnnotationValue(): ?AnnotationValueInterface
+    protected function buildAnnotationValue(): {$returnType}
     {
         {$buildBody}
     }
@@ -705,7 +713,7 @@ PHP;
         }
 
         $write = $innerType === 'Edm.PrimitiveType'
-            ? "return {$writer}::write(\$this->value, \$this->type?->value ?? 'Edm.PrimitiveType');"
+            ? "return {$writer}::write(\$this->value, \$this->type->value ?? 'Edm.PrimitiveType');"
             : "return {$writer}::write(\$this->value, '{$type}');";
 
         $whenNull = $nullable

@@ -6,6 +6,7 @@ namespace LaravelUi5\OData\Tests\Vocabularies;
 
 use DOMDocument;
 use DOMElement;
+use DOMNode;
 use DOMXPath;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
@@ -20,6 +21,7 @@ use LibXMLError;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use ReflectionClass;
+use UnexpectedValueException;
 
 /*
  * Helpers for the vocabulary tests: a one-type service to put annotations into $metadata, and the OASIS schema check.
@@ -76,11 +78,54 @@ function csdlSchemaErrors(string $xml): array
     return $errors;
 }
 
+/**
+ * `$value` as an instance of `$class`, or a failed test: asserts at runtime and tells PHPStan the type, which a Pest
+ * expectation does not (OP32).
+ *
+ * @template T of object
+ * @param class-string<T> $class
+ * @return T
+ */
+function narrow(string $class, mixed $value): object
+{
+    if (!$value instanceof $class) {
+        throw new UnexpectedValueException(sprintf('Expected %s, got %s.', $class, get_debug_type($value)));
+    }
+
+    return $value;
+}
+
+/**
+ * The elements `$query` selects.
+ *
+ * @return list<DOMElement>
+ */
+function elementsAt(DOMXPath $xpath, string $query, ?DOMNode $context = null): array
+{
+    $elements = [];
+    foreach ($xpath->query($query, $context) ?: [] as $node) {
+        $elements[] = narrow(DOMElement::class, $node);
+    }
+
+    return $elements;
+}
+
+/** The one element `$query` selects; fails when it selects none or several. */
+function elementAt(DOMXPath $xpath, string $query, ?DOMNode $context = null): DOMElement
+{
+    $elements = elementsAt($xpath, $query, $context);
+    if (count($elements) !== 1) {
+        throw new UnexpectedValueException(sprintf('Expected one element at %s, found %d.', $query, count($elements)));
+    }
+
+    return $elements[0];
+}
+
 /** @return array<string, string> property → "Kind=value", for the attribute-notation values of a record */
 function recordAttributes(DOMXPath $xpath, DOMElement $record): array
 {
     $fields = [];
-    foreach ($xpath->query('edm:PropertyValue', $record) as $pv) {
+    foreach (elementsAt($xpath, 'edm:PropertyValue', $record) as $pv) {
         foreach ($pv->attributes as $attribute) {
             if ($attribute->name !== 'Property') {
                 $fields[$pv->getAttribute('Property')] = "{$attribute->name}={$attribute->value}";
