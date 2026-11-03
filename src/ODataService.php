@@ -105,6 +105,20 @@ class ODataService implements ODataServiceInterface
         return resource_path('edmx/' . str_replace('\\', '.', $namespace !== '' ? $namespace : static::class) . '.xml');
     }
 
+    /**
+     * Whether `odata:cache` writes the document at `cachedMetadataXMLPath()` and `odata:clear` removes it.
+     *
+     * By default only a document under `resources/edmx/` belongs to the commands; one elsewhere is a document you ship
+     * yourself, served but never written or deleted. Override this to `true` when your service keeps its generated
+     * document somewhere else and the commands should look after it there.
+     */
+    public function cachesMetadataXML(): bool
+    {
+        $path = $this->cachedMetadataXMLPath();
+
+        return $path !== null && str_starts_with($path, resource_path('edmx') . DIRECTORY_SEPARATOR);
+    }
+
     public function endpoint(): string
     {
         $prefix = rtrim(config('odata.prefix', 'odata'), '/');

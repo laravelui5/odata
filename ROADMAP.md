@@ -196,6 +196,33 @@ an addition, so a minor.
 
 ## Done
 
+### [x] `OP47` `odata:cache` writes the `$metadata` document only under the host's `resources/edmx/` — from Core `OP39` (8), noted 2026-11-03 — *built 2026-11-03, ships as `5.0.0`*
+
+`ManagesMetadataDocument` (OP12) lets `odata:cache` and `odata:clear` write and delete a service's XML document only when
+`cachedMetadataXMLPath()` points under `resource_path('edmx')`; any other path counts as a document the service ships —
+served, never written, never deleted. The rule protects a hand-shipped document from being overwritten.
+
+Core's next major moves the document of every UI5 app: `AbstractUi5App` overrides `cachedMetadataXMLPath()` to
+`resources/ui5/Metadata.xml` in the app's package (author, 2026-11-03: *„Hier haben wir Service:$metadata garantiert mit
+1:1“*), beside the app's built assets and away from the host's `resources/edmx/`. Under today's rule that document is
+never generated: `odata:cache` would take it for a shipped one, and `$metadata` would be built on every request (or answer
+from a stale file nobody rewrites).
+
+**Do (a minor):** let a service say that the cache commands own its designated path, wherever it lies — so `odata:cache`
+writes it and `odata:clear` deletes it — while a path a service does not claim keeps today's meaning. Shape open: a
+method on `ODataService` with a default that keeps the `resources/edmx/` rule (additive; `ODataServiceInterface` does not
+grow), or a small interface a service implements to claim its path. Core's `AbstractUi5App` claims it.
+**Test:** a service claiming a path outside `resources/edmx/` gets its document written by `odata:cache` and removed by
+`odata:clear`; a path it does not claim is served and left alone, as now.
+
+**Target:** ~~Minor~~ Major `5.0.0` (the interface grows), before Core's major is tagged (Core raises its constraint to `^5.0` with it).
+
+**Built 2026-11-03** (author: a method, not a fixed Core path in odata; then into the interface, as a major).
+`ODataServiceInterface::cachesMetadataXML()`, implemented by `ODataService` with the 4.0 rule as default;
+`odata:cache` and `odata:clear` ask the service directly; the trait `ManagesMetadataDocument` is gone (author: a one-line trait at two sites hid more than it saved). Tests in `tests/Console/CacheClassOptionTest.php` (a claimed path outside `resources/edmx/` written and
+removed; the default claims only `resources/edmx/`; the shipped-document test unchanged), fixture
+`tests-fixtures/Cached/Claimed/`. Docs: `services/defining-a-service`, `metadata/metadata-document`.
+
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.

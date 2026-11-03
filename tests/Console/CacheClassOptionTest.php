@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use LaravelUi5\OData\Fixtures\Cached\Claimed\ClaimedFlightService;
 use LaravelUi5\OData\Fixtures\Cached\Flights\CachedFlightService;
 use LaravelUi5\OData\Fixtures\DiscoveryFlightService;
 use LaravelUi5\OData\Fixtures\FlightService;
@@ -25,7 +26,7 @@ function fixturesEdmDir(?string $cached = null): string
 
 function rmFixturesEdm(): void
 {
-    foreach ([fixturesEdmDir(), fixturesEdmDir('Flights')] as $dir) {
+    foreach ([fixturesEdmDir(), fixturesEdmDir('Flights'), fixturesEdmDir('Claimed')] as $dir) {
         if (!is_dir($dir)) {
             continue;
         }
@@ -49,11 +50,14 @@ function cachedFlightsXml(): string
 beforeEach(function () {
     rmFixturesEdm();
     @unlink(cachedFlightsXml());
+    @unlink(ClaimedFlightService::documentPath());
 });
 afterEach(function () {
     rmFixturesEdm();
     @unlink(cachedFlightsXml());
     @rmdir(resource_path('edmx')); // only when empty
+    @unlink(ClaimedFlightService::documentPath());
+    @rmdir(dirname(ClaimedFlightService::documentPath()));
 });
 
 /** Bind a registry returning the given services (resolve() unused by the cache command). */
@@ -154,3 +158,31 @@ it('never writes or deletes a document outside resources/edmx — a service that
     unlink($own);
 });
 
+it('writes and removes a document outside resources/edmx when the service claims it (OP47)', function () {
+    bindRegistry([]);
+    $path = ClaimedFlightService::documentPath();
+
+    $this->artisan('odata:cache', ['--class' => ClaimedFlightService::class])
+        ->expectsOutputToContain('Wrote ' . $path)
+        ->assertSuccessful();
+
+    $cold = (new CsdlSerializer())->serialize((new ClaimedFlightService())->buildForCache()[0]);
+    expect(file_get_contents($path))->toBe($cold);
+
+    $this->artisan('odata:clear', ['--class' => ClaimedFlightService::class])->assertSuccessful();
+    expect(file_exists($path))->toBeFalse();
+});
+
+it('claims by default only a document under resources/edmx', function () {
+    expect((new CachedFlightService())->cachesMetadataXML())->toBeTrue();
+
+    $shipped = new class extends LaravelUi5\OData\ODataService {
+        public function cachedMetadataXMLPath(): string { return '/somewhere/else/Metadata.xml'; }
+    };
+    $none = new class extends LaravelUi5\OData\ODataService {
+        public function cachedMetadataXMLPath(): ?string { return null; }
+    };
+
+    expect($shipped->cachesMetadataXML())->toBeFalse()
+        ->and($none->cachesMetadataXML())->toBeFalse();
+});

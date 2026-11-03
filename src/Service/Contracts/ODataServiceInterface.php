@@ -48,6 +48,14 @@ interface ODataServiceInterface
     public function cachedMetadataXMLPath(): ?string;
 
     /**
+     * Whether `odata:cache` writes the document at `cachedMetadataXMLPath()` and `odata:clear` removes it.
+     *
+     * A document the commands do not look after is one the service ships itself: served, never written or deleted.
+     * `ODataService` answers yes for a path under `resources/edmx/` and no elsewhere.
+     */
+    public function cachesMetadataXML(): bool;
+
+    /**
      * Returns the fully resolved runtime schema for this service.
      *
      * Implementations must cache the result after the first call — schema

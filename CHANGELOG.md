@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [5.0.0] - 2026-11-03 — A service claims its `$metadata` document
+
+A major for one method: `ODataServiceInterface` grows, which breaks a class that implements it directly (decided
+2026-11-03, the author: into the interface, as a major, rather than a minor with an exception). Nothing else changes.
+
+### Changed
+
+- **A service says whether the cache commands look after its `$metadata` document** (`OP47`).
+  `ODataServiceInterface::cachesMetadataXML(): bool` — `odata:cache` writes the document at `cachedMetadataXMLPath()`
+  and `odata:clear` removes it only when the service answers yes. `ODataService` keeps 4.0's rule as its default: yes
+  for a document under `resources/edmx/`, no elsewhere, so a hand-written document outside it is still served, never
+  written or deleted. A service that keeps its generated document elsewhere returns `true`. Consumer: LaravelUi5 Core's
+  UI5 apps, whose document moves to `resources/ui5/Metadata.xml` beside the app's built assets.
+  **Upgrade:** a service that extends `ODataService` needs nothing. A class that implements `ODataServiceInterface`
+  directly adds `cachesMetadataXML()`; returning `false` keeps its document untouched by the commands.
+
 ## [4.0.0] - 2026-11-03
 
 The next major, worked on directly, without a deprecating minor before it (decided 2026-11-02). Its rule:

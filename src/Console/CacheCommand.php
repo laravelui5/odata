@@ -7,7 +7,6 @@ namespace LaravelUi5\OData\Console;
 use LaravelUi5\OData\ODataService;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
-use LaravelUi5\OData\Console\Concerns\ManagesMetadataDocument;
 use LaravelUi5\OData\Console\Concerns\ResolvesServices;
 use LaravelUi5\OData\Service\Cache\EdmxWriter;
 use LaravelUi5\OData\Service\Cache\ResolverMapWriter;
@@ -18,7 +17,6 @@ use LaravelUi5\OData\Service\Serialization\CsdlSerializer;
 
 class CacheCommand extends Command
 {
-    use ManagesMetadataDocument;
     use ResolvesServices;
 
     protected $signature = 'odata:cache {--class= : Comma-separated FQCNs of additional OData services to cache (route-composed/bound services not in the registry)}';
@@ -120,7 +118,7 @@ class CacheCommand extends Command
             ResolverMapWriter::write($service, $resolverMap);
 
             // The finished $metadata document, served as is while it exists (OP12).
-            $xmlPath = $this->managedMetadataDocument($service);
+            $xmlPath = $service->cachesMetadataXML() ? $service->cachedMetadataXMLPath() : null;
             if ($xmlPath !== null) {
                 $fs->ensureDirectoryExists(dirname($xmlPath));
                 $fs->put($xmlPath, (new CsdlSerializer())->serialize($edmx));
