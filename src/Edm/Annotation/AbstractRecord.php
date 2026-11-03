@@ -15,8 +15,8 @@ use LogicException;
  * abstract class, so a term that takes `UI.DataFieldAbstract` accepts every concrete record deriving from it.
  *
  * `toRecord()` writes `<Record Type="…">` with only the fields that are set. A field the vocabulary requires
- * (`Nullable="false"`) is still optional in PHP: leaving it out fails here, when the schema is built, instead of
- * breaking every constructor call when a vocabulary adds a required field.
+ * (`Nullable="false"`, no `DefaultValue`) is still optional in PHP: leaving it out fails here, when the schema is
+ * built, instead of breaking every constructor call when a vocabulary adds a required field.
  *
  * @see OData CSDL XML v4.01 §14.4.10 (Record)
  */
@@ -27,7 +27,8 @@ abstract readonly class AbstractRecord
 
     /**
      * Every field of the type, inherited ones first, by CSDL property name:
-     * [PHP property, qualified CSDL type, nullable].
+     * [PHP property, qualified CSDL type, required]. Required is a single-valued field that is neither nullable nor
+     * has a default (CSDL XML 4.01 §14.4.10).
      *
      * @var array<string, array{0: string, 1: string, 2: bool}>
      */
@@ -39,10 +40,10 @@ abstract readonly class AbstractRecord
     public function toRecord(): RecordAnnotationValueInterface
     {
         $values = [];
-        foreach (static::FIELDS as $name => [$property, $type, $nullable]) {
+        foreach (static::FIELDS as $name => [$property, $type, $required]) {
             $value = $this->{$property};
             if ($value === null) {
-                if (!$nullable) {
+                if ($required) {
                     throw new LogicException(sprintf(
                         'The record %s requires the field %s (named argument $%s).',
                         static::TYPE,

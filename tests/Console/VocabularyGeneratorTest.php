@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use LaravelUi5\OData\Console\VocabularyGenerator;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 
 /*
  * The generator end to end, offline: the catalog's URIs answered by fixture vocabularies.
@@ -67,6 +69,13 @@ const GENERATOR_UI_XML = <<<'XML'
         <Property Name="Url" Type="Edm.String" Nullable="false" />
         <Property Name="Items" Type="Collection(UI.ProbeAbstract)" />
       </ComplexType>
+      <EnumType Name="ProbeFlags" IsFlags="true"><Member Name="Read" Value="1" /><Member Name="Write" Value="2" /></EnumType>
+      <Term Name="ProbeLineItem" Type="Collection(UI.ProbeAbstract)" Nullable="false" AppliesTo="EntityType" />
+      <Term Name="ProbeCriticalityTerm" Type="UI.ProbeCriticality" AppliesTo="Property" />
+      <Term Name="ProbeFlagsTerm" Type="UI.ProbeFlags" Nullable="false" AppliesTo="Property" />
+      <Term Name="ProbeMinimum" Type="Edm.PrimitiveType" Nullable="false" AppliesTo="Property" />
+      <Term Name="ProbeDefaulted" Type="Edm.Int32" Nullable="false" DefaultValue="3" AppliesTo="Property" />
+      <Term Name="ProbePath" Type="Edm.PropertyPath" AppliesTo="Property" />
       <ComplexType Name="ProbeShared" BaseType="Common.ProbeShared">
         <Property Name="B" Type="Edm.Boolean" />
       </ComplexType>
@@ -129,8 +138,8 @@ it('resolves a property type in the vocabulary its alias names, not by simple na
     $code = ($this->read)('Common/V1/RestrictionType.php');
     expect($code)->toContain('public string|Path|null $fromCore = null,')
         ->and($code)->toContain('public FilterExpressionType|Path|null $fromCommon = null,')
-        ->and($code)->toContain("'FromCore' => ['fromCore', 'Edm.String', true],")
-        ->and($code)->toContain("'FromCommon' => ['fromCommon', 'com.sap.vocabularies.Common.v1.FilterExpressionType', true],");
+        ->and($code)->toContain("'FromCore' => ['fromCore', 'Edm.String', false],")
+        ->and($code)->toContain("'FromCommon' => ['fromCommon', 'com.sap.vocabularies.Common.v1.FilterExpressionType', false],");
 });
 
 it('reads every vocabulary before generating a single one', function () {
@@ -165,14 +174,15 @@ it('writes complex types as a class hierarchy, across vocabularies', function ()
         ->toContain('final readonly class ProbeFieldWithUrl extends ProbeField')
         ->toContain("        mixed \$value = null,\n        public string|Path|null \$url = null,")
         ->toContain("            value: \$value,\n        );")
-        ->toContain("'Value' => ['value', 'Edm.PrimitiveType', false],")
+        ->toContain("'Value' => ['value', 'Edm.PrimitiveType', true],")
         ->toContain("@param list<ProbeAbstract>|Path|null \$items");
 });
 
-it('writes record classes that load and write their records', function () {
-    $this->generator->run();
-    $root     = "{$this->outputRoot}/Vocabularies/";
-    $loader   = static function (string $class) use ($root): void {
+/** Loads the generated Probe* classes (they exist nowhere else) for the duration of $test. */
+function withGeneratedProbes(string $outputRoot, Closure $test): void
+{
+    $root   = "{$outputRoot}/Vocabularies/";
+    $loader = static function (string $class) use ($root): void {
         $prefix = 'LaravelUi5\\OData\\Vocabularies\\';
         $file   = $root . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
         if (str_starts_with($class, $prefix) && str_contains($class, 'Probe') && is_file($file)) {
@@ -180,12 +190,26 @@ it('writes record classes that load and write their records', function () {
         }
     };
     spl_autoload_register($loader);
-
     try {
+        $test();
+    } finally {
+        spl_autoload_unregister($loader);
+    }
+}
+
+/** A generated class, built by reflection: it exists only once generated. */
+function makeGenerated(string $class, array $args = []): object
+{
+    return (new ReflectionClass('LaravelUi5\\OData\\Vocabularies\\' . $class))->newInstanceArgs($args);
+}
+
+it('writes record classes that load and write their records', function () {
+    $this->generator->run();
+
+    withGeneratedProbes($this->outputRoot, function () {
         $class    = 'LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeFieldWithUrl';
         $field    = 'LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeField';
         $positive = constant('LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeCriticality::Positive');
-        // The classes exist only once generated, so they are built by reflection.
         $make     = static fn(string $c, array $args) => (new ReflectionClass($c))->newInstanceArgs($args);
         $record   = $make($class, [
             'label'       => 'Code',
@@ -205,7 +229,44 @@ it('writes record classes that load and write their records', function () {
 
         expect(fn() => $make($class, ['value' => 'code'])->toRecord())
             ->toThrow(LogicException::class, 'requires the field Url');
-    } finally {
-        spl_autoload_unregister($loader);
-    }
+    });
+});
+
+it('writes every term value through the value writer', function () {
+    $this->generator->run();
+
+    withGeneratedProbes($this->outputRoot, function () {
+        $value = static fn(object $term) => $term->toAnnotation()->getValue();
+
+        $lineItem = $value(makeGenerated('Ui\\V1\\ProbeLineItem', [[makeGenerated('Ui\\V1\\ProbeField', ['value' => new Path('code')])]]));
+        expect($lineItem->getItems()[0]->getType())->toBe('com.sap.vocabularies.UI.v1.ProbeField')
+            ->and($lineItem->getItems()[0]->getPropertyValue('Value')->getValue()->getKind())->toBe('Path');
+
+        $positive = constant('LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeCriticality::Positive');
+        $read     = constant('LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeFlags::Read');
+        $write    = constant('LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeFlags::Write');
+        $constant = static fn(object $term) => $value($term)->getKind() . '=' . $value($term)->getValue();
+
+        expect($constant(makeGenerated('Ui\\V1\\ProbeCriticalityTerm', [$positive])))
+            ->toBe('EnumMember=com.sap.vocabularies.UI.v1.ProbeCriticality/Positive')
+            ->and($constant(makeGenerated('Ui\\V1\\ProbeCriticalityTerm', [new Path('crit')])))->toBe('Path=crit')
+            ->and($constant(makeGenerated('Ui\\V1\\ProbeFlagsTerm', [[$read, $write]])))
+            ->toBe('EnumMember=com.sap.vocabularies.UI.v1.ProbeFlags/Read com.sap.vocabularies.UI.v1.ProbeFlags/Write')
+            ->and($constant(makeGenerated('Ui\\V1\\ProbeMinimum', [0])))->toBe('Int=0')
+            ->and($constant(makeGenerated('Ui\\V1\\ProbeMinimum', ['2026-01-01', EdmPrimitiveType::Date])))
+            ->toBe('Date=2026-01-01')
+            ->and($constant(makeGenerated('Ui\\V1\\ProbePath', ['code'])))->toBe('PropertyPath=code')
+            ->and($value(makeGenerated('Ui\\V1\\ProbeDefaulted')))->toBeNull()
+            ->and($value(makeGenerated('Ui\\V1\\ProbeCriticalityTerm')))->toBeNull();
+
+        expect(fn() => makeGenerated('Ui\\V1\\ProbeMinimum')->toAnnotation())
+            ->toThrow(LogicException::class, 'The term com.sap.vocabularies.UI.v1.ProbeMinimum requires a value.')
+            ->and(fn() => makeGenerated('Ui\\V1\\ProbeLineItem', [['code']])->toAnnotation())
+            ->toThrow(LogicException::class, 'takes a record or an enumeration member, string given');
+    });
+
+    expect(($this->read)('Ui/V1/ProbeLineItem.php'))->toContain('/** @param list<ProbeAbstract> $value */')
+        ->and(($this->read)('Ui/V1/ProbePath.php'))->toContain('public ?string $value = null,')
+        ->and(($this->read)('Ui/V1/ProbeFlagsTerm.php'))
+        ->toContain('public ProbeFlags|array|Path|null $value = null,');
 });

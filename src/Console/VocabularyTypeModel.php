@@ -42,7 +42,7 @@ final class VocabularyTypeModel
     private array $enumTypes = [];
 
     /**
-     * @var array<string, array{name: string, namespace: string, baseType: string|null, abstract: bool, properties: list<array{name: string, type: string, nullable: bool}>}>
+     * @var array<string, array{name: string, namespace: string, baseType: string|null, abstract: bool, properties: list<array{name: string, type: string, nullable: bool, required: bool}>}>
      */
     private array $complexTypes = [];
 
@@ -116,10 +116,16 @@ final class VocabularyTypeModel
             $properties = [];
             foreach ($xpath->query('edm:Property', $node) as $property) {
                 if ($property instanceof DOMElement) {
+                    $type     = $this->qualify($property->getAttribute('Type'), $namespace);
+                    $nullable = strtolower($property->getAttribute('Nullable') ?: 'true') !== 'false';
                     $properties[] = [
                         'name'     => $property->getAttribute('Name'),
-                        'type'     => $this->qualify($property->getAttribute('Type'), $namespace),
-                        'nullable' => strtolower($property->getAttribute('Nullable') ?: 'true') !== 'false',
+                        'type'     => $type,
+                        'nullable' => $nullable,
+                        // A record must give a value only for a single-valued property that is neither
+                        // nullable nor has a default; an absent collection is an empty one (CSDL XML 4.01 §14.4.10).
+                        'required' => !$nullable && !$property->hasAttribute('DefaultValue')
+                            && !str_starts_with($type, 'Collection('),
                     ];
                 }
             }
@@ -198,7 +204,7 @@ final class VocabularyTypeModel
     /**
      * The properties a complex type declares itself.
      *
-     * @return list<array{name: string, type: string, nullable: bool}>
+     * @return list<array{name: string, type: string, nullable: bool, required: bool}>
      */
     public function ownProperties(string $qualifiedName): array
     {
@@ -212,7 +218,7 @@ final class VocabularyTypeModel
      * `Edm.Untyped` in `UI.DataField`, as `Edm.PrimitiveType`). The redeclaration replaces the inherited property in
      * its place, so each name occurs once, with the type and nullability of the most derived declaration.
      *
-     * @return list<array{name: string, type: string, nullable: bool}>
+     * @return list<array{name: string, type: string, nullable: bool, required: bool}>
      */
     public function properties(string $qualifiedName): array
     {

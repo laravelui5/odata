@@ -122,6 +122,7 @@ it('lists inherited properties root first, own last', function () {
             'name'     => 'Criticality',
             'type'     => 'test.Ui.v1.Kind',
             'nullable' => true,
+            'required' => false,
         ])
         ->and($model->properties('test.Ui.v1.Field')[2]['nullable'])->toBeFalse();
 });
@@ -142,13 +143,30 @@ it('lets a redeclared property replace the inherited one in its place', function
 XML));
 
     expect($model->properties('test.Ui.v1.FieldWithUrl'))->toBe([
-        ['name' => 'Value', 'type' => 'Edm.PrimitiveType', 'nullable' => false],
-        ['name' => 'Label', 'type' => 'Edm.String', 'nullable' => true],
-        ['name' => 'Url', 'type' => 'Edm.String', 'nullable' => true],
+        ['name' => 'Value', 'type' => 'Edm.PrimitiveType', 'nullable' => false, 'required' => true],
+        ['name' => 'Label', 'type' => 'Edm.String', 'nullable' => true, 'required' => false],
+        ['name' => 'Url', 'type' => 'Edm.String', 'nullable' => true, 'required' => false],
     ])
         ->and($model->declaringType('test.Ui.v1.FieldWithUrl', 'Value'))->toBe('test.Ui.v1.Field')
         ->and($model->declaringType('test.Ui.v1.FieldWithUrl', 'Url'))->toBe('test.Ui.v1.FieldWithUrl')
         ->and($model->declaringType('test.Ui.v1.FieldWithUrl', 'Nope'))->toBeNull();
+});
+
+it('requires only a single-valued field that is neither nullable nor has a default', function () {
+    $model = new VocabularyTypeModel();
+    $model->load(vocabularyEntry('test.Ui.v1', 'Ui'), vocabularyXpath(<<<'XML'
+<Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="test.Ui.v1" Alias="Ui">
+  <ComplexType Name="Action">
+    <Property Name="Action" Type="Edm.String" Nullable="false" />
+    <Property Name="Inline" Type="Edm.Boolean" Nullable="false" DefaultValue="false" />
+    <Property Name="Targets" Type="Collection(Edm.String)" Nullable="false" />
+    <Property Name="Label" Type="Edm.String" />
+  </ComplexType>
+</Schema>
+XML));
+
+    expect(array_column($model->properties('test.Ui.v1.Action'), 'required', 'name'))
+        ->toBe(['Action' => true, 'Inline' => false, 'Targets' => false, 'Label' => false]);
 });
 
 it('resolves a type definition through a chain into another vocabulary', function () {

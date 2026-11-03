@@ -383,7 +383,7 @@ final class VocabularyGenerator
                 $prop['name'],
                 $property,
                 $this->fieldType($prop['type']),
-                $prop['nullable'] ? 'true' : 'false',
+                $prop['required'] ? 'true' : 'false',
             );
         }
 
@@ -486,7 +486,9 @@ PHP;
         $name      = $node->getAttribute('Name');
         $rawType   = $this->types->qualify($node->getAttribute('Type') ?: 'Edm.Boolean', $entry->getNamespace());
         $appliesto = trim($node->getAttribute('AppliesTo'));
-        $nullable  = strtolower($node->getAttribute('Nullable') ?: 'true') !== 'false';
+        // A term value may be left out when the term is nullable or has a default.
+        $nullable  = strtolower($node->getAttribute('Nullable') ?: 'true') !== 'false'
+            || $node->hasAttribute('DefaultValue');
 
         if ($name === '') {
             return null;
@@ -549,55 +551,25 @@ PHP;
         $isCollection = str_starts_with($rawType, 'Collection(');
         $innerType    = $isCollection ? substr($rawType, 11, -1) : $rawType;
         $isComplex    = $this->isComplexType($innerType);
-        $isPrimitive  = !$isComplex && isset(self::PRIMITIVE_PHP_TYPES[$innerType]);
+        $imports      = new VocabularyImports($phpNs, $name);
 
         // ── Use statements ────────────────────────────────────────────────────
-        $uses = [
-            'LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\AnnotationValueInterface',
-            'LaravelUi5\\OData\\Edm\\Contracts\\AnnotationTargetInterface',
-            'LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\TypedAnnotationInterface',
-            'LaravelUi5\\OData\\Edm\\Annotation\\TypedAnnotationTrait',
-        ];
-
+        $imports->reference('LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\AnnotationValueInterface');
+        $imports->reference('LaravelUi5\\OData\\Edm\\Contracts\\AnnotationTargetInterface');
+        $imports->reference('LaravelUi5\\OData\\Edm\\Contracts\\Annotation\\TypedAnnotationInterface');
+        $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\TypedAnnotationTrait');
         if ($attrTargets !== null) {
-            $uses[] = 'Attribute';
-        }
-        // ConstantAnnotationValue is needed for all non-boolean, non-marker types.
-        // TypeDefinitions resolving to Edm.Boolean (e.g. Core.Tag) also return null — exclude them.
-        $resolvedInner = $this->resolveType($innerType);
-        $isMarker      = ($rawType === 'Edm.Boolean' || $rawType === '')
-            || (!$isCollection && $resolvedInner === 'Edm.Boolean');
-        if (!$isMarker) {
-            $uses[] = 'LaravelUi5\\OData\\Edm\\Annotation\\ConstantAnnotationValue';
-        }
-        if ($isCollection) {
-            $uses[] = 'LaravelUi5\\OData\\Edm\\Annotation\\CollectionAnnotationValue';
-        }
-        if ($isComplex) {
-            $uses[] = 'LaravelUi5\\OData\\Edm\\Annotation\\RecordAnnotationValue';
-            $uses[] = 'LaravelUi5\\OData\\Edm\\Annotation\\PropertyValue';
-        }
-        // Edm.PrimitiveType terms require EdmPrimitiveType in the constructor.
-        if ($innerType === 'Edm.PrimitiveType') {
-            $uses[] = 'LaravelUi5\\OData\\Edm\\EdmPrimitiveType';
-        }
-        if ($this->acceptsPath($rawType, $innerType, $isCollection, $isComplex)) {
-            $uses[] = 'LaravelUi5\\OData\\Edm\\Annotation\\Path';
+            $imports->reference('Attribute');
         }
 
-        // Enum type from a different PHP namespace needs a use import.
-        if (!$isComplex && $this->isEnumType($innerType)) {
-            $simpleName  = $this->simpleTypeName($innerType);
-            $enumNs      = $this->types->phpNamespaceOf($innerType) ?? $phpNs;
-            if ($enumNs !== $phpNs) {
-                $uses[] = $enumNs . '\\' . $simpleName;
-            }
-        }
         $appliesToInterfaces = $this->appliesToInterfaces($appliesToValues);
-        array_push($uses, ...$appliesToInterfaces);
-        $uses = array_values(array_unique($uses));
-        sort($uses);
-        $usesBlock = implode("\n", array_map(fn($u) => "use {$u};", $uses));
+        $appliesToLines      = [];
+        foreach ($appliesToInterfaces as $fqcn) {
+            $appliesToLines[] = '        ' . $imports->reference($fqcn) . '::class,';
+        }
+        $appliesToBlock = $appliesToLines !== []
+            ? "\n" . implode("\n", $appliesToLines) . "\n    "
+            : '';
 
         // ── #[Attribute] line ─────────────────────────────────────────────────
         $attributeLine = '';
@@ -606,24 +578,20 @@ PHP;
             $attributeLine = $flags !== '' ? "#[Attribute({$flags})]\n" : "#[Attribute]\n";
         }
 
-        // ── APPLIES_TO constant ───────────────────────────────────────────────
-        $appliesToLines = [];
-        foreach ($appliesToInterfaces as $fqcn) {
-            $short            = substr($fqcn, strrpos($fqcn, '\\') + 1);
-            $appliesToLines[] = "        {$short}::class,";
-        }
-        $appliesToBlock = $appliesToLines !== []
-            ? "\n" . implode("\n", $appliesToLines) . "\n    "
-            : '';
-
         // ── Constructor + buildAnnotationValue ────────────────────────────────
-        [$ctorParams, $ctorDocblock] = $this->buildTermCtorParams($rawType, $nullable, $innerType, $isCollection, $isComplex);
-        $buildBody = $this->buildAnnotationValueBody($rawType, $innerType, $isCollection, $isComplex, $nullable);
+        if ($isComplex && !$isCollection) {
+            [$ctorParams, $ctorDocblock] = $this->complexTermCtorParams($innerType, $nullable);
+            $buildBody = $this->complexTermBody($innerType, $imports);
+        } else {
+            [$ctorParams, $ctorDocblock] = $this->buildTermCtorParams($rawType, $innerType, $isCollection, $imports);
+            $buildBody = $this->buildAnnotationValueBody($fullyQualified, $rawType, $innerType, $isCollection, $nullable, $imports);
+        }
 
         // ── Class docblock ────────────────────────────────────────────────────
         $classDocParts   = $description !== '' ? [" * {$description}", ' * @see TypedAnnotationInterface'] : [' * @see TypedAnnotationInterface'];
         $classDoc        = "/**\n" . implode("\n", $classDocParts) . "\n */\n";
         $ctorDocblockStr = $ctorDocblock !== '' ? "    {$ctorDocblock}\n" : '';
+        $usesBlock       = $imports->block();
 
         return <<<PHP
 <?php
@@ -643,8 +611,8 @@ namespace {$phpNs};
     /** @var array<class-string<AnnotationTargetInterface>> */
     public const array APPLIES_TO = [{$appliesToBlock}];
 
-    {$ctorDocblockStr}public function __construct(
-{$ctorParams}        public readonly ?string \$qualifier = null,
+{$ctorDocblockStr}    public function __construct(
+{$ctorParams}        public ?string \$qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
@@ -657,198 +625,144 @@ PHP;
     }
 
     /**
+     * The value parameter of a term that is not a single record. Every value is optional: a term the
+     * vocabulary declares non-nullable fails when the schema is built, not at the constructor call.
+     *
      * @return array{0: string, 1: string} [ctorParams, ctorDocblock]
      */
     private function buildTermCtorParams(
         string $rawType,
-        bool $nullable,
         string $innerType,
         bool $isCollection,
-        bool $isComplex,
+        VocabularyImports $imports,
     ): array {
-        $docblock = '';
-
-        if ($rawType === 'Edm.Boolean' || $rawType === '') {
-            return ['', $docblock];
-        }
-
-        // Resolve TypeDefinitions (e.g. Core.Tag → Edm.Boolean).
-        $resolvedInner = $this->resolveType($innerType);
-
-        // TypeDefinition resolving to Edm.Boolean is a marker — no value parameter.
-        if (!$isCollection && $resolvedInner === 'Edm.Boolean') {
-            return ['', $docblock];
+        if ($this->isMarkerTerm($rawType, $innerType, $isCollection)) {
+            return ['', ''];
         }
 
         if ($isCollection) {
-            if ($this->isEnumType($innerType)) {
-                $innerPhpType = $this->simpleTypeName($innerType);
-            } else {
-                $innerPhpType = $this->phpTypeForOdataType($resolvedInner);
-            }
-            $docblock = "/** @param list<{$innerPhpType}> \$value */";
-            return ["        public readonly array \$value = [],\n", $docblock];
+            $itemType = match (true) {
+                $this->isComplexType($innerType), $this->isEnumType($innerType)
+                    => $imports->reference($this->phpClassOf($innerType)),
+                default => self::PRIMITIVE_PHP_TYPES[$this->resolveType($innerType)] ?? 'mixed',
+            };
+            return ["        public array \$value = [],\n", "/** @param list<{$itemType}> \$value */"];
         }
 
-        if ($isComplex) {
-            $properties = $this->getComplexTypeProperties($innerType);
-            if ($properties === []) {
-                // Unknown complex type — `mixed` subsumes null, so never `?mixed`
-                $default = $nullable ? ' = null' : '';
-                return ["        public readonly mixed \$value{$default},\n", $docblock];
-            }
-            // Sort: required (non-nullable) params before optional (nullable) params.
-            $required = array_filter($properties, fn($p) => !$p['nullable']);
-            $optional = array_filter($properties, fn($p) => $p['nullable']);
-            $sorted   = [...array_values($required), ...array_values($optional)];
-            $lines    = [];
-            foreach ($sorted as $prop) {
-                $phpType  = $this->phpTypeForOdataType($prop['type']);
-                $null     = ($prop['nullable'] && $phpType !== 'mixed') ? '?' : '';
-                $default  = $prop['nullable'] ? ' = null' : '';
-                $propName = lcfirst($prop['name']);
-                $lines[]  = "        public readonly {$null}{$phpType} \${$propName}{$default},";
-            }
-            return [implode("\n", $lines) . "\n", $docblock];
-        }
-
-        // Enum type — use the PHP enum class name as the type hint.
-        if ($this->isEnumType($innerType)) {
-            $simpleName = $this->simpleTypeName($innerType);
-            $nullPfx    = $nullable ? '?' : '';
-            $default    = $nullable ? ' = null' : '';
-            return ["        public readonly {$nullPfx}{$simpleName} \$value{$default},\n", $docblock];
-        }
-
-        // Edm.PrimitiveType — the annotator must declare the concrete primitive kind.
-        // EdmPrimitiveType is a required first parameter so the kind is never ambiguous.
+        // Edm.PrimitiveType — the value decides its kind; $type names one the value cannot
+        // (a Date or a Decimal given as a string).
         if ($innerType === 'Edm.PrimitiveType') {
-            $default = $nullable ? ' = null' : '';
-            return [
-                "        public readonly EdmPrimitiveType \$type,\n"
-                . "        public readonly mixed \$value{$default},\n",
-                $docblock,
-            ];
+            $type = $imports->reference('LaravelUi5\\OData\\Edm\\EdmPrimitiveType');
+            return ["        public mixed \$value = null,\n        public ?{$type} \$type = null,\n", ''];
         }
 
-        // Primitive type (including TypeDefinition-resolved). A Path stands in for
-        // the constant when the value is read per instance (e.g. ISOCurrency → currency).
-        $phpType = self::PRIMITIVE_PHP_TYPES[$resolvedInner] ?? 'mixed';
-        $default = $nullable ? ' = null' : '';
-        if ($phpType === 'mixed') {
-            // `mixed` subsumes null and Path — never write `?mixed`
-            return ["        public readonly mixed \$value{$default},\n", $docblock];
+        $known = $this->termValueType($rawType) !== 'Edm.Untyped';
+        if (!$known) {
+            return ["        public mixed \$value = null,\n", ''];
         }
-        $null = $nullable ? '|null' : '';
-        return ["        public readonly {$phpType}|Path{$null} \$value{$default},\n", $docblock];
+        [$phpType, $docType] = $this->fieldPhpType($rawType, $imports);
+        $docblock = $docType !== null ? "/** @param {$docType} \$value */" : '';
+        return ["        public {$phpType} \$value = null,\n", $docblock];
     }
 
     private function buildAnnotationValueBody(
+        string $fullyQualified,
         string $rawType,
         string $innerType,
         bool $isCollection,
-        bool $isComplex,
         bool $nullable,
+        VocabularyImports $imports,
     ): string {
-        if ($rawType === 'Edm.Boolean' || $rawType === '') {
+        if ($this->isMarkerTerm($rawType, $innerType, $isCollection)) {
             return 'return null;';
         }
 
-        // Resolve TypeDefinitions (e.g. Core.Tag → Edm.Boolean).
-        $resolvedInner = $this->resolveType($innerType);
-
-        // TypeDefinition resolving to Edm.Boolean → marker, no value emitted.
-        if (!$isCollection && $resolvedInner === 'Edm.Boolean') {
-            return 'return null;';
-        }
+        $writer = $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\AnnotationValueWriter');
+        $type   = $this->termValueType($rawType);
 
         if ($isCollection) {
-            if ($this->isEnumType($innerType)) {
-                return "return new CollectionAnnotationValue(\n            ...array_map(\n                static fn(\$v) => new ConstantAnnotationValue('Integer', (string) \$v->value),\n                \$this->value,\n            ),\n        );";
-            }
-            $kind = self::PRIMITIVE_KINDS[$resolvedInner] ?? 'String';
-            return "return new CollectionAnnotationValue(\n            ...array_map(\n                static fn(\$v) => new ConstantAnnotationValue('{$kind}', (string) \$v),\n                \$this->value,\n            ),\n        );";
+            return "return {$writer}::write(\$this->value, '{$type}');";
         }
 
-        if ($isComplex) {
-            $properties = $this->getComplexTypeProperties($innerType);
-            if ($properties === []) {
-                return 'return null;';
-            }
-            $pvLines = [];
-            foreach ($properties as $prop) {
-                $propName  = lcfirst($prop['name']);
-                $kind      = self::PRIMITIVE_KINDS[$prop['type']] ?? 'String';
-                $pvLines[] = "            new PropertyValue('{$prop['name']}', new ConstantAnnotationValue('{$kind}', (string) \$this->{$propName})),";
-            }
-            $pvBlock = implode("\n", $pvLines);
-            return "return new RecordAnnotationValue(\n            '{$innerType}',\n{$pvBlock}\n        );";
-        }
+        $write = $innerType === 'Edm.PrimitiveType'
+            ? "return {$writer}::write(\$this->value, \$this->type?->value ?? 'Edm.PrimitiveType');"
+            : "return {$writer}::write(\$this->value, '{$type}');";
 
-        // Enum type — use the PHP enum backing value.
-        if ($this->isEnumType($innerType)) {
-            if ($nullable) {
-                return "if (\$this->value === null) {\n            return null;\n        }\n        return new ConstantAnnotationValue('Integer', (string) \$this->value->value);";
-            }
-            return "return new ConstantAnnotationValue('Integer', (string) \$this->value->value);";
-        }
+        $whenNull = $nullable
+            ? 'return null;'
+            : 'throw new ' . $imports->reference('LogicException') . "('The term {$fullyQualified} requires a value.');";
 
-        // Edm.PrimitiveType — dispatch on the annotator-declared EdmPrimitiveType.
-        if ($innerType === 'Edm.PrimitiveType') {
-            $match = "return match (\$this->type) {\n"
-                . "            EdmPrimitiveType::Byte,\n"
-                . "            EdmPrimitiveType::SByte,\n"
-                . "            EdmPrimitiveType::Int16,\n"
-                . "            EdmPrimitiveType::Int32,\n"
-                . "            EdmPrimitiveType::Int64      => new ConstantAnnotationValue('Integer', (string) \$this->value),\n"
-                . "            EdmPrimitiveType::Decimal    => new ConstantAnnotationValue('Decimal', (string) \$this->value),\n"
-                . "            EdmPrimitiveType::Double,\n"
-                . "            EdmPrimitiveType::Single     => new ConstantAnnotationValue('Float', (string) \$this->value),\n"
-                . "            EdmPrimitiveType::Boolean    => new ConstantAnnotationValue('Boolean', \$this->value ? 'true' : 'false'),\n"
-                . "            EdmPrimitiveType::Date       => new ConstantAnnotationValue('Date', (string) \$this->value),\n"
-                . "            EdmPrimitiveType::DateTimeOffset => new ConstantAnnotationValue('DateTimeOffset', (string) \$this->value),\n"
-                . "            EdmPrimitiveType::TimeOfDay  => new ConstantAnnotationValue('TimeOfDay', (string) \$this->value),\n"
-                . "            EdmPrimitiveType::Duration   => new ConstantAnnotationValue('Duration', (string) \$this->value),\n"
-                . "            EdmPrimitiveType::Guid       => new ConstantAnnotationValue('Guid', (string) \$this->value),\n"
-                . "            default                       => new ConstantAnnotationValue('String', (string) \$this->value),\n"
-                . "        };";
-            $path = "if (\$this->value instanceof Path) {\n            return \$this->value->toAnnotationValue();\n        }\n        ";
-            if ($nullable) {
-                return "if (\$this->value === null) {\n            return null;\n        }\n        " . $path . $match;
-            }
-            return $path . $match;
-        }
-
-        // Primitive type (including TypeDefinition-resolved).
-        $kind = self::PRIMITIVE_KINDS[$resolvedInner] ?? 'String';
-        if ($resolvedInner === 'Edm.Boolean') {
-            return "return new ConstantAnnotationValue('{$kind}', \$this->value ? 'true' : 'false');";
-        }
-        $path = "if (\$this->value instanceof Path) {\n            return \$this->value->toAnnotationValue();\n        }\n        ";
-        if ($nullable) {
-            return "if (\$this->value === null) {\n            return null;\n        }\n        " . $path . "return new ConstantAnnotationValue('{$kind}', (string) \$this->value);";
-        }
-        return $path . "return new ConstantAnnotationValue('{$kind}', (string) \$this->value);";
+        return "if (\$this->value === null) {\n            {$whenNull}\n        }\n        {$write}";
     }
 
     /**
-     * Whether the generated constructor accepts a {@see \LaravelUi5\OData\Edm\Annotation\Path}:
-     * a single primitive value (TypeDefinitions resolved, booleans excluded — a marker
-     * term has no value) or an `Edm.PrimitiveType` term.
+     * The CSDL type a term value is written with: type definitions resolved, collections kept,
+     * a type no loaded vocabulary declares written as Edm.Untyped (by the PHP value).
      */
-    private function acceptsPath(string $rawType, string $innerType, bool $isCollection, bool $isComplex): bool
+    private function termValueType(string $rawType): string
     {
-        if ($isCollection || $isComplex || $rawType === '' || $rawType === 'Edm.Boolean') {
-            return false;
+        $isCollection = str_starts_with($rawType, 'Collection(');
+        $inner        = $isCollection ? substr($rawType, 11, -1) : $rawType;
+        $resolved     = $this->resolveType($inner);
+        $known        = str_starts_with($resolved, 'Edm.') || $this->isComplexType($inner) || $this->isEnumType($inner);
+        $type         = $known ? $resolved : 'Edm.Untyped';
+
+        return $isCollection ? "Collection({$type})" : $type;
+    }
+
+    /** A Boolean term, also through a type definition (Core.Tag): the annotation has no value. */
+    private function isMarkerTerm(string $rawType, string $innerType, bool $isCollection): bool
+    {
+        return $rawType === 'Edm.Boolean' || $rawType === ''
+            || (!$isCollection && $this->resolveType($innerType) === 'Edm.Boolean');
+    }
+
+    /**
+     * The fields of a term whose type is one record, as they stood before OP07 (replaced in step 4).
+     *
+     * @return array{0: string, 1: string} [ctorParams, ctorDocblock]
+     */
+    private function complexTermCtorParams(string $innerType, bool $nullable): array
+    {
+        $properties = $this->getComplexTypeProperties($innerType);
+        if ($properties === []) {
+            // Unknown complex type — `mixed` subsumes null, so never `?mixed`
+            $default = $nullable ? ' = null' : '';
+            return ["        public readonly mixed \$value{$default},\n", ''];
         }
-        if ($innerType === 'Edm.PrimitiveType') {
-            return true;
+        // Sort: required (non-nullable) params before optional (nullable) params.
+        $required = array_filter($properties, fn($p) => !$p['nullable']);
+        $optional = array_filter($properties, fn($p) => $p['nullable']);
+        $sorted   = [...array_values($required), ...array_values($optional)];
+        $lines    = [];
+        foreach ($sorted as $prop) {
+            $phpType  = $this->phpTypeForOdataType($prop['type']);
+            $null     = ($prop['nullable'] && $phpType !== 'mixed') ? '?' : '';
+            $default  = $prop['nullable'] ? ' = null' : '';
+            $propName = lcfirst($prop['name']);
+            $lines[]  = "        public readonly {$null}{$phpType} \${$propName}{$default},";
         }
-        if ($this->isEnumType($innerType)) {
-            return false;
+        return [implode("\n", $lines) . "\n", ''];
+    }
+
+    /** The record of a term whose type is one record, as it stood before OP07 (replaced in step 4). */
+    private function complexTermBody(string $innerType, VocabularyImports $imports): string
+    {
+        $properties = $this->getComplexTypeProperties($innerType);
+        if ($properties === []) {
+            return 'return null;';
         }
-        $resolved = $this->resolveType($innerType);
-        return $resolved !== 'Edm.Boolean' && isset(self::PRIMITIVE_PHP_TYPES[$resolved]);
+        $record   = $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\RecordAnnotationValue');
+        $property = $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\PropertyValue');
+        $constant = $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\ConstantAnnotationValue');
+        $pvLines  = [];
+        foreach ($properties as $prop) {
+            $propName  = lcfirst($prop['name']);
+            $kind      = self::PRIMITIVE_KINDS[$prop['type']] ?? 'String';
+            $pvLines[] = "            new {$property}('{$prop['name']}', new {$constant}('{$kind}', (string) \$this->{$propName})),";
+        }
+        $pvBlock = implode("\n", $pvLines);
+        return "return new {$record}(\n            '{$innerType}',\n{$pvBlock}\n        );";
     }
 
     // ── Attribute candidate detection ─────────────────────────────────────────
@@ -967,7 +881,7 @@ PHP;
     /**
      * The properties a qualified complex type declares itself; [] when it is not loaded.
      *
-     * @return list<array{name: string, type: string, nullable: bool}>
+     * @return list<array{name: string, type: string, nullable: bool, required: bool}>
      */
     private function getComplexTypeProperties(string $type): array
     {
@@ -989,11 +903,6 @@ PHP;
         return $this->types->isEnumType($type);
     }
 
-    /** Extracts the simple (unqualified) name from an OData type string. */
-    private function simpleTypeName(string $type): string
-    {
-        return str_contains($type, '.') ? substr($type, strrpos($type, '.') + 1) : $type;
-    }
 
     // ── EnumType class generation ─────────────────────────────────────────────
 

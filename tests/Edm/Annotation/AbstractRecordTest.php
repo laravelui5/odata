@@ -31,8 +31,8 @@ abstract readonly class RecordTestFieldAbstract extends AbstractRecord
     public const string TYPE = 'test.Ui.v1.FieldAbstract';
 
     public const array FIELDS = [
-        'Label'       => ['label', 'Edm.String', true],
-        'Criticality' => ['criticality', 'test.Ui.v1.Criticality', true],
+        'Label'       => ['label', 'Edm.String', false],
+        'Criticality' => ['criticality', 'test.Ui.v1.Criticality', false],
     ];
 
     public function __construct(
@@ -46,14 +46,14 @@ final readonly class RecordTestField extends RecordTestFieldAbstract
     public const string TYPE = 'test.Ui.v1.Field';
 
     public const array FIELDS = [
-        'Label'       => ['label', 'Edm.String', true],
-        'Criticality' => ['criticality', 'test.Ui.v1.Criticality', true],
-        'Value'       => ['value', 'Edm.Untyped', false],
-        'Hidden'      => ['hidden', 'Edm.Boolean', true],
-        'Width'       => ['width', 'Edm.Int32', true],
-        'Target'      => ['target', 'Edm.NavigationPropertyPath', true],
-        'Access'      => ['access', 'test.Ui.v1.Flag', true],
-        'Nested'      => ['nested', 'Collection(test.Ui.v1.FieldAbstract)', true],
+        'Label'       => ['label', 'Edm.String', false],
+        'Criticality' => ['criticality', 'test.Ui.v1.Criticality', false],
+        'Value'       => ['value', 'Edm.Untyped', true],
+        'Hidden'      => ['hidden', 'Edm.Boolean', false],
+        'Width'       => ['width', 'Edm.Int32', false],
+        'Target'      => ['target', 'Edm.NavigationPropertyPath', false],
+        'Access'      => ['access', 'test.Ui.v1.Flag', false],
+        'Nested'      => ['nested', 'Collection(test.Ui.v1.FieldAbstract)', false],
     ];
 
     /**
@@ -141,6 +141,10 @@ it('fails loud when a required field is not set', function () {
 it('refuses a value it cannot write', function () {
     AnnotationValueWriter::write(new stdClass(), 'Edm.Untyped');
 })->throws(LogicException::class, 'A value of type stdClass cannot be written for Edm.Untyped.');
+
+it('refuses a scalar where a vocabulary type asks for a record or a member', function () {
+    AnnotationValueWriter::write(['code'], 'Collection(test.Ui.v1.FieldAbstract)');
+})->throws(LogicException::class, 'A test.Ui.v1.FieldAbstract takes a record or an enumeration member, string given.');
 
 it('refuses a scalar for a collection', function () {
     AnnotationValueWriter::write('x', 'Collection(Edm.String)');

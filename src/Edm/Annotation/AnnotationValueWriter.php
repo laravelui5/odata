@@ -84,6 +84,15 @@ final class AnnotationValueWriter
             );
         }
 
+        if (!str_starts_with($type, 'Edm.')) {
+            // A vocabulary type that is not primitive: a complex type takes a record, an enum type a member.
+            throw new LogicException(sprintf(
+                'A %s takes a record or an enumeration member, %s given.',
+                $type,
+                get_debug_type($value),
+            ));
+        }
+
         $kind = self::KINDS[$type] ?? self::kindOf($value, $type);
 
         return new ConstantAnnotationValue($kind, self::lexical($value, $type));
