@@ -18,9 +18,9 @@ use LaravelUi5\OData\Protocol\Planning\Expression\PropertyPathExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\UnaryExpression;
 
 /**
- * Resolves unresolved string property names in a FilterExpression tree
- * against an EntityTypeInterface, and applies type hints from properties
- * to adjacent literals.
+ * Resolves the parser's tree against an EntityTypeInterface: each UnresolvedPathExpression becomes a
+ * PropertyPathExpression, each UnresolvedLambdaExpression a LambdaExpression, or the request answers 400. It also
+ * applies type hints from properties to adjacent literals. What it returns holds no unresolved node.
  */
 final readonly class PropertyResolver
 {
@@ -39,8 +39,13 @@ final readonly class PropertyResolver
 
     private function walk(FilterExpression $expr, EntityTypeInterface $entityType, ?string $hintEdmType): FilterExpression
     {
-        if ($expr instanceof PropertyPathExpression) {
+        if ($expr instanceof UnresolvedPathExpression) {
             return $this->resolveProperty($expr, $entityType);
+        }
+
+        // Already resolved: the planner builds these itself, for $orderby and $select.
+        if ($expr instanceof PropertyPathExpression) {
+            return $expr;
         }
 
         if ($expr instanceof LiteralExpression && $hintEdmType !== null) {
@@ -74,7 +79,7 @@ final readonly class PropertyResolver
             return new FunctionCallExpression($expr->name, $resolvedArgs);
         }
 
-        if ($expr instanceof LambdaExpression) {
+        if ($expr instanceof UnresolvedLambdaExpression) {
             return $this->resolveLambda($expr, $entityType);
         }
 
@@ -110,47 +115,37 @@ final readonly class PropertyResolver
         };
     }
 
-    private function resolveLambda(LambdaExpression $expr, EntityTypeInterface $entityType): LambdaExpression
+    private function resolveLambda(UnresolvedLambdaExpression $expr, EntityTypeInterface $entityType): LambdaExpression
     {
-        // Resolve the navigation property on the collection path
-        $navPropName = $expr->collection->segments[0] ?? null;
-        // The parser leaves segments as strings until they are resolved here; the segment type does not say so yet (OP45).
-        if (is_string($navPropName)) {
-            $navProperty = $entityType->getNavigationProperty($navPropName);
-            if ($navProperty === null) {
-                throw new BadRequestException(
-                    'unknown_navigation_property',
-                    "Unknown navigation property in lambda: {$navPropName}"
-                );
-            }
-
-            $collection = new PropertyPathExpression([$navProperty]);
-            $predicate = $this->walk($expr->predicate, $navProperty->getTargetType(), null);
-
-            return new LambdaExpression($collection, $expr->variable, $predicate, $expr->operator);
+        $navProperty = $entityType->getNavigationProperty($expr->navigation);
+        if ($navProperty === null) {
+            throw new BadRequestException(
+                'unknown_navigation_property',
+                "Unknown navigation property in lambda: {$expr->navigation}"
+            );
         }
 
-        return $expr;
+        return new LambdaExpression(
+            new PropertyPathExpression([$navProperty]),
+            $expr->variable,
+            $this->walk($expr->predicate, $navProperty->getTargetType(), null),
+            $expr->operator,
+        );
     }
 
-    private function resolveProperty(PropertyPathExpression $expr, EntityTypeInterface $entityType): PropertyPathExpression
+    private function resolveProperty(UnresolvedPathExpression $expr, EntityTypeInterface $entityType): PropertyPathExpression
     {
         $segments = [];
 
-        foreach ($expr->segments as $segment) {
-            // The parser leaves segments as strings until they are resolved here; the segment type does not say so yet (OP45).
-            if (is_string($segment)) {
-                $property = $entityType->getProperty($segment);
-                if ($property === null) {
-                    throw new BadRequestException(
-                        'unknown_property',
-                        "Unknown property in {$this->option}: {$segment}"
-                    );
-                }
-                $segments[] = $property;
-            } else {
-                $segments[] = $segment;
+        foreach ($expr->names as $name) {
+            $property = $entityType->getProperty($name);
+            if ($property === null) {
+                throw new BadRequestException(
+                    'unknown_property',
+                    "Unknown property in {$this->option}: {$name}"
+                );
             }
+            $segments[] = $property;
         }
 
         return new PropertyPathExpression($segments);

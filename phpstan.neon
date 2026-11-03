@@ -19,9 +19,3 @@ parameters:
         -
             identifier: function.alreadyNarrowedType
             path: tests/Service/Contracts/SqlQueryInterfaceTest.php
-        # The filter parser leaves path segments as strings until PropertyResolver resolves them; the segment type
-        # (PropertyPathExpression::$segments) does not say so yet. Seen from level 4 up; the fix is OP45.
-        -
-            identifier: function.impossibleType
-            path: src/Protocol/Parser/PropertyResolver.php
-            reportUnmatched: false

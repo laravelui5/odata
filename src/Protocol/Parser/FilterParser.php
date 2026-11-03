@@ -9,12 +9,10 @@ use LaravelUi5\OData\Protocol\Planning\Expression\BinaryExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\BinaryOperator;
 use LaravelUi5\OData\Protocol\Planning\Expression\FilterExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\FunctionCallExpression;
-use LaravelUi5\OData\Protocol\Planning\Expression\LambdaExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\LambdaOperator;
 use LaravelUi5\OData\Protocol\Planning\Expression\LambdaVariableExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\LiteralExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\NullLiteralExpression;
-use LaravelUi5\OData\Protocol\Planning\Expression\PropertyPathExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\UnaryExpression;
 use LaravelUi5\OData\Protocol\Planning\Expression\UnaryOperator;
 
@@ -22,8 +20,9 @@ use LaravelUi5\OData\Protocol\Planning\Expression\UnaryOperator;
  * OData $filter expression parser — Shunting Yard producing FilterExpression directly.
  *
  * FilterExpression objects go straight onto the operand stack during parsing;
- * there is no separate node tree. Property names are stored as unresolved strings
- * in PropertyPathExpression segments; callers resolve them against an EntityType.
+ * there is no separate node tree. Property paths and lambdas come out unresolved, as
+ * UnresolvedPathExpression and UnresolvedLambdaExpression, holding names; PropertyResolver
+ * turns them into PropertyPathExpression and LambdaExpression against an EntityType.
  */
 // History: replaces lodata's 83-class Node tree; reuses the operator precedence levels and regex
 // patterns of the lodata-era parser, without its dependencies.
@@ -139,8 +138,9 @@ final class FilterParser
     /**
      * Parse a filter expression string into a FilterExpression IR.
      *
-     * Property names are stored as unresolved strings in PropertyPathExpression
-     * segments. Callers (QueryPlanner) must resolve them against an EntityType.
+     * Property paths and lambdas come out unresolved (UnresolvedPathExpression,
+     * UnresolvedLambdaExpression); callers (QueryPlanner) resolve the tree with
+     * PropertyResolver before anything visits it.
      */
     public function parse(string $expression): FilterExpression
     {
@@ -387,8 +387,7 @@ final class FilterParser
                 $navProp = $attached['navProp'] ?? '';
                 $variable = $attached['lambdaVar'] ?? '';
 
-                $collection = new PropertyPathExpression([$navProp]);
-                $this->pushOperand(new LambdaExpression($collection, $variable, $bodyExpr, $lambdaOp));
+                $this->pushOperand(new UnresolvedLambdaExpression($navProp, $variable, $bodyExpr, $lambdaOp));
             } elseif ($attached['symbol'] === 'in') {
                 if ($hasNewOperands) {
                     $attached['args'][] = array_pop($this->operands);
@@ -484,7 +483,7 @@ final class FilterParser
             return false;
         }
 
-        $this->pushOperand(new PropertyPathExpression([$token]));
+        $this->pushOperand(new UnresolvedPathExpression([$token]));
         $this->tokens[] = ['type' => 'lambda_property', 'value' => $token];
         return true;
     }
@@ -506,7 +505,7 @@ final class FilterParser
 
         // Navigation property becomes part of the next operator (lambda).
         // Push as operand; lambda handling will pop it.
-        $this->pushOperand(new PropertyPathExpression([$token]));
+        $this->pushOperand(new UnresolvedPathExpression([$token]));
         $this->tokens[] = ['type' => 'navigation', 'value' => $token];
         return true;
     }
@@ -542,7 +541,7 @@ final class FilterParser
             return false;
         }
 
-        $this->pushOperand(new PropertyPathExpression([$token]));
+        $this->pushOperand(new UnresolvedPathExpression([$token]));
         $this->tokens[] = ['type' => 'property', 'value' => $token];
         return true;
     }
@@ -588,8 +587,8 @@ final class FilterParser
             // For lambda operators: pop the navigation property from operands
             if ($isLambda && $this->operands !== []) {
                 $navOperand = array_pop($this->operands);
-                if ($navOperand instanceof PropertyPathExpression && $navOperand->segments !== []) {
-                    $o1['navProp'] = $navOperand->segments[0];
+                if ($navOperand instanceof UnresolvedPathExpression && $navOperand->names !== []) {
+                    $o1['navProp'] = $navOperand->names[0];
                 }
             }
 
@@ -634,8 +633,7 @@ final class FilterParser
             $navProp = $op['navProp'] ?? '';
             $variable = $op['lambdaVar'] ?? '';
             $body = array_pop($this->operands) ?? new NullLiteralExpression();
-            $collection = new PropertyPathExpression([$navProp]);
-            $this->pushOperand(new LambdaExpression($collection, $variable, $body, $lambdaOp));
+            $this->pushOperand(new UnresolvedLambdaExpression($navProp, $variable, $body, $lambdaOp));
             return;
         }
 

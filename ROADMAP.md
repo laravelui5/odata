@@ -9,55 +9,6 @@ Releases follow the consumer-bump dance: tag the package → Satis rebuilds → 
 
 ---
 
-## Known gaps
-
-The documentation describes the **target** state of each surface, so a page may promise behaviour a
-release has not caught up with yet. Those places are marked **planned** and point here; each one is
-an entry below.
-
-| Gap | Today | Queued |
-|:---|:---|:---|
-| **Service document** | Neither `includedInServiceDocument` switch is read, and function imports are never listed | Both honoured; `FunctionImport`'s default moves to `true` — *built for the next major (`OP11`), the row goes with its release* |
-| **Cached `$metadata`** | `$metadata` is serialized on every request; `cachedMetadataXMLPath()` is read by nothing | `odata:cache` writes the document and the serializer streams it; the cold path is unchanged |
-
----
-
-## Next major
-
-> ### The declaration rule
->
-> **A discovered model is described by its table and its class. What goes beyond the table is declared on the model's
-> class; what depends on the runtime comes from a forward-exit bound in the container. Every declaration adds to
-> discovery; none overrides it. And the wire carries exactly what `$metadata` declares.**
->
-> Two surfaces, nothing in between: a discovered model (table, casts, `$hidden`, class attributes) or a custom entity set.
-> A rename, another type or a cut of a column is a custom set. No attribute on a PHP property: the property shadows
-> Eloquent's attribute bag (`OP24`), a class attribute cannot. *(Author, 2026-11-02; may be carried into the docs,
-> Chiron and the book.)*
-
-Decided 2026-11-02 (author): an OData major, worked on directly, without a deprecating minor before it. What goes in:
-
-- `OP38` — the property and method attributes go; a discovered model or a custom entity set, nothing in between.
-- `OP35` — column annotations: `#[ODataAnnotate]` on the class for hosts, `ColumnAnnotationResolverInterface` for
-  packages. Replaces vocabulary on hooked properties.
-- `OP40` — `$compute` sees only declared properties.
-- `OP36`, widened to the rule (author, 2026-11-02): **the Eloquent path emits exactly the declared properties**, at every
-  level. Covers `pivot`, undeclared `$appends`, and what `OP40` leaves.
-- `OP39` — a `json` cast goes out as the string `$metadata` declares.
-- `OP34` — computed properties: `#[ODataComputed]` on the class, the value from `ColumnExpressionResolverInterface`.
-- `OP11` — the service document honours `includedInServiceDocument`; `FunctionImport`'s default flips to `true`.
-- `OP41` — `#[ODataEntity]` keeps only the names: `$hidden` and `$visible` always apply, `useHidden` goes, three failure
-  cases fail loud or right.
-- `OP32` — PHPStan level 5 for `src` and `tests` (done 2026-11-03); the parser's path type is `OP45`.
-- `OP33` — comments on the read gate.
-- `OP07` + `OP29` (decided 2026-11-02, built 2026-11-03) — the vocabulary generator: spec-conform records, optional
-  record fields checked at build, `EnumMember`, `Bool`, a `Path` everywhere; regenerated. `OP32`'s vocabulary findings
-  went with it.
-
-The entries stay in place under *Pending*; this list is the cut.
-
----
-
 ## Pending
 
 ### [ ] `OP03` Virtual `$expand` is resolved only on Eloquent-backed sets — custom (SQL) entity sets ignore it
@@ -145,37 +96,6 @@ and its value is the refusal as much as the extraction.
 `eq` only? `eq`/`ne`/comparisons? `contains`?), whether it belongs beside `AbstractEntitySet` or as a
 trait, and whether the real answer is simply "document the walk" — which is what the page does today,
 and may be enough. An acceptable outcome is "no helper, and here is why".
-
-### [ ] `OP12` `cachedMetadataXMLPath()` is declared, implemented and read by nothing — **finish specifying**
-
-Surfaced 2026-09-17 in the docs SEO pass. The method sits on the public interface
-(`Service/Contracts/ODataServiceInterface.php:45`) and on `ODataService:82`, and no caller exists in
-the package or its tests: `$metadata` is serialized on every request. `metadata/metadata-document`
-and `services/defining-a-service` present it as a mechanism.
-
-**Decided 2026-09-21 (author): it gets implemented, not removed.** The target behaviour, sketched:
-
-> `odata:cache` produces, beside the Edm class tree, the **finished `$metadata` XML**, and the
-> serializer **streams that file**. The cold path is unchanged — nothing about a non-cached service
-> moves.
-
-That keeps the interface honest, removes a per-request serialization from the warm path, and is
-**additive: Minor or Patch, never a Major.**
-
-**Open before it can be built — this entry is a stub until then:**
-- **Where does the XML go for a pure OData project?** For a Core project the answer is settled:
-  `resources/ui5/Metadata.xml`, beside the app's other generated resources. A standalone OData
-  service has no such tree.
-- **That difference needs a lever** — an argument or an option on `odata:cache` (a target path, or a
-  mode that says "Core layout" vs "standalone"). Which of the two, and what the default is, is
-  unentschieden.
-- How `cachedMetadataXMLPath()` and the cache writer agree on the path (who owns it: the service, the
-  command, or config), and what happens when the file is missing or stale — fall back to
-  serialization silently, or fail loud? The house answer elsewhere is loud, but the warm path must not
-  break a deployment that forgot the command.
-
-Until those are settled, the two doc pages keep describing the mechanism (docs-are-the-spec); they
-must not describe the path or the command flag, because neither is decided.
 
 ### [ ] `OP16` The announced `odata-error` trailer is not an HTTP trailer — it corrupts the body instead
 
@@ -272,7 +192,24 @@ an addition, so a minor.
 
 **Target:** Minor.
 
-### [ ] `OP45` A filter path is a string until it is resolved — `PropertyPathExpression::$segments` does not say so — found 2026-10-09, split from `OP32` 2026-11-03
+---
+
+## Done
+
+Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
+section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
+that passed through Pending.
+
+### [x] `OP45` A filter path is a string until it is resolved — `PropertyPathExpression::$segments` does not say so — found 2026-10-09, split from `OP32` 2026-11-03
+
+> **Built 2026-11-03** for the next major (author). The parser emits two internal nodes, `Parser\UnresolvedPathExpression`
+> (names) and `Parser\UnresolvedLambdaExpression` (the navigation by name); `PropertyResolver` is the only bridge to
+> `PropertyPathExpression` and `LambdaExpression`, which now always hold properties — the `is_string()` branches and the
+> pass-through of an already resolved lambda are gone. An unresolved node cannot be visited (`accept()` throws), so the
+> visitor interface is unchanged; `FilterExpressionKind` gains `Unresolved`. The drivers did not change. The exception in
+> `phpstan.neon` is removed: `src` is at level 5 without one. Tests: `tests/Protocol/Parser/UnresolvedTreeTest.php`
+> (the parser's tree is unresolved and refuses a visitor; the resolver's can be visited whole, lambdas included); the
+> existing parser tests run parser and resolver together and passed unchanged.
 
 `PropertyPathExpression::$segments` is declared `list<PropertyInterface|NavigationPropertyInterface>`. The
 `FilterParser` builds it with **strings** (the names as written in `$filter`, `$orderby`, `$compute` and a lambda's
@@ -294,13 +231,49 @@ ignore goes from `phpstan.neon` and level 5 stays green.
 **Target:** Minor, if the parser's output stays internal (it is not part of a published interface today: check
 `FilterExpressionVisitor` and the resolver contracts before calling it so); otherwise major.
 
----
+### [x] `OP12` `cachedMetadataXMLPath()` is declared, implemented and read by nothing
 
-## Done
+> **Decided and built 2026-11-03** for the next major (author). **Where:** `resources/edmx/{Namespace}.xml` in the
+> host — the default of `cachedMetadataXMLPath()`, so the service owns the path and the command needs no option; one
+> service per namespace (`OP01`) keeps the name unique. **When:** the file exists → served (the cache hit), otherwise
+> the cold path; no staleness check, `odata:cache` writes it and `odata:clear` removes it together with `Edm/`.
+> **How:** the controller streams it **before** `schema()`, so neither the Edm cache is loaded nor the XML serialized
+> (measured on a 60-set, 240 KB schema: about 20 ms → 0.1 ms per `$metadata` request), with an `ETag` (mtime, size) that
+> answers `If-None-Match` with `304`. **Consequence, accepted:** the read authorizer is not asked for a cached
+> `$metadata` — it is not a data read, the SDK's authorizer ignores it already, and authentication still runs; written
+> into `ReadAuthorizerInterface`. The commands only touch documents under `resources/edmx/`, so a hand-written document
+> elsewhere is served but never overwritten or deleted. Tests: `tests/Protocol/Execution/CachedMetadataTest.php`
+> (served without building the schema, `304`, cold path without the file), `tests/Console/CacheClassOptionTest.php`
+> (written byte-identical to the cold serialization, removed by `odata:clear`, a foreign document left alone).
 
-Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
-section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
-that passed through Pending.
+Surfaced 2026-09-17 in the docs SEO pass. The method sits on the public interface
+(`Service/Contracts/ODataServiceInterface.php:45`) and on `ODataService:82`, and no caller exists in
+the package or its tests: `$metadata` is serialized on every request. `metadata/metadata-document`
+and `services/defining-a-service` present it as a mechanism.
+
+**Decided 2026-09-21 (author): it gets implemented, not removed.** The target behaviour, sketched:
+
+> `odata:cache` produces, beside the Edm class tree, the **finished `$metadata` XML**, and the
+> serializer **streams that file**. The cold path is unchanged — nothing about a non-cached service
+> moves.
+
+That keeps the interface honest, removes a per-request serialization from the warm path, and is
+**additive: Minor or Patch, never a Major.**
+
+**Open before it can be built — this entry is a stub until then:**
+- **Where does the XML go for a pure OData project?** For a Core project the answer is settled:
+  `resources/ui5/Metadata.xml`, beside the app's other generated resources. A standalone OData
+  service has no such tree.
+- **That difference needs a lever** — an argument or an option on `odata:cache` (a target path, or a
+  mode that says "Core layout" vs "standalone"). Which of the two, and what the default is, is
+  unentschieden.
+- How `cachedMetadataXMLPath()` and the cache writer agree on the path (who owns it: the service, the
+  command, or config), and what happens when the file is missing or stale — fall back to
+  serialization silently, or fail loud? The house answer elsewhere is loud, but the warm path must not
+  break a deployment that forgot the command.
+
+Until those are settled, the two doc pages keep describing the mechanism (docs-are-the-spec); they
+must not describe the path or the command flag, because neither is decided.
 
 ### [x] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
 
@@ -406,7 +379,7 @@ code-list section, which should show the reference. Chiron's annotation referenc
 > `EnumType::fromBackedEnum()`'s guard call it as untyped code would, through reflection. Two exceptions remain in
 > `phpstan.neon`, each with its reason: the hierarchy guards in tests (`pest.expectation.redundant`, and
 > `function.alreadyNarrowedType` for `SqlQueryInterfaceTest`), and the parser's unresolved path segments, split off as
-> `OP45`.
+> `OP45` — gone the same day, when `OP45` was built.
 
 Found 2026-10-09, when the dev setup moved to Pest 5 (PHPUnit 13, Testbench 11) and
 `pest-plugin-phpstan` replaced the abandoned `peststan`. Core went to level 5 the same day
@@ -666,7 +639,7 @@ its `$metadata`). The docs pass removes the `<Planned>` marker in `metadata/serv
 
 ### [x] `OP34` `discoverModel()` cannot serve a computed scalar property — the code beside a code-list `…_id` — from SDK Foundation D178, 2026-10-12
 
-> **Decided 2026-11-02 (author): built in the next major, under the declaration rule** (see *Next major*).
+> **Decided 2026-11-02 (author): built in the next major, under the declaration rule** (see `CHANGELOG.md` `[4.0.0]`).
 > - **Declared on the model's class:** `#[ODataComputed('currency', type: 'Edm.String', maxLength: 3)]`, repeatable.
     >   Static, so `odata:cache` keeps it. The engine adds `Core.Computed` itself.
 > - **Its value comes from the existing `ColumnExpressionResolverInterface`** (3.2). New is only that the engine selects
@@ -787,7 +760,7 @@ class attributes, `#[ODataComputed]`, *Upgrading from 3.x*), `annotations/applyi
 
 ### [x] `OP35` Discovered columns cannot be annotated from outside — `Core.IsLanguageDependent` for translated fields — from SDK i18n, 2026-10-23
 
-> **Decided 2026-11-02 (author): built in the next major, under the declaration rule** (see *Next major*).
+> **Decided 2026-11-02 (author): built in the next major, under the declaration rule** (see `CHANGELOG.md` `[4.0.0]`).
 > - **For a host:** a repeatable class attribute that names the column and carries typed vocabulary objects:
     >   `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`, signature
     >   `(string $property, TypedAnnotationInterface ...$annotations)`. The vocabulary attributes cannot sit on the class

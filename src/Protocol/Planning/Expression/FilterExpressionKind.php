@@ -14,4 +14,6 @@ enum FilterExpressionKind
     case FunctionCall;
     case Lambda;
     case LambdaVariable;
+    /** A node the parser left for the resolver; never in a tree a plan carries. */
+    case Unresolved;
 }
