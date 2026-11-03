@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Service\Contracts;
 
+use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\SingletonInterface;
@@ -113,6 +114,15 @@ interface EdmBuilderInterface
      * No resolver is registered here — resolver binding is Stage 2.
      */
     public function addFunctionImport(FunctionImportInterface $import): static;
+
+    /**
+     * Annotates the entity container — the target of service-wide terms such as
+     * `CodeList.CurrencyCodes` / `UnitsOfMeasure`, which point UI5 at a code-list service.
+     *
+     * A service author calls {@see \LaravelUi5\OData\ODataService::annotateContainer()} in configure(),
+     * which also takes generated vocabulary terms.
+     */
+    public function annotateContainer(AnnotationInterface ...$annotations): static;
 
     // ── Produce the frozen model ──────────────────────────────────────────────
 

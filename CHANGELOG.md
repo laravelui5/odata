@@ -104,6 +104,9 @@ carries exactly what `$metadata` declares.
     `Validation.MinItems`, `MaxItems` and `Analytics.AnalyticalContext` attributes.
   - New upstream terms come along: `UI.CardItem`, `Common.ExpandAfterConcatSupported`,
     `PersonalData.RelatedDataCategoryID`. Each field carries the vocabulary's description as `@param`.
+- **BREAKING: `EdmBuilderInterface::annotateContainer(AnnotationInterface ...)`** (`OP46`). On the concrete `EdmBuilder`
+  since 3.1, promised to the interface for this major. A class implementing `EdmBuilderInterface` adds the method; a
+  service keeps calling `ODataService::annotateContainer()` in `configure()`.
 - **`CsdlSerializer` writes the kind `Boolean` as `Bool`**, and a Bool constant in its lexical form (`"1"` → `true`,
   `""` → `false`), for annotations built by hand or by vocabulary classes of 3.x.
 - **Comments on the read gate are current** (`OP33`): `ReadContext` and `ReadMessage` no longer announce pruning and the

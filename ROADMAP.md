@@ -342,6 +342,21 @@ Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
 
+### [x] `OP46` `annotateContainer()` was promised to `EdmBuilderInterface` for the next major — found 2026-11-03
+
+> **Built 2026-11-03** with the next major (`CHANGELOG.md` `[4.0.0]`): the method is on the interface;
+> `tests/Service/Builder/EdmBuilderTest.php` reaches it through an `EdmBuilderInterface`.
+
+`EdmBuilder::annotateContainer()` came with the code-list wiring in 3.1 (`OP19` level 3), on the concrete builder
+only: *"adding it to `EdmBuilderInterface` would break every implementer, so it moves there with the next major."*
+4.0 is that major, and the method was still missing from the interface; Chiron's annotation reference said the same.
+Service authors were not affected (`ODataService::annotateContainer()` applies the annotations to the concrete builder
+on purpose, so a decorating `configure()` cannot lose them), but code typed against the interface could not reach it,
+and moving it after 4.0 would have needed another major. Found while building `OP44`.
+
+**Breaking** for a class implementing `EdmBuilderInterface` (none in the workspace; `EdmBuilder` is the only
+implementation). **Target:** the open major.
+
 ### [x] `OP44` `Vocabulary` has no case for CodeList — its terms ship, its reference must be added by hand — found 2026-11-03
 
 > **Built 2026-11-03** with the next major (`CHANGELOG.md` `[4.0.0]`, *Added*): `case CodeList`, in catalog order;

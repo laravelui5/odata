@@ -297,14 +297,6 @@ final class EdmBuilder implements EdmBuilderInterface
         return $this;
     }
 
-    /**
-     * Annotate the entity container — the target of service-wide terms such as
-     * `CodeList.CurrencyCodes` / `UnitsOfMeasure`, which point UI5 at a code-list service.
-     *
-     * On the concrete builder for now: adding it to {@see EdmBuilderInterface} would break
-     * every implementer, so it moves there with the next major. Service authors call
-     * {@see \LaravelUi5\OData\ODataService::annotateContainer()} instead.
-     */
     public function annotateContainer(AnnotationInterface ...$annotations): static
     {
         $this->assertNotBuilt();

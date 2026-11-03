@@ -10,7 +10,10 @@ use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
+use LaravelUi5\OData\Edm\Annotation\Annotation;
+use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
 use LaravelUi5\OData\Service\Builder\EdmBuilder;
+use LaravelUi5\OData\Service\Contracts\EdmBuilderInterface;
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
@@ -227,4 +230,22 @@ describe('EdmBuilder', function () {
             expect(fn () => $builder->version('4.01'))->toThrow(\LogicException::class);
         });
     });
+
+    describe('container annotations', function () {
+        // Part of the interface since 4.0 (OP46), so code holding an EdmBuilderInterface reaches it.
+        it('annotates the entity container through the interface', function () {
+            $builder = edmBuilderAsInterface(new EdmBuilder())->namespace('Test.Service');
+            $builder->annotateContainer(new Annotation('Org.OData.Core.V1.Description', null, new ConstantAnnotationValue('String', 'A service')));
+
+            $annotations = $builder->build()->getEntityContainer()->getAnnotations();
+
+            expect($annotations)->toHaveCount(1)
+                ->and($annotations[0]->getTerm())->toBe('Org.OData.Core.V1.Description');
+        });
+    });
 });
+
+function edmBuilderAsInterface(EdmBuilderInterface $builder): EdmBuilderInterface
+{
+    return $builder;
+}
