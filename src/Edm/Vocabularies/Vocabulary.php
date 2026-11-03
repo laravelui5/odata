@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Edm\Vocabularies;
 
 /**
- * Built-in vocabularies supported by the package.
+ * Built-in vocabularies supported by the package: one case per entry of VocabularyCatalog::default(), whose
+ * generated classes live under LaravelUi5\OData\Vocabularies.
  *
  * Use with EdmBuilderInterface::useVocabulary() to declare which
  * vocabulary references the $metadata document should include.
@@ -22,5 +23,6 @@ enum Vocabulary: string
     case UI            = 'com.sap.vocabularies.UI.v1';
     case Analytics     = 'com.sap.vocabularies.Analytics.v1';
     case Communication = 'com.sap.vocabularies.Communication.v1';
+    case CodeList      = 'com.sap.vocabularies.CodeList.v1';
     case PersonalData  = 'com.sap.vocabularies.PersonalData.v1';
 }

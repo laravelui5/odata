@@ -128,6 +128,9 @@ carries exactly what `$metadata` declares.
 - **`#[ODataAnnotate]`** (`OP35`, `OP38`) — annotates one property of a discovered model, written on the class:
   `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`, repeatable, any number of typed annotations per
   attribute. The property must be one the entity type declares, or discovery fails loud.
+- **`Vocabulary::CodeList`** (`OP44`). The `CodeList` classes shipped since 3.1, but the enum had no case for them, so a
+  service announcing a code list had to build the `edmx:Reference` by hand. Every catalog entry has its case now, and a
+  test keeps the two in step.
 - **`AbstractRecord`** and **`AnnotationValueWriter`** (`Edm\Annotation`, `OP07`) — the base of every vocabulary record
   class (`TYPE`, `FIELDS`, `toRecord()`) and the writer that turns a PHP value into the expression its declared type asks
   for. Usable for a record or a term of your own vocabulary.

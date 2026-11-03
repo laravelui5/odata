@@ -312,23 +312,6 @@ an addition, so a minor.
 
 **Target:** Minor.
 
-### [ ] `OP44` `Vocabulary` has no case for CodeList — its terms ship, its reference must be added by hand — found 2026-11-03
-
-`EdmBuilderInterface::useVocabulary(Vocabulary $vocabulary)` looks the enum's value up in `VocabularyCatalog::default()`
-and adds that entry's `edmx:Reference`. The catalog holds twelve vocabularies, the enum names eleven: `CodeList`
-(`com.sap.vocabularies.CodeList.v1`) is missing, although its classes are generated and shipped (`CurrencyCodes`,
-`UnitsOfMeasure`, `StandardCode`, `ExternalCode`). A service that announces a code list — the documented way to give UI5
-the decimals of a currency (`docs/odata/annotations/applying-annotations` § *Code lists*) — cannot say
-`useVocabulary(Vocabulary::CodeList)`; it has to write
-`addReference(VocabularyCatalog::default()->getEntry('com.sap.vocabularies.CodeList.v1')->toReference())`, which no
-page tells it. Found while writing the docs for `OP07`.
-
-**Fix:** add `case CodeList = 'com.sap.vocabularies.CodeList.v1';`, and a test that every catalog entry has an enum
-case (and the reverse), so the two cannot drift again. Docs: the count in *Vocabulary references* (11 → 12) and the
-code-list section, which should show the reference. Chiron's annotation reference likewise.
-
-**Target:** Minor (an added enum case; a consumer's exhaustive `match` over `Vocabulary` would need the new arm).
-
 ### [ ] `OP45` A filter path is a string until it is resolved — `PropertyPathExpression::$segments` does not say so — found 2026-10-09, split from `OP32` 2026-11-03
 
 `PropertyPathExpression::$segments` is declared `list<PropertyInterface|NavigationPropertyInterface>`. The
@@ -358,6 +341,27 @@ ignore goes from `phpstan.neon` and level 5 stays green.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+### [x] `OP44` `Vocabulary` has no case for CodeList — its terms ship, its reference must be added by hand — found 2026-11-03
+
+> **Built 2026-11-03** with the next major (`CHANGELOG.md` `[4.0.0]`, *Added*): `case CodeList`, in catalog order;
+> `tests/Edm/Vocabularies/VocabularyTest.php` checks both directions and the reference each case writes (counter-check:
+> without the case the test fails). Docs and Chiron show `useVocabulary(Vocabulary::CodeList)` beside `CurrencyCodes`.
+
+`EdmBuilderInterface::useVocabulary(Vocabulary $vocabulary)` looks the enum's value up in `VocabularyCatalog::default()`
+and adds that entry's `edmx:Reference`. The catalog holds twelve vocabularies, the enum names eleven: `CodeList`
+(`com.sap.vocabularies.CodeList.v1`) is missing, although its classes are generated and shipped (`CurrencyCodes`,
+`UnitsOfMeasure`, `StandardCode`, `ExternalCode`). A service that announces a code list — the documented way to give UI5
+the decimals of a currency (`docs/odata/annotations/applying-annotations` § *Code lists*) — cannot say
+`useVocabulary(Vocabulary::CodeList)`; it has to write
+`addReference(VocabularyCatalog::default()->getEntry('com.sap.vocabularies.CodeList.v1')->toReference())`, which no
+page tells it. Found while writing the docs for `OP07`.
+
+**Fix:** add `case CodeList = 'com.sap.vocabularies.CodeList.v1';`, and a test that every catalog entry has an enum
+case (and the reverse), so the two cannot drift again. Docs: the count in *Vocabulary references* (11 → 12) and the
+code-list section, which should show the reference. Chiron's annotation reference likewise.
+
+**Target:** Minor (an added enum case; a consumer's exhaustive `match` over `Vocabulary` would need the new arm).
 
 ### [x] `OP32` PHPStan level 5 — collective ticket for what levels 2–5 find
 
