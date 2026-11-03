@@ -21,6 +21,7 @@ use LaravelUi5\OData\Edm\Property\NavigationProperty;
 use LaravelUi5\OData\Service\Contracts\VirtualExpandResolverInterface;
 use LaravelUi5\OData\Service\Discovery\ModelDiscovery;
 use LaravelUi5\OData\Service\Resolver\ResolverMap;
+use ReflectionClass;
 
 /**
  * Base OData service implementation.
@@ -93,9 +94,15 @@ class ODataService implements ODataServiceInterface
             : (string) (config('odata.namespace') ?? self::DEFAULT_NAMESPACE);
     }
 
+    /**
+     * `resources/edmx/{Namespace}.xml` in the host, the service's PHP namespace with dots
+     * (`App\Excel` → `App.Excel.xml`). One service per namespace (OP01) keeps the name unique.
+     */
     public function cachedMetadataXMLPath(): ?string
     {
-        return null;
+        $namespace = (new ReflectionClass($this))->getNamespaceName();
+
+        return resource_path('edmx/' . str_replace('\\', '.', $namespace !== '' ? $namespace : static::class) . '.xml');
     }
 
     public function endpoint(): string

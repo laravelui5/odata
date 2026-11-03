@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Console;
 
 use Illuminate\Console\Command;
+use LaravelUi5\OData\Console\Concerns\ManagesMetadataDocument;
 use LaravelUi5\OData\Console\Concerns\ResolvesServices;
 use LaravelUi5\OData\Service\Cache\EdmxLoader;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 
 class ClearCommand extends Command
 {
+    use ManagesMetadataDocument;
     use ResolvesServices;
 
     protected $signature = 'odata:clear {--class= : Comma-separated FQCNs of additional OData services to clear}';
@@ -34,6 +36,12 @@ class ClearCommand extends Command
         }
 
         foreach ($services as $service) {
+            $xmlPath = $this->managedMetadataDocument($service);
+            if ($xmlPath !== null && is_file($xmlPath)) {
+                unlink($xmlPath);
+                $this->info("Cleared: {$xmlPath}");
+            }
+
             $cacheDir = EdmxLoader::cacheDir($service);
 
             if (!is_dir($cacheDir)) {

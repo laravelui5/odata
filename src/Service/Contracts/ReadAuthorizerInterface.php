@@ -24,6 +24,10 @@ use LaravelUi5\OData\Service\ReadContext;
  * Service → Protocol ring boundary; an enforcer downcasts to the concrete plan
  * (`EntitySetQueryPlan`, `EntityQueryPlan`, …) to read its target set. It must not throw for
  * an authorization decision — it records into the collector, and the caller enforces.
+ *
+ * `$metadata` is not a data read. A service whose document `odata:cache` wrote serves it from that file, before the
+ * schema is loaded, and this authorizer is not asked; only the cold path still passes the metadata plan through it.
+ * Who may see a service at all is the authentication in front of it (OP12).
  */
 interface ReadAuthorizerInterface
 {

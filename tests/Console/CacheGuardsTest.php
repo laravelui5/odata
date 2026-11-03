@@ -9,8 +9,8 @@ use LaravelUi5\OData\Edm\Property\Property;
 use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
 use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
-use LaravelUi5\OData\Fixtures\DiscoveryFlightService;
-use LaravelUi5\OData\Fixtures\EnumService;
+use LaravelUi5\OData\Fixtures\Cached\Enums\CachedEnumService;
+use LaravelUi5\OData\Fixtures\Cached\Flights\CachedFlightService;
 use LaravelUi5\OData\ODataService;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
@@ -60,26 +60,33 @@ final class UnboundSetService extends ODataService
     }
 }
 
-/** The Edm dir the fixture services write into. */
-function guardFixturesEdmDir(): string
+/**
+ * The Edm dir a fixture service writes into: each cached fixture lives alone in its directory under
+ * tests-fixtures/Cached/ (OP01).
+ */
+function guardFixturesEdmDir(string $fixture): string
 {
-    return dirname(__DIR__, 2) . '/tests-fixtures/Edm';
+    return dirname(__DIR__, 2) . "/tests-fixtures/Cached/{$fixture}/Edm";
 }
 
 function rmGuardFixturesEdm(): void
 {
-    $dir = guardFixturesEdmDir();
-    if (!is_dir($dir)) {
-        return;
+    foreach (['Flights', 'Enums'] as $fixture) {
+        @unlink(resource_path("edmx/LaravelUi5.OData.Fixtures.Cached.{$fixture}.xml"));
+        $dir = guardFixturesEdmDir($fixture);
+        if (!is_dir($dir)) {
+            continue;
+        }
+        $items = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($items as $item) {
+            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+        }
+        rmdir($dir);
     }
-    $items = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CHILD_FIRST,
-    );
-    foreach ($items as $item) {
-        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
-    }
-    rmdir($dir);
+    @rmdir(resource_path('edmx')); // only when empty
 }
 
 /**
@@ -156,12 +163,12 @@ it('leaves every existing cache untouched when one service cannot be built', fun
     // directory has been removed. Deleting as it went was the second half of
     // the 2026-08-19 incident: services already rewritten, later ones left with
     // no cache at all, inside `vendor/` recoverable only by reinstalling.
-    bindGuardRegistry([new DiscoveryFlightService(), new UnboundSetService()]);
+    bindGuardRegistry([new CachedFlightService(), new UnboundSetService()]);
 
     expect(fn () => $this->artisan('odata:cache')->run())
         ->toThrow(RuntimeException::class);
 
-    expect(is_dir(guardFixturesEdmDir()))->toBeFalse();
+    expect(is_dir(guardFixturesEdmDir('Flights')))->toBeFalse();
 });
 
 it('skips services that live in a package, and says so', function () {
@@ -181,10 +188,10 @@ it('re-caches from configure(), not from the cache it is replacing', function ()
     // had a cache, the *previous* Edmx was handed back and written straight out
     // again. A schema defect therefore survived every regeneration, and 3.0.3's
     // enum fix appeared to do nothing on exactly the consumers that needed it.
-    bindGuardRegistry([new EnumService()]);
+    bindGuardRegistry([new CachedEnumService()]);
     $this->artisan('odata:cache')->assertSuccessful();
 
-    $typeFile = guardFixturesEdmDir() . '/Types/PassengerColour.php';
+    $typeFile = guardFixturesEdmDir('Enums') . '/Types/PassengerColour.php';
     expect(file_get_contents($typeFile))->toContain('EnumType');
 
     // Age the cache: this is what a pre-3.0.3 writer left behind, and what
@@ -198,7 +205,7 @@ it('re-caches from configure(), not from the cache it is replacing', function ()
 
     // A fresh instance, so schema() finds that stale cache and takes the warm
     // path — the exact situation that used to keep flattening the type.
-    bindGuardRegistry([new EnumService()]);
+    bindGuardRegistry([new CachedEnumService()]);
     $this->artisan('odata:cache')->assertSuccessful();
 
     expect(file_get_contents($typeFile))->toContain('EnumType');

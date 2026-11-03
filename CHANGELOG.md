@@ -104,6 +104,14 @@ carries exactly what `$metadata` declares.
     `Validation.MinItems`, `MaxItems` and `Analytics.AnalyticalContext` attributes.
   - New upstream terms come along: `UI.CardItem`, `Common.ExpandAfterConcatSupported`,
     `PersonalData.RelatedDataCategoryID`. Each field carries the vocabulary's description as `@param`.
+- **A multipart `$batch` answers every part in its position** (`OP37`). A change set gets one `405`
+  (`changeset_not_supported`): this service is read-only, and OpenUI5's two-way bindings send one when a bound field is
+  edited. A part without a readable request gets a `400` (`invalid_batch_part`). Both used to be dropped, so the response
+  had a part fewer than the request and UI5 failed every request after the gap.
+- **BREAKING: one OData service per directory** (`OP01`). `odata:cache` fails before writing anything when a second,
+  non-abstract `ODataServiceInterface` class sits in the directory of a service it caches — registered or
+  route-composed, cached or not. The cache is found by namespace, so that second service used to be served the first
+  one's schema in silence. **Upgrade:** move each service into its own namespace; an abstract base class may stay.
 - **BREAKING: `EdmBuilderInterface::annotateContainer(AnnotationInterface ...)`** (`OP46`). On the concrete `EdmBuilder`
   since 3.1, promised to the interface for this major. A class implementing `EdmBuilderInterface` adds the method; a
   service keeps calling `ODataService::annotateContainer()` in `configure()`.

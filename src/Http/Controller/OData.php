@@ -21,6 +21,8 @@ use LaravelUi5\OData\Protocol\Planning\QueryPlanner;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use Throwable;
+use LaravelUi5\OData\Exception\MethodNotAllowedException;
+use LaravelUi5\OData\Protocol\Execution\ODataVersion;
 
 /**
  * OData HTTP controller — routes requests through the execution engine.
@@ -61,6 +63,41 @@ class OData extends Controller
      * that prefix; otherwise paginated responses emit next-links into the default
      * `/odata` namespace and downstream clients page into the wrong place.
      */
+    /**
+     * The service's cached `$metadata` document, or null when there is none — then the request takes the cold path.
+     *
+     * Served without loading the schema, so the read authorizer is not asked: `$metadata` is not a data read. An
+     * `ETag` from the file's modification time and size lets a client revalidate with `If-None-Match` and get a 304.
+     */
+    private function cachedMetadata(Request $request, ODataServiceInterface $service): ?ODataResponse
+    {
+        $file = $service->cachedMetadataXMLPath();
+        if ($file === null || !is_file($file)) {
+            return null;
+        }
+
+        $etag    = sprintf('"%x-%x"', (int) filemtime($file), (int) filesize($file));
+        $headers = [
+            'Content-Type'  => 'application/xml;charset=utf-8',
+            'OData-Version' => ODataVersion::current(),
+            'ETag'          => $etag,
+        ];
+
+        if (in_array($etag, array_map('trim', explode(',', (string) $request->header('If-None-Match'))), true)) {
+            $notModified = new ODataResponse(null, 304, $headers);
+            $notModified->setCallback(static function (): void {});
+
+            return $notModified;
+        }
+
+        $response = new ODataResponse(null, 200, $headers);
+        $response->setCallback(static function () use ($file): void {
+            readfile($file);
+        });
+
+        return $response;
+    }
+
     public function forService(Request $request, ODataServiceInterface $service): ODataResponse
     {
         try {
@@ -79,14 +116,28 @@ class OData extends Controller
             }
 
             if ($method !== 'GET' && !($method === 'POST' && trim($path, '/') === '$batch')) {
-                throw new BadRequestException(
+                // RFC 9110 §15.5.6: a 405 names the methods the target accepts.
+                $allow = match (trim($path, '/')) {
+                    ''       => 'GET, HEAD',
+                    '$batch' => 'POST',
+                    default  => 'GET',
+                };
+                throw (new MethodNotAllowedException(
                     'method_not_allowed',
                     sprintf('HTTP method %s is not supported on this read-only service.', $method)
-                );
+                ))->header('Allow', $allow);
             }
 
             // Reject unsupported system query options.
             $this->validateQueryOptions($request);
+
+            // $metadata from the document odata:cache wrote, before the schema is loaded (OP12).
+            if (trim($path, '/') === '$metadata') {
+                $cached = $this->cachedMetadata($request, $service);
+                if ($cached !== null) {
+                    return $cached;
+                }
+            }
 
             // Batch — handled separately since it re-dispatches inner requests.
             // Supports both JSON batch and multipart/mixed batch formats.

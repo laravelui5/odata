@@ -39,8 +39,11 @@ interface ODataServiceInterface
     public function namespace(): string;
 
     /**
-     * The absolute filesystem path to a pre-built EDMX file (e.g. from CAPire),
-     * or null for dynamic generation.
+     * Where the finished `$metadata` document of this service lives, or null to serialize it per request.
+     *
+     * `odata:cache` writes the document there, `odata:clear` removes it, and `$metadata` is served from the file
+     * whenever it exists — the cache hit; without it the service serializes, the cold path. A service that ships a
+     * hand-written document returns its path.
      */
     public function cachedMetadataXMLPath(): ?string;
 

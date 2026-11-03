@@ -60,27 +60,6 @@ The entries stay in place under *Pending*; this list is the cut.
 
 ## Pending
 
-### [ ] `OP01` EDM cache is keyed by class location, not service identity — load-side silent collision
-
-Surfaced 2026-06-11 (`pragmatiqu/timesheet.biz`) building a second, **route-composed** service
-(`ExcelService`, via the 1.0.6 `OData::forService()` seam) beside the registry-cached
-`TimesheetService`. `EdmxLoader::cacheDir()` (`dirname(classFile)/Edm`) and `edmxClassName()`
-(`{ns}\Edm\Edmx`) key the warm cache by the service class's **directory + namespace**, not by
-service identity. Two services sharing a namespace → the second's `schema()` warm path loads the
-FIRST's cached EDMX and serves it, **silently**. `ExcelService` returned `TimesheetService`'s full
-60-set `$metadata` on `/excel` until it was moved to its own `App\Excel` namespace.
-
-Workaround (in place downstream): one service per namespace.
-
-**Write side shipped (1.0.7):** `odata:cache` now fails loud when two services resolve to the same
-cache dir, before writing anything (see Done). **Still pending — the load side:**
-`EdmxLoader::forService` should fail loud (or key the cache by `serviceUri`/`route()` / a
-service-provided cache key) so a pre-existing or hand-placed collision can't be silently served.
-Silent-wrong-schema is the worst failure mode — same family as the 1.0.5 collision.
-
-Reasoned through in the internal route-composition notes.
-<!-- Atom [[ODATA_ALTERNATIVE_CLIENT_DEDICATED_SERVICE]] · spec docs/meta/specs/odata/route-composition.md OP5. -->
-
 ### [ ] `OP03` Virtual `$expand` is resolved only on Eloquent-backed sets — custom (SQL) entity sets ignore it
 
 Surfaced 2026-07-08 (`laravelui5/sdk` — `sdk-host` Partners, building the ui5-partners **object-page
@@ -250,25 +229,6 @@ probe in `acme` before switching it on.
 and pass it into the navigation plans too. Probably a Minor, since server-visible behaviour changes
 for hosts that set `pagination.default`.
 
-### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
-
-`Protocol/Execution/BatchHandler::parseMultipartParts()` reads the top level of a `multipart/mixed` body. A part it does
-not recognise as a request line — a nested change set (`Content-Type: multipart/mixed; boundary=changeset_…`), a part
-without headers, an empty message, a method outside the regex — is skipped with `continue`, and the response carries one
-part fewer than the request. UI5's `_Requestor` pairs responses with requests by position: the first request without a
-response is rejected with *"HTTP request was not processed because the previous request failed"*, and so is every one
-after it. The `$batch` in the network panel looks healthy — every response that came back is a 200 — so the cause hides.
-Met in the SDK's Partners smoke on 2026-10-25 while chasing another cause (an undeployed database); the shape is real
-regardless.
-
-**Fix (direction):** answer **every** part. A part that cannot be parsed gets its own error response in its position
-(`400`, an OData error body naming what was wrong); a change set on this read-only engine gets one `400`/`405` response
-for the set as a whole, as the protocol pairs a change set with one response. The JSON `$batch` path validates already
-and fails the whole batch loudly; the multipart path should at least keep the positions. **Test:** a body with a GET, an
-unparseable part and a GET answers three parts, the middle one an error.
-
-**Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
-
 ### [ ] `OP42` A constant inside a nested collection is dropped from `$metadata` — found 2026-11-03
 
 `CsdlSerializer::appendAnnotationValueAsChild()` writes the items of a collection that stands **inside** another
@@ -341,6 +301,65 @@ ignore goes from `phpstan.neon` and level 5 stays green.
 Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
 section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
 that passed through Pending.
+
+### [x] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
+
+> **Built 2026-11-03** for the next major (author). Every part of a multipart `$batch` is answered in its position:
+> a change set with **one `405`** (`changeset_not_supported`, new `MethodNotAllowedException`) — change sets carry data
+> modification or action requests only (OData 4.01 Part 1 §11.7), and OpenUI5 sends one unasked: its V4 model binds
+> two-way and updates through `$auto`, so an edited field PATCHes; a part without headers, without a request, or without
+> a request line with a **`400`** (`invalid_batch_part`, naming what was wrong). Whitespace after a last boundary without
+> its closing dashes is no part. A readable non-GET part still fails the whole batch, as on the JSON path. Tests:
+> `tests/Protocol/Execution/BatchMultipartTest.php` (GET · change set · GET → 200 · 405 · 200; GET · garbage · GET →
+> 200 · 400 · 200). The Core side — make the injected model one-way? — is a question in Core `OP89`.
+
+`Protocol/Execution/BatchHandler::parseMultipartParts()` reads the top level of a `multipart/mixed` body. A part it does
+not recognise as a request line — a nested change set (`Content-Type: multipart/mixed; boundary=changeset_…`), a part
+without headers, an empty message, a method outside the regex — is skipped with `continue`, and the response carries one
+part fewer than the request. UI5's `_Requestor` pairs responses with requests by position: the first request without a
+response is rejected with *"HTTP request was not processed because the previous request failed"*, and so is every one
+after it. The `$batch` in the network panel looks healthy — every response that came back is a 200 — so the cause hides.
+Met in the SDK's Partners smoke on 2026-10-25 while chasing another cause (an undeployed database); the shape is real
+regardless.
+
+**Fix (direction):** answer **every** part. A part that cannot be parsed gets its own error response in its position
+(`400`, an OData error body naming what was wrong); a change set on this read-only engine gets one `400`/`405` response
+for the set as a whole, as the protocol pairs a change set with one response. The JSON `$batch` path validates already
+and fails the whole batch loudly; the multipart path should at least keep the positions. **Test:** a body with a GET, an
+unparseable part and a GET answers three parts, the middle one an error.
+
+**Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
+
+### [x] `OP01` EDM cache is keyed by class location, not service identity — load-side silent collision
+
+> **Decided and built 2026-11-03** for the next major (author): **one OData service per directory**, as Core already
+> has it for its apps (`AbstractUi5App`), instead of an identity check on the load side. `odata:cache` checks the
+> directory of every service it caches and fails before writing anything when it finds a second, non-abstract class
+> implementing `ODataServiceInterface` there — whether that one is registered, route-composed, cached or not (PSR-4:
+> each file is a class of the service's namespace; an abstract base may stay). It replaces the 1.0.7 check, which only
+> compared the services being cached and so missed exactly the route-composed `ExcelService`. No check at request time:
+> the warm path stays a file lookup. Left open, deliberately: a second service added after the last `odata:cache` and
+> committed without re-running it. Tests: `tests/Console/CacheClassOptionTest.php` (the case above); the cache tests
+> cache fixtures that live alone (`tests-fixtures/Cached/`). Docs: `advanced/caching`, `services/multi-service`.
+
+Surfaced 2026-06-11 (`pragmatiqu/timesheet.biz`) building a second, **route-composed** service
+(`ExcelService`, via the 1.0.6 `OData::forService()` seam) beside the registry-cached
+`TimesheetService`. `EdmxLoader::cacheDir()` (`dirname(classFile)/Edm`) and `edmxClassName()`
+(`{ns}\Edm\Edmx`) key the warm cache by the service class's **directory + namespace**, not by
+service identity. Two services sharing a namespace → the second's `schema()` warm path loads the
+FIRST's cached EDMX and serves it, **silently**. `ExcelService` returned `TimesheetService`'s full
+60-set `$metadata` on `/excel` until it was moved to its own `App\Excel` namespace.
+
+Workaround (in place downstream): one service per namespace.
+
+**Write side shipped (1.0.7):** `odata:cache` now fails loud when two services resolve to the same
+cache dir, before writing anything (see Done). **Still pending — the load side:**
+`EdmxLoader::forService` should fail loud (or key the cache by `serviceUri`/`route()` / a
+service-provided cache key) so a pre-existing or hand-placed collision can't be silently served.
+Silent-wrong-schema is the worst failure mode — same family as the 1.0.5 collision.
+
+Reasoned through in the internal route-composition notes.
+<!-- Atom [[ODATA_ALTERNATIVE_CLIENT_DEDICATED_SERVICE]] · spec docs/meta/specs/odata/route-composition.md OP5. -->
 
 ### [x] `OP46` `annotateContainer()` was promised to `EdmBuilderInterface` for the next major — found 2026-11-03
 

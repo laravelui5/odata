@@ -7,15 +7,18 @@ namespace LaravelUi5\OData\Console;
 use LaravelUi5\OData\ODataService;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use LaravelUi5\OData\Console\Concerns\ManagesMetadataDocument;
 use LaravelUi5\OData\Console\Concerns\ResolvesServices;
 use LaravelUi5\OData\Service\Cache\EdmxWriter;
 use LaravelUi5\OData\Service\Cache\ResolverMapWriter;
 use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use ReflectionClass;
+use LaravelUi5\OData\Service\Serialization\CsdlSerializer;
 
 class CacheCommand extends Command
 {
+    use ManagesMetadataDocument;
     use ResolvesServices;
 
     protected $signature = 'odata:cache {--class= : Comma-separated FQCNs of additional OData services to cache (route-composed/bound services not in the registry)}';
@@ -44,24 +47,23 @@ class CacheCommand extends Command
             return self::SUCCESS;
         }
 
-        // Pre-pass: each service must own its cache directory. Two services sharing a
-        // namespace would overwrite each other's Edm/ — and the warm path would then serve
-        // the wrong schema. Fail loud BEFORE writing anything, rather than silently.
-        $claimedBy = [];
+        // Pre-pass: one OData service per directory (and so per namespace). The cache lives in
+        // {directory}/Edm and is found by namespace alone, so a second service beside a cached
+        // one — registered or route-composed, cached or not — would be handed this one's schema
+        // on its warm path. Fail loud BEFORE writing anything, rather than silently (OP01).
         foreach ($services as $service) {
-            $dir = dirname((new ReflectionClass($service))->getFileName()) . '/Edm';
-            if (isset($claimedBy[$dir])) {
+            $sibling = $this->siblingService(new ReflectionClass($service));
+            if ($sibling !== null) {
                 $this->error(sprintf(
-                    'Cache directory collision: %s and %s both map to %s.',
+                    'Cache directory collision: %s and %s both live in %s.',
                     $service::class,
-                    $claimedBy[$dir],
-                    $dir,
+                    $sibling,
+                    dirname((string) (new ReflectionClass($service))->getFileName()),
                 ));
                 $this->error('Each OData service must live in its own namespace/directory.');
 
                 return self::FAILURE;
             }
-            $claimedBy[$dir] = $service::class;
         }
 
         // ── Pass 1: build everything, write nothing ─────────────────────
@@ -117,6 +119,14 @@ class CacheCommand extends Command
 
             ResolverMapWriter::write($service, $resolverMap);
 
+            // The finished $metadata document, served as is while it exists (OP12).
+            $xmlPath = $this->managedMetadataDocument($service);
+            if ($xmlPath !== null) {
+                $fs->ensureDirectoryExists(dirname($xmlPath));
+                $fs->put($xmlPath, (new CsdlSerializer())->serialize($edmx));
+                $this->info("Wrote {$xmlPath}");
+            }
+
             $this->info("Cached: {$reflected->getName()}");
         }
 
@@ -131,5 +141,31 @@ class CacheCommand extends Command
         $this->info('OData schema cached successfully.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Another concrete OData service in the same directory as `$service`, or null. Found by PSR-4: each PHP file
+     * in the directory is a class of the service's namespace; subdirectories are other namespaces. An abstract
+     * base service may sit beside it.
+     *
+     * @param ReflectionClass<ODataServiceInterface> $service
+     * @return class-string|null
+     */
+    private function siblingService(ReflectionClass $service): ?string
+    {
+        $directory = dirname((string) $service->getFileName());
+
+        foreach (glob($directory . '/*.php') ?: [] as $file) {
+            $class = $service->getNamespaceName() . '\\' . basename($file, '.php');
+            if ($class === $service->getName() || !class_exists($class)) {
+                continue;
+            }
+            $candidate = new ReflectionClass($class);
+            if ($candidate->implementsInterface(ODataServiceInterface::class) && $candidate->isInstantiable()) {
+                return $class;
+            }
+        }
+
+        return null;
     }
 }

@@ -532,3 +532,97 @@ MULTIPART, $boundary);
     expect($body)->toContain('HTTP/1.1 200 OK')
         ->and($body)->toContain('"value"');
 });
+
+// ── Every part answered in its position (OP37) ───────────────────────────────
+
+/** The inner status lines of a multipart batch response, in order. */
+function batchStatuses(string $body): array
+{
+    preg_match_all('/HTTP\/1\.1 (\d+)/', $body, $matches);
+
+    return $matches[1];
+}
+
+it('answers a change set with one 405 in its position, and keeps the requests after it', function () {
+    // What UI5 sends unasked: a two-way bound field, edited, PATCHes through the $auto group.
+    $boundary = 'batch_id-1';
+    $changeset = 'changeset_id-2';
+
+    $response = postMultipartBatch($this, <<<MULTIPART
+--{$boundary}
+Content-Type: application/http
+
+GET Flights(1) HTTP/1.1
+Accept: application/json
+
+
+--{$boundary}
+Content-Type: multipart/mixed;boundary={$changeset}
+
+--{$changeset}
+Content-Type: application/http
+Content-ID: 0.0
+
+PATCH Flights(1) HTTP/1.1
+Content-Type: application/json
+
+{"gate":5}
+--{$changeset}--
+--{$boundary}
+Content-Type: application/http
+
+GET Flights(2) HTTP/1.1
+Accept: application/json
+
+
+--{$boundary}--
+MULTIPART, $boundary);
+
+    $response->assertStatus(200);
+    $body = $response->streamedContent();
+
+    expect(batchStatuses($body))->toBe(['200', '405', '200'])
+        ->and($body)->toContain('"code":"changeset_not_supported"')
+        ->and($body)->toContain('"origin":"sfo"');
+});
+
+it('answers a part without a request with a 400 in its position', function () {
+    $boundary = 'batch_unreadable';
+
+    $response = postMultipartBatch($this, <<<MULTIPART
+--{$boundary}
+Content-Type: application/http
+
+GET Flights(1) HTTP/1.1
+
+
+--{$boundary}
+Content-Type: application/http
+
+this is not a request line
+
+
+--{$boundary}
+Content-Type: application/http
+
+GET Flights(2) HTTP/1.1
+
+
+--{$boundary}--
+MULTIPART, $boundary);
+
+    $body = $response->streamedContent();
+
+    expect(batchStatuses($body))->toBe(['200', '400', '200'])
+        ->and($body)->toContain('"code":"invalid_batch_part"')
+        ->and($body)->toContain('this is not a request line');
+});
+
+it('does not answer the whitespace after a last boundary without its closing dashes', function () {
+    $boundary = 'batch_open_end';
+
+    $response = postMultipartBatch($this, "--{$boundary}\nContent-Type: application/http\n\nGET Flights(1) HTTP/1.1\n\n\n--{$boundary}\n\n", $boundary);
+
+    expect(batchStatuses($response->streamedContent()))->toBe(['200']);
+});
+

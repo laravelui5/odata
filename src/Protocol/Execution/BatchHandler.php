@@ -7,6 +7,7 @@ namespace LaravelUi5\OData\Protocol\Execution;
 use Illuminate\Http\Request;
 use LaravelUi5\OData\Http\ODataResponse;
 use LaravelUi5\OData\Exception\BadRequestException;
+use LaravelUi5\OData\Exception\MethodNotAllowedException;
 use LaravelUi5\OData\Exception\ProtocolException;
 use LaravelUi5\OData\Http\CustomQueryOptions;
 use LaravelUi5\OData\Http\ODataRequest;
@@ -109,7 +110,7 @@ final readonly class BatchHandler
         }
 
         $requests = $this->parseMultipartParts($requestBody, $boundary);
-        $this->validateMethodsAreGet($requests);
+        $this->validateMethodsAreGet(array_values(array_filter($requests, static fn(array $r) => !isset($r['error']))));
 
         $responseBoundary = 'batchresponse_' . bin2hex(random_bytes(16));
         $schema  = $this->schema;
@@ -124,7 +125,13 @@ final readonly class BatchHandler
 
         $response->setCallback(static function () use ($requests, $schema, $service, $gate, $request, $responseBoundary): void {
             foreach ($requests as $requestData) {
-                $innerResult = self::dispatchInnerRequest($requestData, $schema, $service, $gate, $request);
+                $innerResult = isset($requestData['error'])
+                    ? [
+                        'id'     => $requestData['id'],
+                        'status' => $requestData['error']->toResponse()->getStatusCode(),
+                        'body'   => ['error' => $requestData['error']->toError()],
+                    ]
+                    : self::dispatchInnerRequest($requestData, $schema, $service, $gate, $request);
 
                 $status     = $innerResult['status'];
                 $statusText = self::httpStatusText($status);
@@ -166,9 +173,10 @@ final readonly class BatchHandler
     }
 
     /**
-     * Parse multipart body into an array of request descriptors.
+     * Parse multipart body into one entry per part, in order: a request descriptor, or — for a change set or a
+     * part that holds no readable request — the error that answers it.
      *
-     * @return list<array{id: string, method: string, url: string}>
+     * @return list<array{id: string, method: string, url: string, headers: array<string, string>}|array{id: string, error: ProtocolException}>
      */
     private function parseMultipartParts(string $body, string $boundary): array
     {
@@ -191,14 +199,37 @@ final readonly class BatchHandler
                 break;
             }
 
+            // Whitespace after the last boundary (a body without the closing "--") is no part.
+            if (trim($trimmed) === '') {
+                continue;
+            }
+
+            // Every part gets an answer in its position: UI5 pairs responses with requests by
+            // position, and a part left out fails every request after it (OP37).
+
             // Split part headers from HTTP message by double newline.
             $sections = explode("\n\n", $trimmed, 2);
             if (count($sections) < 2) {
+                $requests[] = self::unreadablePart((string) $id++, 'The part has no headers.');
+                continue;
+            }
+
+            // A change set is a nested multipart document of data modification or action
+            // requests (OData 4.01 Part 1 §11.7); it is answered as one, with one response.
+            if (preg_match('/^content-type:\s*multipart\/mixed/im', $sections[0])) {
+                $requests[] = [
+                    'id'    => (string) $id++,
+                    'error' => new MethodNotAllowedException(
+                        'changeset_not_supported',
+                        'A change set carries data modification requests; this service is read-only.',
+                    ),
+                ];
                 continue;
             }
 
             $httpMessage = trim($sections[1]);
             if ($httpMessage === '') {
+                $requests[] = self::unreadablePart((string) $id++, 'The part holds no request.');
                 continue;
             }
 
@@ -207,6 +238,7 @@ final readonly class BatchHandler
             $requestLine = trim($lines[0]);
 
             if (!preg_match('/^(GET|POST|PUT|PATCH|DELETE|HEAD)\s+(.+?)(?:\s+HTTP\/[\d.]+)?$/i', $requestLine, $m)) {
+                $requests[] = self::unreadablePart((string) $id++, sprintf('The part does not start with a request line: "%s".', mb_substr($requestLine, 0, 80)));
                 continue;
             }
 
@@ -234,6 +266,16 @@ final readonly class BatchHandler
         }
 
         return $requests;
+    }
+
+    /**
+     * The answer to a part that holds no readable request: a 400 in its position.
+     *
+     * @return array{id: string, error: ProtocolException}
+     */
+    private static function unreadablePart(string $id, string $reason): array
+    {
+        return ['id' => $id, 'error' => new BadRequestException('invalid_batch_part', $reason)];
     }
 
     // ── Shared validation / dispatch ─────────────────────────────────────────

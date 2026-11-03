@@ -563,19 +563,20 @@ it('POST to entity set returns error (read-only)', function () {
     $response = $this->postJson('/odata/Flights', ['origin' => 'test']);
 
     // New engine only supports GET; POST should fail
-    $response->assertStatus(400);
+    $response->assertStatus(405);
 });
 
 it('DELETE to entity returns error (read-only)', function () {
     $response = $this->delete('/odata/Flights(1)');
 
-    $response->assertStatus(400);
+    $response->assertStatus(405);
 });
 
 it('PATCH to entity returns error (read-only)', function () {
     $response = $this->patch('/odata/Flights(1)', ['origin' => 'test']);
 
-    $response->assertStatus(400);
+    $response->assertStatus(405);
+    $response->assertHeader('Allow', 'GET');
 });
 
 // ── Multiple entity sets ─────────────────────────────────────────────────────
@@ -1766,7 +1767,7 @@ it('HEAD / returns 200 with X-CSRF-Token header', function () {
 it('HEAD /Flights is rejected as method not allowed', function () {
     $response = $this->call('HEAD', '/odata/Flights');
 
-    $response->assertStatus(400);
+    $response->assertStatus(405);
 });
 
 // ── BelongsToMany navigation (anchor path) ──────────────────────────────────
