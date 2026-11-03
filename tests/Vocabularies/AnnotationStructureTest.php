@@ -3,14 +3,7 @@
 declare(strict_types=1);
 
 use LaravelUi5\OData\Edm\Annotation\Path;
-use LaravelUi5\OData\Edm\Container\EntitySet;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
-use LaravelUi5\OData\Edm\Property\Property;
-use LaravelUi5\OData\Edm\Type\EntityType;
-use LaravelUi5\OData\Edm\Type\PrimitiveType;
-use LaravelUi5\OData\Service\Builder\EdmBuilder;
-use LaravelUi5\OData\Service\Serialization\CsdlSerializer;
 use LaravelUi5\OData\Vocabularies\CodeList\V1\CurrencyCodes;
 use LaravelUi5\OData\Vocabularies\CodeList\V1\StandardCode;
 use LaravelUi5\OData\Vocabularies\Common\V1\FieldControl;
@@ -27,72 +20,15 @@ use LaravelUi5\OData\Vocabularies\Ui\V1\LineItem;
 use LaravelUi5\OData\Vocabularies\Ui\V1\PresentationVariant;
 use LaravelUi5\OData\Vocabularies\Validation\V1\Minimum;
 
+use function LaravelUi5\OData\Tests\Vocabularies\annotatedCsdl;
+use function LaravelUi5\OData\Tests\Vocabularies\csdlSchemaErrors;
+use function LaravelUi5\OData\Tests\Vocabularies\csdlXpath;
+use function LaravelUi5\OData\Tests\Vocabularies\recordAttributes;
+
 /*
  * The generated vocabulary classes, one term family at a time, through the serializer into $metadata (OP07, step 8).
  * Each document is also validated against the OASIS CSDL schema in tests/schemas/.
  */
-
-/**
- * A one-type service: `$typeAnnotations` on the entity type, `$propertyAnnotations` on its key `code`. The entity
- * set is there because the schema refuses an empty entity container.
- *
- * @param list<TypedAnnotationInterface> $typeAnnotations
- * @param list<TypedAnnotationInterface> $propertyAnnotations
- */
-function annotatedCsdl(array $typeAnnotations = [], array $propertyAnnotations = []): string
-{
-    $code = new Property('code', new PrimitiveType(EdmPrimitiveType::String), annotations: array_map(
-        static fn(TypedAnnotationInterface $a) => $a->toAnnotation(),
-        $propertyAnnotations,
-    ));
-    $type = new EntityType('Probe.Ns', 'Airport', key: [$code], declaredProperties: [$code], annotations: array_map(
-        static fn(TypedAnnotationInterface $a) => $a->toAnnotation(),
-        $typeAnnotations,
-    ));
-
-    return (new CsdlSerializer())->serialize(
-        (new EdmBuilder())->namespace('Probe.Ns')->addEntityType($type)->addEntitySet(new EntitySet('Airports', $type))->build(),
-    );
-}
-
-function csdlXpath(string $xml): DOMXPath
-{
-    $doc = new DOMDocument();
-    $doc->loadXML($xml);
-    $xpath = new DOMXPath($doc);
-    $xpath->registerNamespace('edm', 'http://docs.oasis-open.org/odata/ns/edm');
-
-    return $xpath;
-}
-
-/** @return list<string> the schema violations of a CSDL XML document */
-function csdlSchemaErrors(string $xml): array
-{
-    $doc = new DOMDocument();
-    $doc->loadXML($xml);
-    libxml_use_internal_errors(true);
-    libxml_clear_errors();
-    $doc->schemaValidate(dirname(__DIR__) . '/schemas/csdl.xsd');
-    $errors = array_map(static fn(LibXMLError $e) => trim($e->message), libxml_get_errors());
-    libxml_clear_errors();
-
-    return $errors;
-}
-
-/** @return array<string, string> property → "Kind=value", for the attribute-notation values of a record */
-function recordAttributes(DOMXPath $xpath, DOMElement $record): array
-{
-    $fields = [];
-    foreach ($xpath->query('edm:PropertyValue', $record) as $pv) {
-        foreach ($pv->attributes as $attribute) {
-            if ($attribute->name !== 'Property') {
-                $fields[$pv->getAttribute('Property')] = "{$attribute->name}={$attribute->value}";
-            }
-        }
-    }
-
-    return $fields;
-}
 
 /** The annotation of `$term` on the entity type (or, with `$property`, on that property). */
 function termAnnotation(DOMXPath $xpath, string $term, ?string $property = null): DOMElement

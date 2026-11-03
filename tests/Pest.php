@@ -15,3 +15,4 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/Protocol/Parser/Helpers.php';
+require_once __DIR__ . '/Vocabularies/Helpers.php';
