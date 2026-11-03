@@ -117,29 +117,6 @@ final class VocabularyGenerator
         'Edm.Single'                 => 'float',
     ];
 
-    /** Maps OData primitive types to ConstantAnnotationValue kind strings. */
-    private const array PRIMITIVE_KINDS = [
-        'Edm.String'                 => 'String',
-        'Edm.Guid'                   => 'Guid',
-        'Edm.Duration'               => 'Duration',
-        'Edm.Date'                   => 'Date',
-        'Edm.TimeOfDay'              => 'TimeOfDay',
-        'Edm.DateTimeOffset'         => 'DateTimeOffset',
-        'Edm.Binary'                 => 'Binary',
-        'Edm.AnnotationPath'         => 'AnnotationPath',
-        'Edm.PropertyPath'           => 'PropertyPath',
-        'Edm.NavigationPropertyPath' => 'NavigationPropertyPath',
-        'Edm.ModelElementPath'       => 'ModelElementPath',
-        'Edm.Boolean'                => 'Boolean',
-        'Edm.Byte'                   => 'Integer',
-        'Edm.SByte'                  => 'Integer',
-        'Edm.Int16'                  => 'Integer',
-        'Edm.Int32'                  => 'Integer',
-        'Edm.Int64'                  => 'Integer',
-        'Edm.Decimal'                => 'Decimal',
-        'Edm.Double'                 => 'Float',
-        'Edm.Single'                 => 'Float',
-    ];
 
     // ── Run state ─────────────────────────────────────────────────────────────
 
@@ -367,7 +344,7 @@ final class VocabularyGenerator
         $handOver  = [];
         $fields    = [];
         foreach ($this->types->properties($qualifiedName) as $prop) {
-            $property = lcfirst($prop['name']);
+            $property = $this->phpPropertyName($prop['name']);
             [$phpType, $docType] = $this->fieldPhpType($prop['type'], $imports);
             $own      = $this->types->declaringType($qualifiedName, $prop['name']) === $qualifiedName;
             $promote  = $own ? 'public ' : '';
@@ -451,7 +428,7 @@ PHP;
 
         if ($isCollection) {
             $suffix = ($path !== '' ? "|{$path}" : '') . '|null';
-            return ["array{$suffix}", "list<{$itemType}>{$suffix}"];
+            return [$path !== '' ? "array{$suffix}" : '?array', "list<{$itemType}>{$suffix}"];
         }
         if ($itemType === 'mixed') {
             return ['mixed', null];
@@ -466,6 +443,19 @@ PHP;
             return 'Collection(' . $this->resolveType(substr($type, 11, -1)) . ')';
         }
         return $this->resolveType($type);
+    }
+
+    /**
+     * The PHP name of a record field: the leading capital, or a leading acronym, lower-cased
+     * (`Label` → `label`, `ID` → `id`, `IDProperty` → `idProperty`).
+     */
+    private function phpPropertyName(string $name): string
+    {
+        return (string) preg_replace_callback(
+            '/^[A-Z]+(?=[A-Z][a-z]|$)|^[A-Z]/',
+            static fn(array $m) => strtolower($m[0]),
+            $name,
+        );
     }
 
     /** The generated PHP class of a qualified vocabulary type. */
@@ -501,21 +491,11 @@ PHP;
         $isAttribute = $this->isAttributeCandidate($appliesToValues, $entry->getNamespace());
         $attrTargets = $isAttribute ? $this->resolveAttributeTargets($appliesToValues) : null;
 
-        // Track terms whose buildAnnotationValue() body cannot be fully resolved.
-        if ($rawType !== 'Edm.Boolean') {
-            $isCol        = str_starts_with($rawType, 'Collection(');
-            $inner        = $isCol ? substr($rawType, 11, -1) : $rawType;
-            $isCplx       = $this->isComplexType($inner);
-            $resolvedInner = $this->resolveType($inner);
-            $isTypeDef    = $resolvedInner !== $inner;
-            $isEnm        = !$isCplx && $this->isEnumType($inner);
-            $isPrim       = !$isCplx && isset(self::PRIMITIVE_PHP_TYPES[$resolvedInner]);
-
-            if ($isCplx && $this->getComplexTypeProperties($inner) === []) {
-                $this->stubs[] = "[{$entry->getAlias()}] {$fullyQualified}: unresolved complex type '{$inner}'";
-            } elseif (!$isPrim && !$isCol && !$isCplx && !$isEnm && !$isTypeDef && $inner !== 'Edm.PrimitiveType') {
-                $this->stubs[] = "[{$entry->getAlias()}] {$fullyQualified}: unknown type '{$rawType}' — mapped to mixed";
-            }
+        // Track terms whose type no loaded vocabulary declares: their value is written by its PHP value.
+        $inner = str_starts_with($rawType, 'Collection(') ? substr($rawType, 11, -1) : $rawType;
+        $written = $this->termValueType($rawType);
+        if (in_array($written, ['Edm.Untyped', 'Collection(Edm.Untyped)'], true) && $this->resolveType($inner) !== 'Edm.Untyped') {
+            $this->stubs[] = "[{$entry->getAlias()}] {$fullyQualified}: unknown type '{$rawType}' — mapped to mixed";
         }
 
         $code = $this->buildTermClassCode(
@@ -579,9 +559,11 @@ PHP;
         }
 
         // ── Constructor + buildAnnotationValue ────────────────────────────────
-        if ($isComplex && !$isCollection) {
-            [$ctorParams, $ctorDocblock] = $this->complexTermCtorParams($innerType, $nullable);
-            $buildBody = $this->complexTermBody($innerType, $imports);
+        // A term of one concrete record takes the record's fields; an abstract record type (UI.DataFieldDefault)
+        // takes a record of any type deriving from it, like a collection element does.
+        if ($isComplex && !$isCollection && !$this->types->isAbstract($innerType)) {
+            [$ctorParams, $ctorDocblock] = $this->recordTermCtorParams($fullyQualified, $innerType, $imports);
+            $buildBody = $this->recordTermBody($innerType, $imports);
         } else {
             [$ctorParams, $ctorDocblock] = $this->buildTermCtorParams($rawType, $innerType, $isCollection, $imports);
             $buildBody = $this->buildAnnotationValueBody($fullyQualified, $rawType, $innerType, $isCollection, $nullable, $imports);
@@ -590,7 +572,7 @@ PHP;
         // ── Class docblock ────────────────────────────────────────────────────
         $classDocParts   = $description !== '' ? [" * {$description}", ' * @see TypedAnnotationInterface'] : [' * @see TypedAnnotationInterface'];
         $classDoc        = "/**\n" . implode("\n", $classDocParts) . "\n */\n";
-        $ctorDocblockStr = $ctorDocblock !== '' ? "    {$ctorDocblock}\n" : '';
+        $ctorDocblockStr = $ctorDocblock !== '' ? preg_replace('/^/m', '    ', $ctorDocblock) . "\n" : '';
         $usesBlock       = $imports->block();
 
         return <<<PHP
@@ -718,51 +700,47 @@ PHP;
     }
 
     /**
-     * The fields of a term whose type is one record, as they stood before OP07 (replaced in step 4).
+     * The fields of a term whose type is one concrete record: every field of the type, own and inherited,
+     * as a named optional parameter, typed as in the record class.
      *
      * @return array{0: string, 1: string} [ctorParams, ctorDocblock]
      */
-    private function complexTermCtorParams(string $innerType, bool $nullable): array
+    private function recordTermCtorParams(string $fullyQualified, string $innerType, VocabularyImports $imports): array
     {
-        $properties = $this->getComplexTypeProperties($innerType);
-        if ($properties === []) {
-            // Unknown complex type — `mixed` subsumes null, so never `?mixed`
-            $default = $nullable ? ' = null' : '';
-            return ["        public readonly mixed \$value{$default},\n", ''];
+        $lines     = [];
+        $docParams = [];
+        foreach ($this->types->properties($innerType) as $prop) {
+            $property = $this->phpPropertyName($prop['name']);
+            if ($property === 'qualifier') {
+                throw new \RuntimeException(
+                    "The term {$fullyQualified} has a field Qualifier, which collides with the annotation qualifier.",
+                );
+            }
+            [$phpType, $docType] = $this->fieldPhpType($prop['type'], $imports);
+            $lines[] = "        public {$phpType} \${$property} = null,";
+            if ($docType !== null) {
+                $docParams[] = " * @param {$docType} \${$property}";
+            }
         }
-        // Sort: required (non-nullable) params before optional (nullable) params.
-        $required = array_filter($properties, fn($p) => !$p['nullable']);
-        $optional = array_filter($properties, fn($p) => $p['nullable']);
-        $sorted   = [...array_values($required), ...array_values($optional)];
-        $lines    = [];
-        foreach ($sorted as $prop) {
-            $phpType  = $this->phpTypeForOdataType($prop['type']);
-            $null     = ($prop['nullable'] && $phpType !== 'mixed') ? '?' : '';
-            $default  = $prop['nullable'] ? ' = null' : '';
-            $propName = lcfirst($prop['name']);
-            $lines[]  = "        public readonly {$null}{$phpType} \${$propName}{$default},";
-        }
-        return [implode("\n", $lines) . "\n", ''];
+        $docblock = $docParams !== [] ? "/**\n" . implode("\n", $docParams) . "\n */" : '';
+        return [$lines !== [] ? implode("\n", $lines) . "\n" : '', $docblock];
     }
 
-    /** The record of a term whose type is one record, as it stood before OP07 (replaced in step 4). */
-    private function complexTermBody(string $innerType, VocabularyImports $imports): string
+    /**
+     * The record of a term whose type is one concrete record: built through its record class, so the
+     * required fields and the value writing are those of {@see \LaravelUi5\OData\Edm\Annotation\AbstractRecord}.
+     */
+    private function recordTermBody(string $innerType, VocabularyImports $imports): string
     {
-        $properties = $this->getComplexTypeProperties($innerType);
-        if ($properties === []) {
-            return 'return null;';
+        $class = $imports->reference($this->phpClassOf($innerType));
+        $args  = array_map(
+            fn(array $p) => '            ' . $this->phpPropertyName($p['name']) . ': $this->' . $this->phpPropertyName($p['name']) . ',',
+            $this->types->properties($innerType),
+        );
+        if ($args === []) {
+            return "return (new {$class}())->toRecord();";
         }
-        $record   = $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\RecordAnnotationValue');
-        $property = $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\PropertyValue');
-        $constant = $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\ConstantAnnotationValue');
-        $pvLines  = [];
-        foreach ($properties as $prop) {
-            $propName  = lcfirst($prop['name']);
-            $kind      = self::PRIMITIVE_KINDS[$prop['type']] ?? 'String';
-            $pvLines[] = "            new {$property}('{$prop['name']}', new {$constant}('{$kind}', (string) \$this->{$propName})),";
-        }
-        $pvBlock = implode("\n", $pvLines);
-        return "return new {$record}(\n            '{$innerType}',\n{$pvBlock}\n        );";
+        return "return (new {$class}(\n" . implode("\n", $args) . "\n        ))->toRecord();";
     }
 
     // ── Attribute candidate detection ─────────────────────────────────────────
@@ -864,13 +842,6 @@ PHP;
 
     // ── Type helpers ──────────────────────────────────────────────────────────
 
-    private function phpTypeForOdataType(string $odataType): string
-    {
-        if (str_starts_with($odataType, 'Collection(')) {
-            return 'array';
-        }
-        return self::PRIMITIVE_PHP_TYPES[$this->resolveType($odataType)] ?? 'mixed';
-    }
 
     /** Whether the qualified $type is a loaded ComplexType. */
     private function isComplexType(string $type): bool
@@ -878,15 +849,6 @@ PHP;
         return $this->types->isComplexType($type);
     }
 
-    /**
-     * The properties a qualified complex type declares itself; [] when it is not loaded.
-     *
-     * @return list<array{name: string, type: string, nullable: bool, required: bool}>
-     */
-    private function getComplexTypeProperties(string $type): array
-    {
-        return $this->types->ownProperties($type);
-    }
 
     /**
      * Resolves a qualified TypeDefinition to its underlying OData type.
@@ -981,13 +943,13 @@ PHP;
     {
         if ($this->stubs === []) {
             $this->emit('');
-            $this->emit('All buildAnnotationValue() bodies fully resolved.');
+            $this->emit('All term types resolved.');
             return;
         }
 
         $this->emit('');
         $this->emit(sprintf(
-            '%d term(s) require manual implementation of buildAnnotationValue():',
+            '%d term(s) with a type no loaded vocabulary declares, written by their PHP value:',
             count($this->stubs),
         ));
         foreach ($this->stubs as $stub) {

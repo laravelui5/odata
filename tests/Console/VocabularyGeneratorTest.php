@@ -43,6 +43,7 @@ const GENERATOR_COMMON_XML = <<<'XML'
       </ComplexType>
       <ComplexType Name="ProbeShared">
         <Property Name="A" Type="Edm.String" />
+        <Property Name="ID" Type="Edm.String" />
       </ComplexType>
     </Schema>
   </edmx:DataServices>
@@ -76,6 +77,8 @@ const GENERATOR_UI_XML = <<<'XML'
       <Term Name="ProbeMinimum" Type="Edm.PrimitiveType" Nullable="false" AppliesTo="Property" />
       <Term Name="ProbeDefaulted" Type="Edm.Int32" Nullable="false" DefaultValue="3" AppliesTo="Property" />
       <Term Name="ProbePath" Type="Edm.PropertyPath" AppliesTo="Property" />
+      <Term Name="ProbeVariant" Type="UI.ProbeFieldWithUrl" AppliesTo="EntityType" />
+      <Term Name="ProbeDefault" Type="UI.ProbeAbstract" Nullable="false" AppliesTo="Property" />
       <ComplexType Name="ProbeShared" BaseType="Common.ProbeShared">
         <Property Name="B" Type="Edm.Boolean" />
       </ComplexType>
@@ -269,4 +272,40 @@ it('writes every term value through the value writer', function () {
         ->and(($this->read)('Ui/V1/ProbePath.php'))->toContain('public ?string $value = null,')
         ->and(($this->read)('Ui/V1/ProbeFlagsTerm.php'))
         ->toContain('public ProbeFlags|array|Path|null $value = null,');
+});
+
+it('gives a term of one concrete record the record\'s fields and builds it through the record class', function () {
+    $this->generator->run();
+
+    expect(($this->read)('Ui/V1/ProbeVariant.php'))
+        ->toContain("        public string|Path|null \$label = null,\n        public ProbeCriticality|Path|null \$criticality = null,\n        public mixed \$value = null,\n        public string|Path|null \$url = null,")
+        ->toContain('@param list<ProbeAbstract>|Path|null $items')
+        ->toContain("return (new ProbeFieldWithUrl(\n            label: \$this->label,")
+        ->and(($this->read)('Common/V1/ProbeShared.php'))->toContain('public string|Path|null $id = null,')
+        ->toContain("'ID' => ['id', 'Edm.String', false],");
+
+    withGeneratedProbes($this->outputRoot, function () {
+        $record = makeGenerated('Ui\\V1\\ProbeVariant', ['value' => 'code', 'url' => 'https://example.test', 'label' => 'Code'])
+            ->toAnnotation()->getValue();
+        expect($record->getType())->toBe('com.sap.vocabularies.UI.v1.ProbeFieldWithUrl')
+            ->and(array_map(static fn($pv) => $pv->getProperty(), $record->getPropertyValues()))->toBe(['Label', 'Value', 'Url']);
+
+        expect(fn() => makeGenerated('Ui\\V1\\ProbeVariant', ['value' => 'code'])->toAnnotation())
+            ->toThrow(LogicException::class, 'requires the field Url');
+    });
+});
+
+it('gives a term of an abstract record type a record of any type deriving from it', function () {
+    $this->generator->run();
+
+    expect(($this->read)('Ui/V1/ProbeDefault.php'))->toContain('public ProbeAbstract|Path|null $value = null,');
+
+    withGeneratedProbes($this->outputRoot, function () {
+        $record = makeGenerated('Ui\\V1\\ProbeDefault', [makeGenerated('Ui\\V1\\ProbeField', ['value' => 1])])
+            ->toAnnotation()->getValue();
+        expect($record->getType())->toBe('com.sap.vocabularies.UI.v1.ProbeField');
+
+        expect(fn() => makeGenerated('Ui\\V1\\ProbeDefault')->toAnnotation())
+            ->toThrow(LogicException::class, 'The term com.sap.vocabularies.UI.v1.ProbeDefault requires a value.');
+    });
 });
