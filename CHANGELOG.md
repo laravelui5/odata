@@ -6,10 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
-## [4.0.0] - unreleased – 
+## [4.0.0] - 2026-11-03
 
-The next major (`ROADMAP.md`, *Next major*). A discovered model is described by its table and its class, and the wire
-carries exactly what `$metadata` declares.
+The next major, worked on directly, without a deprecating minor before it (decided 2026-11-02). Its rule:
+
+> **A discovered model is described by its table and its class. What goes beyond the table is declared on the model's
+> class; what depends on the runtime comes from a forward-exit bound in the container. Every declaration adds to
+> discovery; none overrides it. And the wire carries exactly what `$metadata` declares.**
+>
+> Two surfaces, nothing in between: a discovered model (table, casts, `$hidden`, class attributes) or a custom entity
+> set. A rename, another type or a cut of a column is a custom set. No attribute on a PHP property: the property shadows
+> Eloquent's attribute bag (`OP24`), a class attribute cannot.
 
 ### Changed
 
@@ -68,8 +75,8 @@ carries exactly what `$metadata` declares.
   numeric query key arrives as an int; the three bindings' `getSourceClass()` return `string` (they are final and
   never returned null; `ResolverBindingInterface` keeps `?string`). `odata:cache` refuses a service that does not extend
   `ODataService` with a message instead of a fatal error. With the regenerated vocabularies (below) **all of `src` is
-  clean at level 5, and so are the tests**: `phpstan.neon` runs at level 5, no baseline (`OP32`). One exception for
-  `src` stays, with its reason: the filter parser's unresolved path segments (`OP45`).
+  clean at level 5, and so are the tests**: `phpstan.neon` runs at level 5, no baseline and no exception for `src`
+  (`OP32`, `OP45`).
 - **BREAKING: the vocabulary classes are regenerated, and write what CSDL and UI5 read** (`OP07`, `OP29`). The generator
   now reads base types and abstract types, keys every type by its qualified name, and writes one value by its declared
   type. What a client sees:
@@ -104,6 +111,17 @@ carries exactly what `$metadata` declares.
     `Validation.MinItems`, `MaxItems` and `Analytics.AnalyticalContext` attributes.
   - New upstream terms come along: `UI.CardItem`, `Common.ExpandAfterConcatSupported`,
     `PersonalData.RelatedDataCategoryID`. Each field carries the vocabulary's description as `@param`.
+- **The filter tree says whether it is resolved** (`OP45`). `FilterParser` emits internal unresolved nodes for paths and
+  lambdas; `PropertyResolver` turns them into `PropertyPathExpression` and `LambdaExpression`, whose `segments` and
+  `collection` now always hold properties, as their types say. A custom resolver reading `$plan->filter` sees no change.
+  `FilterExpressionKind` gains the case `Unresolved` (BREAKING only for an exhaustive `match` over it); a tree that still
+  holds such a node refuses a visitor.
+- **BREAKING: a write verb answers `405 Method Not Allowed`**, with an `Allow` header naming what the target accepts
+  (`GET`; `GET, HEAD` on the service root; `POST` on `$batch`). The code stays `method_not_allowed`; the status was `400`.
+  New `MethodNotAllowedException`.
+- **BREAKING: a cached `$metadata` is not passed to the read authorizer** (`OP12`). It is not a data read: the
+  document is served before the schema is loaded (below). The authentication in front of the service still applies;
+  only the cold path still hands the metadata plan to `ReadAuthorizerInterface`.
 - **A multipart `$batch` answers every part in its position** (`OP37`). A change set gets one `405`
   (`changeset_not_supported`): this service is read-only, and OpenUI5's two-way bindings send one when a bound field is
   edited. A part without a readable request gets a `400` (`invalid_batch_part`). Both used to be dropped, so the response
@@ -139,6 +157,12 @@ carries exactly what `$metadata` declares.
 - **`#[ODataAnnotate]`** (`OP35`, `OP38`) — annotates one property of a discovered model, written on the class:
   `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`, repeatable, any number of typed annotations per
   attribute. The property must be one the entity type declares, or discovery fails loud.
+- **`odata:cache` writes the finished `$metadata` document, and it is served from the file** (`OP12`). By default at
+  `resources/edmx/{Namespace}.xml` in the host (`cachedMetadataXMLPath()`, which existed but returned `null` and was
+  read by nothing). Served while it exists — before the schema is loaded, about 20 ms down to 0.1 ms for a 60-set
+  schema — with an `ETag` that answers `If-None-Match` with `304`; without it the cold path serializes as before.
+  `odata:clear` removes it. Both commands only touch documents under `resources/edmx/`; a hand-written one elsewhere is
+  served, never written or deleted. **Upgrade:** run `odata:cache` and commit `resources/edmx/` with `Edm/`.
 - **`Vocabulary::CodeList`** (`OP44`). The `CodeList` classes shipped since 3.1, but the enum had no case for them, so a
   service announcing a code list had to build the `edmx:Reference` by hand. Every catalog entry has its case now, and a
   test keeps the two in step.
