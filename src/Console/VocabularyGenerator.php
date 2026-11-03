@@ -423,7 +423,7 @@ PHP;
         $fullyQualified  = $entry->getNamespace() . '.' . $name;
         $appliesToValues = $appliesto !== '' ? preg_split('/\s+/', $appliesto) : [];
 
-        $isAttribute = $this->isAttributeCandidate($rawType, $appliesToValues, $entry->getNamespace());
+        $isAttribute = $this->isAttributeCandidate($appliesToValues, $entry->getNamespace());
         $attrTargets = $isAttribute ? $this->resolveAttributeTargets($appliesToValues) : null;
 
         // Track terms whose buildAnnotationValue() body cannot be fully resolved.
@@ -783,22 +783,18 @@ PHP;
     /**
      * Returns true when the term qualifies as a PHP #[Attribute].
      *
-     * Three conditions must all hold:
-     *   1. Type is not Edm.EntitySetPath.
-     *   2. AppliesTo is absent, or contains at least one value in ATTRIBUTE_TARGET_MAP.
-     *   3. The vocabulary is not Org.OData.Capabilities.V1.
+     * Two conditions must both hold:
+     *   1. AppliesTo is absent, or contains at least one value in ATTRIBUTE_TARGET_MAP.
+     *   2. The vocabulary is not Org.OData.Capabilities.V1.
      *
      * A term without AppliesTo applies to every model element (CSDL XML 4.01 §14.1.2), so it is
      * an attribute on every target — Core.Description and Common.Label are such terms.
      *
      * @param list<string> $appliesToValues
      */
-    private function isAttributeCandidate(string $rawType, array $appliesToValues, string $odataNamespace): bool
+    private function isAttributeCandidate(array $appliesToValues, string $odataNamespace): bool
     {
         if ($odataNamespace === 'Org.OData.Capabilities.V1') {
-            return false;
-        }
-        if ($rawType === 'Edm.EntitySetPath') {
             return false;
         }
 
