@@ -5,15 +5,14 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Vocabularies\Common\V1\SortOrderType;
 
 /**
  * Defines how the result of a queried collection of entities is shaped and how this result is displayed
@@ -32,42 +31,51 @@ final readonly class PresentationVariant implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param list<SortOrderType>|Path|null $sortOrder
+     * @param list<string>|Path|null $groupBy
+     * @param list<string>|Path|null $totalBy
+     * @param list<string>|Path|null $total
+     * @param list<string>|Path|null $dynamicTotal
+     * @param list<string>|Path|null $visualizations
+     * @param list<string>|Path|null $requestAtLeast
+     * @param list<string>|Path|null $selectionFields
+     */
     public function __construct(
-        public readonly array $sortOrder,
-        public readonly array $groupBy,
-        public readonly array $totalBy,
-        public readonly array $total,
-        public readonly array $dynamicTotal,
-        public readonly bool $includeGrandTotal,
-        public readonly int $initialExpansionLevel,
-        public readonly array $visualizations,
-        public readonly array $requestAtLeast,
-        public readonly array $selectionFields,
-        public readonly ?string $iD = null,
-        public readonly ?string $text = null,
-        public readonly ?int $maxItems = null,
-        public readonly ?string $recursiveHierarchyQualifier = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $id = null,
+        public string|Path|null $text = null,
+        public int|Path|null $maxItems = null,
+        public array|Path|null $sortOrder = null,
+        public array|Path|null $groupBy = null,
+        public array|Path|null $totalBy = null,
+        public array|Path|null $total = null,
+        public array|Path|null $dynamicTotal = null,
+        public bool|Path|null $includeGrandTotal = null,
+        public int|Path|null $initialExpansionLevel = null,
+        public array|Path|null $visualizations = null,
+        public string|Path|null $recursiveHierarchyQualifier = null,
+        public array|Path|null $requestAtLeast = null,
+        public array|Path|null $selectionFields = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.PresentationVariantType',
-            new PropertyValue('ID', new ConstantAnnotationValue('String', (string) $this->iD)),
-            new PropertyValue('Text', new ConstantAnnotationValue('String', (string) $this->text)),
-            new PropertyValue('MaxItems', new ConstantAnnotationValue('Integer', (string) $this->maxItems)),
-            new PropertyValue('SortOrder', new ConstantAnnotationValue('String', (string) $this->sortOrder)),
-            new PropertyValue('GroupBy', new ConstantAnnotationValue('String', (string) $this->groupBy)),
-            new PropertyValue('TotalBy', new ConstantAnnotationValue('String', (string) $this->totalBy)),
-            new PropertyValue('Total', new ConstantAnnotationValue('String', (string) $this->total)),
-            new PropertyValue('DynamicTotal', new ConstantAnnotationValue('String', (string) $this->dynamicTotal)),
-            new PropertyValue('IncludeGrandTotal', new ConstantAnnotationValue('Boolean', (string) $this->includeGrandTotal)),
-            new PropertyValue('InitialExpansionLevel', new ConstantAnnotationValue('Integer', (string) $this->initialExpansionLevel)),
-            new PropertyValue('Visualizations', new ConstantAnnotationValue('String', (string) $this->visualizations)),
-            new PropertyValue('RecursiveHierarchyQualifier', new ConstantAnnotationValue('String', (string) $this->recursiveHierarchyQualifier)),
-            new PropertyValue('RequestAtLeast', new ConstantAnnotationValue('String', (string) $this->requestAtLeast)),
-            new PropertyValue('SelectionFields', new ConstantAnnotationValue('String', (string) $this->selectionFields)),
-        );
+        return (new PresentationVariantType(
+            id: $this->id,
+            text: $this->text,
+            maxItems: $this->maxItems,
+            sortOrder: $this->sortOrder,
+            groupBy: $this->groupBy,
+            totalBy: $this->totalBy,
+            total: $this->total,
+            dynamicTotal: $this->dynamicTotal,
+            includeGrandTotal: $this->includeGrandTotal,
+            initialExpansionLevel: $this->initialExpansionLevel,
+            visualizations: $this->visualizations,
+            recursiveHierarchyQualifier: $this->recursiveHierarchyQualifier,
+            requestAtLeast: $this->requestAtLeast,
+            selectionFields: $this->selectionFields,
+        ))->toRecord();
     }
 }

@@ -4,9 +4,18 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Capabilities\V1;
 
-final readonly class CountRestrictionsBase
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+readonly class CountRestrictionsBase extends AbstractRecord
 {
+    public const string TYPE = 'Org.OData.Capabilities.V1.CountRestrictionsBase';
+
+    public const array FIELDS = [
+        'Countable' => ['countable', 'Edm.Boolean', false],
+    ];
+
     public function __construct(
-        public readonly bool $countable,
+        public bool|Path|null $countable = null,
     ) {}
 }

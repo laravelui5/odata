@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 
 /**
  * Information for the header area of an entity representation. HeaderInfo is mandatory for main entity types of the model
@@ -31,29 +29,28 @@ final readonly class HeaderInfo implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string $typeName,
-        public readonly string $typeNamePlural,
-        public readonly mixed $title = null,
-        public readonly mixed $description = null,
-        public readonly mixed $image = null,
-        public readonly ?string $imageUrl = null,
-        public readonly ?string $typeImageUrl = null,
-        public readonly ?string $initials = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $typeName = null,
+        public string|Path|null $typeNamePlural = null,
+        public DataFieldAbstract|Path|null $title = null,
+        public DataFieldAbstract|Path|null $description = null,
+        public mixed $image = null,
+        public string|Path|null $imageUrl = null,
+        public string|Path|null $typeImageUrl = null,
+        public string|Path|null $initials = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.HeaderInfoType',
-            new PropertyValue('TypeName', new ConstantAnnotationValue('String', (string) $this->typeName)),
-            new PropertyValue('TypeNamePlural', new ConstantAnnotationValue('String', (string) $this->typeNamePlural)),
-            new PropertyValue('Title', new ConstantAnnotationValue('String', (string) $this->title)),
-            new PropertyValue('Description', new ConstantAnnotationValue('String', (string) $this->description)),
-            new PropertyValue('Image', new ConstantAnnotationValue('String', (string) $this->image)),
-            new PropertyValue('ImageUrl', new ConstantAnnotationValue('String', (string) $this->imageUrl)),
-            new PropertyValue('TypeImageUrl', new ConstantAnnotationValue('String', (string) $this->typeImageUrl)),
-            new PropertyValue('Initials', new ConstantAnnotationValue('String', (string) $this->initials)),
-        );
+        return (new HeaderInfoType(
+            typeName: $this->typeName,
+            typeNamePlural: $this->typeNamePlural,
+            title: $this->title,
+            description: $this->description,
+            image: $this->image,
+            imageUrl: $this->imageUrl,
+            typeImageUrl: $this->typeImageUrl,
+            initials: $this->initials,
+        ))->toRecord();
     }
 }

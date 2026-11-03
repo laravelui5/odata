@@ -5,15 +5,14 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\CollectionAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * List of actions that are not available in the current state of the instance of the Semantic Object
@@ -33,19 +32,14 @@ final readonly class SemanticObjectUnavailableActions implements TypedAnnotation
         PropertyInterface::class,
     ];
 
-        /** @param list<string> $value */
-public function __construct(
-        public readonly array $value = [],
-        public readonly ?string $qualifier = null,
+    /** @param list<string> $value */
+    public function __construct(
+        public array $value = [],
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new CollectionAnnotationValue(
-            ...array_map(
-                static fn($v) => new ConstantAnnotationValue('String', (string) $v),
-                $this->value,
-            ),
-        );
+        return AnnotationValueWriter::write($this->value, 'Collection(Edm.String)');
     }
 }

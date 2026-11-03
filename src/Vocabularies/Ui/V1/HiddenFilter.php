@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Properties annotated with this term will not be rendered as filter criteria if the annotation evaluates to true.
@@ -30,7 +30,7 @@ final readonly class HiddenFilter implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly ?string $qualifier = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface

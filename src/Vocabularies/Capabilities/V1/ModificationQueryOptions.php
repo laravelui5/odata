@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Capabilities\V1;
 
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Support for query options with modification requests (insert, update, action invocation)
@@ -31,25 +29,24 @@ final readonly class ModificationQueryOptions implements TypedAnnotationInterfac
     ];
 
     public function __construct(
-        public readonly bool $expandSupported,
-        public readonly bool $selectSupported,
-        public readonly bool $computeSupported,
-        public readonly bool $filterSupported,
-        public readonly bool $searchSupported,
-        public readonly bool $sortSupported,
-        public readonly ?string $qualifier = null,
+        public bool|Path|null $expandSupported = null,
+        public bool|Path|null $selectSupported = null,
+        public bool|Path|null $computeSupported = null,
+        public bool|Path|null $filterSupported = null,
+        public bool|Path|null $searchSupported = null,
+        public bool|Path|null $sortSupported = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Capabilities.ModificationQueryOptionsType',
-            new PropertyValue('ExpandSupported', new ConstantAnnotationValue('Boolean', (string) $this->expandSupported)),
-            new PropertyValue('SelectSupported', new ConstantAnnotationValue('Boolean', (string) $this->selectSupported)),
-            new PropertyValue('ComputeSupported', new ConstantAnnotationValue('Boolean', (string) $this->computeSupported)),
-            new PropertyValue('FilterSupported', new ConstantAnnotationValue('Boolean', (string) $this->filterSupported)),
-            new PropertyValue('SearchSupported', new ConstantAnnotationValue('Boolean', (string) $this->searchSupported)),
-            new PropertyValue('SortSupported', new ConstantAnnotationValue('Boolean', (string) $this->sortSupported)),
-        );
+        return (new ModificationQueryOptionsType(
+            expandSupported: $this->expandSupported,
+            selectSupported: $this->selectSupported,
+            computeSupported: $this->computeSupported,
+            filterSupported: $this->filterSupported,
+            searchSupported: $this->searchSupported,
+            sortSupported: $this->sortSupported,
+        ))->toRecord();
     }
 }

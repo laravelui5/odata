@@ -4,9 +4,23 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
-final readonly class SemanticObjectMappingConstant
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+final readonly class SemanticObjectMappingConstant extends SemanticObjectMappingAbstract
 {
+    public const string TYPE = 'com.sap.vocabularies.Common.v1.SemanticObjectMappingConstant';
+
+    public const array FIELDS = [
+        'SemanticObjectProperty' => ['semanticObjectProperty', 'Edm.String', true],
+        'Constant' => ['constant', 'Edm.PrimitiveType', true],
+    ];
+
     public function __construct(
-        public readonly mixed $constant,
-    ) {}
+        string|Path|null $semanticObjectProperty = null,
+        public mixed $constant = null,
+    ) {
+        parent::__construct(
+            semanticObjectProperty: $semanticObjectProperty,
+        );
+    }
 }

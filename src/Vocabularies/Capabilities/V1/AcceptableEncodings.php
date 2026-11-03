@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Capabilities\V1;
 
-use LaravelUi5\OData\Edm\Annotation\CollectionAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
 
 /**
  * List of acceptable compression methods for ($batch) requests, e.g. gzip
@@ -27,19 +26,14 @@ final readonly class AcceptableEncodings implements TypedAnnotationInterface
         EntityContainerInterface::class,
     ];
 
-        /** @param list<string> $value */
-public function __construct(
-        public readonly array $value = [],
-        public readonly ?string $qualifier = null,
+    /** @param list<string> $value */
+    public function __construct(
+        public array $value = [],
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new CollectionAnnotationValue(
-            ...array_map(
-                static fn($v) => new ConstantAnnotationValue('String', (string) $v),
-                $this->value,
-            ),
-        );
+        return AnnotationValueWriter::write($this->value, 'Collection(Edm.String)');
     }
 }

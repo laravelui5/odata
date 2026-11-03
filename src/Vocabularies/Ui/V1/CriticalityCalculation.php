@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Parameters for client-calculated criticality, alternative to UI.Criticality
@@ -25,22 +23,36 @@ final readonly class CriticalityCalculation implements TypedAnnotationInterface
     /** @var array<class-string<AnnotationTargetInterface>> */
     public const array APPLIES_TO = [];
 
+    /**
+     * @param list<LevelThresholdsType>|Path|null $constantThresholds
+     */
     public function __construct(
-        public readonly bool $isRelativeDifference,
-        public readonly mixed $improvementDirection,
-        public readonly array $constantThresholds,
-        public readonly mixed $referenceValue = null,
-        public readonly ?string $qualifier = null,
+        public mixed $acceptanceRangeLowValue = null,
+        public mixed $acceptanceRangeHighValue = null,
+        public mixed $toleranceRangeLowValue = null,
+        public mixed $toleranceRangeHighValue = null,
+        public mixed $deviationRangeLowValue = null,
+        public mixed $deviationRangeHighValue = null,
+        public mixed $referenceValue = null,
+        public bool|Path|null $isRelativeDifference = null,
+        public ImprovementDirectionType|Path|null $improvementDirection = null,
+        public array|Path|null $constantThresholds = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.CriticalityCalculationType',
-            new PropertyValue('ReferenceValue', new ConstantAnnotationValue('String', (string) $this->referenceValue)),
-            new PropertyValue('IsRelativeDifference', new ConstantAnnotationValue('Boolean', (string) $this->isRelativeDifference)),
-            new PropertyValue('ImprovementDirection', new ConstantAnnotationValue('String', (string) $this->improvementDirection)),
-            new PropertyValue('ConstantThresholds', new ConstantAnnotationValue('String', (string) $this->constantThresholds)),
-        );
+        return (new CriticalityCalculationType(
+            acceptanceRangeLowValue: $this->acceptanceRangeLowValue,
+            acceptanceRangeHighValue: $this->acceptanceRangeHighValue,
+            toleranceRangeLowValue: $this->toleranceRangeLowValue,
+            toleranceRangeHighValue: $this->toleranceRangeHighValue,
+            deviationRangeLowValue: $this->deviationRangeLowValue,
+            deviationRangeHighValue: $this->deviationRangeHighValue,
+            referenceValue: $this->referenceValue,
+            isRelativeDifference: $this->isRelativeDifference,
+            improvementDirection: $this->improvementDirection,
+            constantThresholds: $this->constantThresholds,
+        ))->toRecord();
     }
 }

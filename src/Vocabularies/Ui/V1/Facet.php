@@ -4,13 +4,23 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
 /**
  * Abstract base type for facets
  */
-final readonly class Facet
+abstract readonly class Facet extends AbstractRecord
 {
+    public const string TYPE = 'com.sap.vocabularies.UI.v1.Facet';
+
+    public const array FIELDS = [
+        'Label' => ['label', 'Edm.String', false],
+        'ID' => ['id', 'Edm.String', false],
+    ];
+
     public function __construct(
-        public readonly ?string $label = null,
-        public readonly ?string $iD = null,
+        public string|Path|null $label = null,
+        public string|Path|null $id = null,
     ) {}
 }

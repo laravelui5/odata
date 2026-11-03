@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Specifies how to get a list of acceptable values for a property or parameter
@@ -32,34 +30,36 @@ final readonly class ValueList implements TypedAnnotationInterface
         FunctionParameterInterface::class,
     ];
 
+    /**
+     * @param list<ValueListParameter>|Path|null $parameters
+     */
     public function __construct(
-        public readonly bool $distinctValuesSupported,
-        public readonly bool $searchSupported,
-        public readonly array $parameters,
-        public readonly ?string $label = null,
-        public readonly ?string $collectionPath = null,
-        public readonly ?string $relativeCollectionPath = null,
-        public readonly ?string $collectionRoot = null,
-        public readonly ?int $fetchValues = null,
-        public readonly ?string $presentationVariantQualifier = null,
-        public readonly ?string $selectionVariantQualifier = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $label = null,
+        public string|Path|null $collectionPath = null,
+        public string|Path|null $relativeCollectionPath = null,
+        public string|Path|null $collectionRoot = null,
+        public bool|Path|null $distinctValuesSupported = null,
+        public bool|Path|null $searchSupported = null,
+        public int|Path|null $fetchValues = null,
+        public string|Path|null $presentationVariantQualifier = null,
+        public string|Path|null $selectionVariantQualifier = null,
+        public array|Path|null $parameters = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Common.ValueListType',
-            new PropertyValue('Label', new ConstantAnnotationValue('String', (string) $this->label)),
-            new PropertyValue('CollectionPath', new ConstantAnnotationValue('String', (string) $this->collectionPath)),
-            new PropertyValue('RelativeCollectionPath', new ConstantAnnotationValue('NavigationPropertyPath', (string) $this->relativeCollectionPath)),
-            new PropertyValue('CollectionRoot', new ConstantAnnotationValue('String', (string) $this->collectionRoot)),
-            new PropertyValue('DistinctValuesSupported', new ConstantAnnotationValue('Boolean', (string) $this->distinctValuesSupported)),
-            new PropertyValue('SearchSupported', new ConstantAnnotationValue('Boolean', (string) $this->searchSupported)),
-            new PropertyValue('FetchValues', new ConstantAnnotationValue('String', (string) $this->fetchValues)),
-            new PropertyValue('PresentationVariantQualifier', new ConstantAnnotationValue('String', (string) $this->presentationVariantQualifier)),
-            new PropertyValue('SelectionVariantQualifier', new ConstantAnnotationValue('String', (string) $this->selectionVariantQualifier)),
-            new PropertyValue('Parameters', new ConstantAnnotationValue('String', (string) $this->parameters)),
-        );
+        return (new ValueListType(
+            label: $this->label,
+            collectionPath: $this->collectionPath,
+            relativeCollectionPath: $this->relativeCollectionPath,
+            collectionRoot: $this->collectionRoot,
+            distinctValuesSupported: $this->distinctValuesSupported,
+            searchSupported: $this->searchSupported,
+            fetchValues: $this->fetchValues,
+            presentationVariantQualifier: $this->presentationVariantQualifier,
+            selectionVariantQualifier: $this->selectionVariantQualifier,
+            parameters: $this->parameters,
+        ))->toRecord();
     }
 }

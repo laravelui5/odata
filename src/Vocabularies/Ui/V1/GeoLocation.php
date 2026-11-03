@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+use LaravelUi5\OData\Vocabularies\Communication\V1\AddressType;
 
 /**
  * Geographic location
@@ -31,21 +30,20 @@ final readonly class GeoLocation implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly ?float $latitude = null,
-        public readonly ?float $longitude = null,
-        public readonly mixed $location = null,
-        public readonly mixed $address = null,
-        public readonly ?string $qualifier = null,
+        public float|Path|null $latitude = null,
+        public float|Path|null $longitude = null,
+        public mixed $location = null,
+        public AddressType|Path|null $address = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.GeoLocationType',
-            new PropertyValue('Latitude', new ConstantAnnotationValue('Float', (string) $this->latitude)),
-            new PropertyValue('Longitude', new ConstantAnnotationValue('Float', (string) $this->longitude)),
-            new PropertyValue('Location', new ConstantAnnotationValue('String', (string) $this->location)),
-            new PropertyValue('Address', new ConstantAnnotationValue('String', (string) $this->address)),
-        );
+        return (new GeoLocationType(
+            latitude: $this->latitude,
+            longitude: $this->longitude,
+            location: $this->location,
+            address: $this->address,
+        ))->toRecord();
     }
 }

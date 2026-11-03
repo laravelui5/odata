@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Core\V1;
 
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\SchemaInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\SchemaInterface;
 
 /**
  * Functions, actions and types in this namespace can be referenced in URLs with or without namespace- or alias- qualification.
@@ -26,7 +26,7 @@ final readonly class DefaultNamespace implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly ?string $qualifier = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface

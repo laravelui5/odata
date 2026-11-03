@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\EdmPrimitiveType;
-use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
+use LaravelUi5\OData\Edm\EdmPrimitiveType;
 
 /**
  * A default value for the property to be used in filter expressions.
@@ -30,9 +30,9 @@ final readonly class FilterDefaultValue implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly EdmPrimitiveType $type,
-        public readonly mixed $value = null,
-        public readonly ?string $qualifier = null,
+        public mixed $value = null,
+        public ?EdmPrimitiveType $type = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
@@ -40,22 +40,6 @@ final readonly class FilterDefaultValue implements TypedAnnotationInterface
         if ($this->value === null) {
             return null;
         }
-        return match ($this->type) {
-            EdmPrimitiveType::Byte,
-            EdmPrimitiveType::SByte,
-            EdmPrimitiveType::Int16,
-            EdmPrimitiveType::Int32,
-            EdmPrimitiveType::Int64      => new ConstantAnnotationValue('Integer', (string) $this->value),
-            EdmPrimitiveType::Decimal    => new ConstantAnnotationValue('Decimal', (string) $this->value),
-            EdmPrimitiveType::Double,
-            EdmPrimitiveType::Single     => new ConstantAnnotationValue('Float', (string) $this->value),
-            EdmPrimitiveType::Boolean    => new ConstantAnnotationValue('Boolean', $this->value ? 'true' : 'false'),
-            EdmPrimitiveType::Date       => new ConstantAnnotationValue('Date', (string) $this->value),
-            EdmPrimitiveType::DateTimeOffset => new ConstantAnnotationValue('DateTimeOffset', (string) $this->value),
-            EdmPrimitiveType::TimeOfDay  => new ConstantAnnotationValue('TimeOfDay', (string) $this->value),
-            EdmPrimitiveType::Duration   => new ConstantAnnotationValue('Duration', (string) $this->value),
-            EdmPrimitiveType::Guid       => new ConstantAnnotationValue('Guid', (string) $this->value),
-            default                       => new ConstantAnnotationValue('String', (string) $this->value),
-        };
+        return AnnotationValueWriter::write($this->value, $this->type?->value ?? 'Edm.PrimitiveType');
     }
 }

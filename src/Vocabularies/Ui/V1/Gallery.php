@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Target MUST reference a UI.MediaResource
@@ -23,7 +23,7 @@ final readonly class Gallery implements TypedAnnotationInterface
     public const array APPLIES_TO = [];
 
     public function __construct(
-        public readonly ?string $qualifier = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface

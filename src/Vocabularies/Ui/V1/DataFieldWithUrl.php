@@ -4,14 +4,40 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
+use LaravelUi5\OData\Edm\Annotation\Path;
+
 /**
  * A piece of data that allows navigating to other information on the Web
  */
-final readonly class DataFieldWithUrl
+final readonly class DataFieldWithUrl extends DataField
 {
+    public const string TYPE = 'com.sap.vocabularies.UI.v1.DataFieldWithUrl';
+
+    public const array FIELDS = [
+        'Label' => ['label', 'Edm.String', false],
+        'Criticality' => ['criticality', 'com.sap.vocabularies.UI.v1.CriticalityType', false],
+        'CriticalityRepresentation' => ['criticalityRepresentation', 'com.sap.vocabularies.UI.v1.CriticalityRepresentationType', false],
+        'IconUrl' => ['iconUrl', 'Edm.String', false],
+        'Value' => ['value', 'Edm.PrimitiveType', true],
+        'Url' => ['url', 'Edm.String', true],
+        'UrlContentType' => ['urlContentType', 'Edm.String', false],
+    ];
+
     public function __construct(
-        public readonly mixed $value,
-        public readonly string $url,
-        public readonly ?string $urlContentType = null,
-    ) {}
+        string|Path|null $label = null,
+        CriticalityType|Path|null $criticality = null,
+        CriticalityRepresentationType|Path|null $criticalityRepresentation = null,
+        string|Path|null $iconUrl = null,
+        mixed $value = null,
+        public string|Path|null $url = null,
+        public string|Path|null $urlContentType = null,
+    ) {
+        parent::__construct(
+            label: $label,
+            criticality: $criticality,
+            criticalityRepresentation: $criticalityRepresentation,
+            iconUrl: $iconUrl,
+            value: $value,
+        );
+    }
 }

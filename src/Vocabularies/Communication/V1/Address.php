@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Communication\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 
 /**
  * Address
@@ -30,38 +28,40 @@ final readonly class Address implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param ContactInformationType|list<ContactInformationType>|Path|null $type
+     */
     public function __construct(
-        public readonly ?string $building = null,
-        public readonly ?string $street = null,
-        public readonly ?string $district = null,
-        public readonly ?string $locality = null,
-        public readonly ?string $region = null,
-        public readonly ?string $code = null,
-        public readonly ?string $country = null,
-        public readonly ?string $pobox = null,
-        public readonly ?string $ext = null,
-        public readonly ?string $careof = null,
-        public readonly ?string $label = null,
-        public readonly mixed $type = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $building = null,
+        public string|Path|null $street = null,
+        public string|Path|null $district = null,
+        public string|Path|null $locality = null,
+        public string|Path|null $region = null,
+        public string|Path|null $code = null,
+        public string|Path|null $country = null,
+        public string|Path|null $pobox = null,
+        public string|Path|null $ext = null,
+        public string|Path|null $careof = null,
+        public string|Path|null $label = null,
+        public ContactInformationType|array|Path|null $type = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Communication.AddressType',
-            new PropertyValue('building', new ConstantAnnotationValue('String', (string) $this->building)),
-            new PropertyValue('street', new ConstantAnnotationValue('String', (string) $this->street)),
-            new PropertyValue('district', new ConstantAnnotationValue('String', (string) $this->district)),
-            new PropertyValue('locality', new ConstantAnnotationValue('String', (string) $this->locality)),
-            new PropertyValue('region', new ConstantAnnotationValue('String', (string) $this->region)),
-            new PropertyValue('code', new ConstantAnnotationValue('String', (string) $this->code)),
-            new PropertyValue('country', new ConstantAnnotationValue('String', (string) $this->country)),
-            new PropertyValue('pobox', new ConstantAnnotationValue('String', (string) $this->pobox)),
-            new PropertyValue('ext', new ConstantAnnotationValue('String', (string) $this->ext)),
-            new PropertyValue('careof', new ConstantAnnotationValue('String', (string) $this->careof)),
-            new PropertyValue('label', new ConstantAnnotationValue('String', (string) $this->label)),
-            new PropertyValue('type', new ConstantAnnotationValue('String', (string) $this->type)),
-        );
+        return (new AddressType(
+            building: $this->building,
+            street: $this->street,
+            district: $this->district,
+            locality: $this->locality,
+            region: $this->region,
+            code: $this->code,
+            country: $this->country,
+            pobox: $this->pobox,
+            ext: $this->ext,
+            careof: $this->careof,
+            label: $this->label,
+            type: $this->type,
+        ))->toRecord();
     }
 }

@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Capabilities\V1;
 
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\SingletonInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Change tracking capabilities of this service or entity set
@@ -36,18 +34,23 @@ final readonly class ChangeTracking implements TypedAnnotationInterface
         NavigationPropertyInterface::class,
     ];
 
+    /**
+     * @param list<string>|Path|null $filterableProperties
+     * @param list<string>|Path|null $expandableProperties
+     */
     public function __construct(
-        public readonly array $filterableProperties,
-        public readonly array $expandableProperties,
-        public readonly ?string $qualifier = null,
+        public bool|Path|null $supported = null,
+        public array|Path|null $filterableProperties = null,
+        public array|Path|null $expandableProperties = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Capabilities.ChangeTrackingType',
-            new PropertyValue('FilterableProperties', new ConstantAnnotationValue('String', (string) $this->filterableProperties)),
-            new PropertyValue('ExpandableProperties', new ConstantAnnotationValue('String', (string) $this->expandableProperties)),
-        );
+        return (new ChangeTrackingType(
+            supported: $this->supported,
+            filterableProperties: $this->filterableProperties,
+            expandableProperties: $this->expandableProperties,
+        ))->toRecord();
     }
 }

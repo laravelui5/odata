@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Measures\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
 use LaravelUi5\OData\Edm\Annotation\Path;
 use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
@@ -13,6 +13,7 @@ use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
+use LogicException;
 
 /**
  * The number of significant decimal places in the scale part (less than or equal to the number declared in the Scale facet)
@@ -32,15 +33,15 @@ final readonly class Scale implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly int|Path $value,
-        public readonly ?string $qualifier = null,
+        public int|Path|null $value = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        if ($this->value instanceof Path) {
-            return $this->value->toAnnotationValue();
+        if ($this->value === null) {
+            throw new LogicException('The term Org.OData.Measures.V1.Scale requires a value.');
         }
-        return new ConstantAnnotationValue('Integer', (string) $this->value);
+        return AnnotationValueWriter::write($this->value, 'Edm.Byte');
     }
 }

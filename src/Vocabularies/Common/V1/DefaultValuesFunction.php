@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LogicException;
 
 /**
  * Function to calculate default values based on user input that is only known to the client and "context information" that is already available to the service
@@ -30,16 +32,18 @@ final readonly class DefaultValuesFunction implements TypedAnnotationInterface
         EntitySetInterface::class,
         NavigationPropertyInterface::class,
         FunctionInterface::class,
-        FunctionInterface::class,
     ];
 
     public function __construct(
-        public readonly string $value,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $value = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new ConstantAnnotationValue('String', (string) $this->value);
+        if ($this->value === null) {
+            throw new LogicException('The term com.sap.vocabularies.Common.v1.DefaultValuesFunction requires a value.');
+        }
+        return AnnotationValueWriter::write($this->value, 'Edm.String');
     }
 }

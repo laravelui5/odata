@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Core\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
@@ -15,8 +18,7 @@ use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LogicException;
 
 /**
  * Permissions for accessing a resource
@@ -38,16 +40,19 @@ final readonly class Permissions implements TypedAnnotationInterface
         EntitySetInterface::class,
         NavigationPropertyInterface::class,
         FunctionInterface::class,
-        FunctionInterface::class,
     ];
 
+    /** @param Permission|list<Permission>|Path|null $value */
     public function __construct(
-        public readonly Permission $value,
-        public readonly ?string $qualifier = null,
+        public Permission|array|Path|null $value = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new ConstantAnnotationValue('Integer', (string) $this->value->value);
+        if ($this->value === null) {
+            throw new LogicException('The term Org.OData.Core.V1.Permissions requires a value.');
+        }
+        return AnnotationValueWriter::write($this->value, 'Org.OData.Core.V1.Permission');
     }
 }

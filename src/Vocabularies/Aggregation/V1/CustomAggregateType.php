@@ -4,10 +4,20 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Aggregation\V1;
 
-final readonly class CustomAggregateType
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+final readonly class CustomAggregateType extends AbstractRecord
 {
+    public const string TYPE = 'Org.OData.Aggregation.V1.CustomAggregateType';
+
+    public const array FIELDS = [
+        'Name' => ['name', 'Edm.String', true],
+        'Type' => ['type', 'Edm.String', true],
+    ];
+
     public function __construct(
-        public readonly string $name,
-        public readonly string $type,
+        public string|Path|null $name = null,
+        public string|Path|null $type = null,
     ) {}
 }

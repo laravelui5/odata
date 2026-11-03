@@ -4,18 +4,36 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Capabilities\V1;
 
-final readonly class SelectSupportType
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+final readonly class SelectSupportType extends AbstractRecord
 {
+    public const string TYPE = 'Org.OData.Capabilities.V1.SelectSupportType';
+
+    public const array FIELDS = [
+        'Supported' => ['supported', 'Edm.Boolean', false],
+        'InstanceAnnotationsSupported' => ['instanceAnnotationsSupported', 'Edm.Boolean', false],
+        'Expandable' => ['expandable', 'Edm.Boolean', false],
+        'Filterable' => ['filterable', 'Edm.Boolean', false],
+        'Searchable' => ['searchable', 'Edm.Boolean', false],
+        'TopSupported' => ['topSupported', 'Edm.Boolean', false],
+        'SkipSupported' => ['skipSupported', 'Edm.Boolean', false],
+        'ComputeSupported' => ['computeSupported', 'Edm.Boolean', false],
+        'Countable' => ['countable', 'Edm.Boolean', false],
+        'Sortable' => ['sortable', 'Edm.Boolean', false],
+    ];
+
     public function __construct(
-        public readonly bool $supported,
-        public readonly bool $instanceAnnotationsSupported,
-        public readonly bool $expandable,
-        public readonly bool $filterable,
-        public readonly bool $searchable,
-        public readonly bool $topSupported,
-        public readonly bool $skipSupported,
-        public readonly bool $computeSupported,
-        public readonly bool $countable,
-        public readonly bool $sortable,
+        public bool|Path|null $supported = null,
+        public bool|Path|null $instanceAnnotationsSupported = null,
+        public bool|Path|null $expandable = null,
+        public bool|Path|null $filterable = null,
+        public bool|Path|null $searchable = null,
+        public bool|Path|null $topSupported = null,
+        public bool|Path|null $skipSupported = null,
+        public bool|Path|null $computeSupported = null,
+        public bool|Path|null $countable = null,
+        public bool|Path|null $sortable = null,
     ) {}
 }

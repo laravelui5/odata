@@ -5,15 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Authorization\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\CollectionAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
 
 /**
  * Lists the methods supported by the service to authorize access
@@ -31,19 +28,14 @@ final readonly class Authorizations implements TypedAnnotationInterface
         EntityContainerInterface::class,
     ];
 
-        /** @param list<mixed> $value */
-public function __construct(
-        public readonly array $value = [],
-        public readonly ?string $qualifier = null,
+    /** @param list<Authorization> $value */
+    public function __construct(
+        public array $value = [],
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new CollectionAnnotationValue(
-            ...array_map(
-                static fn($v) => new ConstantAnnotationValue('String', (string) $v),
-                $this->value,
-            ),
-        );
+        return AnnotationValueWriter::write($this->value, 'Collection(Org.OData.Authorization.V1.Authorization)');
     }
 }

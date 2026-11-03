@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Fixtures\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use LaravelUi5\OData\Edm\Annotation\Path;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataAnnotate;
 use LaravelUi5\OData\Vocabularies\Common\V1\Label;
 use LaravelUi5\OData\Vocabularies\Core\V1\Description;
+use LaravelUi5\OData\Vocabularies\Ui\V1\CriticalityType;
+use LaravelUi5\OData\Vocabularies\Ui\V1\DataField;
 use LaravelUi5\OData\Vocabularies\Ui\V1\Hidden;
 use LaravelUi5\OData\Vocabularies\Ui\V1\LineItem;
 use LaravelUi5\OData\Vocabularies\Ui\V1\SelectionFields;
@@ -20,7 +23,10 @@ use LaravelUi5\OData\Vocabularies\Ui\V1\SelectionFields;
  */
 #[Description('An airport with IATA code')]
 #[SelectionFields(['code', 'name'])]
-#[LineItem(['code', 'name'])]
+#[LineItem([
+    new DataField(value: new Path('code'), label: 'Code'),
+    new DataField(value: new Path('name'), criticality: CriticalityType::Positive),
+])]
 #[ODataAnnotate('code', new Label('IATA Code'), new Description('The IATA airport code'))]
 #[ODataAnnotate('name', new Label('Airport Name'))]
 #[ODataAnnotate('country_id', new Hidden())]

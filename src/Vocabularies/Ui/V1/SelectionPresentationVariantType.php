@@ -4,12 +4,24 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
-final readonly class SelectionPresentationVariantType
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+final readonly class SelectionPresentationVariantType extends AbstractRecord
 {
+    public const string TYPE = 'com.sap.vocabularies.UI.v1.SelectionPresentationVariantType';
+
+    public const array FIELDS = [
+        'ID' => ['id', 'Edm.String', false],
+        'Text' => ['text', 'Edm.String', false],
+        'SelectionVariant' => ['selectionVariant', 'com.sap.vocabularies.UI.v1.SelectionVariantType', true],
+        'PresentationVariant' => ['presentationVariant', 'com.sap.vocabularies.UI.v1.PresentationVariantType', true],
+    ];
+
     public function __construct(
-        public readonly mixed $selectionVariant,
-        public readonly mixed $presentationVariant,
-        public readonly ?string $iD = null,
-        public readonly ?string $text = null,
+        public string|Path|null $id = null,
+        public string|Path|null $text = null,
+        public SelectionVariantType|Path|null $selectionVariant = null,
+        public PresentationVariantType|Path|null $presentationVariant = null,
     ) {}
 }

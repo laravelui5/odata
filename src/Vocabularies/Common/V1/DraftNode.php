@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 
 /**
  * Entities in this set are parts of business documents that support the draft pattern
@@ -31,17 +29,16 @@ final readonly class DraftNode implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly ?string $preparationAction = null,
-        public readonly ?string $validationFunction = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $preparationAction = null,
+        public string|Path|null $validationFunction = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Common.DraftNodeType',
-            new PropertyValue('PreparationAction', new ConstantAnnotationValue('String', (string) $this->preparationAction)),
-            new PropertyValue('ValidationFunction', new ConstantAnnotationValue('String', (string) $this->validationFunction)),
-        );
+        return (new DraftNodeType(
+            preparationAction: $this->preparationAction,
+            validationFunction: $this->validationFunction,
+        ))->toRecord();
     }
 }

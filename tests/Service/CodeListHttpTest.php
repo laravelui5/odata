@@ -38,7 +38,7 @@ uses(TestCase::class);
 #[ODataEntity(name: 'Currency', entitySet: 'Currencies')]
 #[ODataAnnotate(
     'code',
-    new UnitSpecificScale(EdmPrimitiveType::Int16, new Path('decimals')),
+    new UnitSpecificScale(new Path('decimals')),
     new Text(new Path('name')),
     new StandardCode(new Path('iso')),
 )]

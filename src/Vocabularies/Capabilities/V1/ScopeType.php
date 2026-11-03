@@ -4,10 +4,20 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Capabilities\V1;
 
-final readonly class ScopeType
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+final readonly class ScopeType extends AbstractRecord
 {
+    public const string TYPE = 'Org.OData.Capabilities.V1.ScopeType';
+
+    public const array FIELDS = [
+        'Scope' => ['scope', 'Edm.String', true],
+        'RestrictedProperties' => ['restrictedProperties', 'Edm.String', false],
+    ];
+
     public function __construct(
-        public readonly string $scope,
-        public readonly ?string $restrictedProperties = null,
+        public string|Path|null $scope = null,
+        public string|Path|null $restrictedProperties = null,
     ) {}
 }

@@ -14,7 +14,12 @@ use UnitEnum;
  * The type is the qualified CSDL type of a term or record field, type definitions already resolved to their
  * underlying type: `Edm.Boolean` becomes `Bool="true"`, an enum type `EnumMember="Namespace.Type/Member"`, a complex
  * type the record of an {@see AbstractRecord}, `Collection(…)` a collection of its items. A {@see Path} stands in for
- * any value except a path type's: CSDL allows a dynamic expression in every field.
+ * any value and is written as a value path (`Path="…"`).
+ *
+ * For the model-path types (`Edm.PropertyPath` and its kin) the two differ in meaning: a string is written as the path
+ * itself (`PropertyPath="iso"`, §14.4.1.6), a Path as the value at that path (`Path="iso"`, §14.4.1.7). SAP's clients
+ * read some of these terms as a value path — OpenUI5 reads `CodeList.StandardCode` through `…/$Path` — so the choice
+ * stays with the annotator.
  *
  * @see OData CSDL XML v4.01 §14.3 (Constant Expressions), §14.4 (Dynamic Expressions)
  */
@@ -43,15 +48,6 @@ final class AnnotationValueWriter
         'Edm.NavigationPropertyPath' => 'NavigationPropertyPath',
         'Edm.PropertyPath'           => 'PropertyPath',
         'Edm.AnyPropertyPath'        => 'PropertyPath',
-    ];
-
-    /** Types whose value is a model path, written as such; a Path would make it the value at that path. */
-    public const array PATH_TYPES = [
-        'Edm.AnnotationPath',
-        'Edm.ModelElementPath',
-        'Edm.NavigationPropertyPath',
-        'Edm.PropertyPath',
-        'Edm.AnyPropertyPath',
     ];
 
     /**

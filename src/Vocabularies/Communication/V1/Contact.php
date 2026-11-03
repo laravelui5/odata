@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Communication\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 
 /**
  * Address book entry
@@ -30,50 +28,56 @@ final readonly class Contact implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param list<AddressType>|Path|null $adr
+     * @param list<PhoneNumberType>|Path|null $tel
+     * @param list<EmailAddressType>|Path|null $email
+     * @param list<GeoDataType>|Path|null $geo
+     * @param list<UrlType>|Path|null $url
+     */
     public function __construct(
-        public readonly array $adr,
-        public readonly array $tel,
-        public readonly array $email,
-        public readonly array $geo,
-        public readonly array $url,
-        public readonly ?string $fn = null,
-        public readonly mixed $n = null,
-        public readonly ?string $nickname = null,
-        public readonly ?string $photo = null,
-        public readonly ?string $bday = null,
-        public readonly ?string $anniversary = null,
-        public readonly mixed $gender = null,
-        public readonly ?string $title = null,
-        public readonly ?string $role = null,
-        public readonly ?string $org = null,
-        public readonly ?string $orgunit = null,
-        public readonly mixed $kind = null,
-        public readonly ?string $note = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $fn = null,
+        public NameType|Path|null $n = null,
+        public string|Path|null $nickname = null,
+        public string|Path|null $photo = null,
+        public string|Path|null $bday = null,
+        public string|Path|null $anniversary = null,
+        public GenderType|Path|null $gender = null,
+        public string|Path|null $title = null,
+        public string|Path|null $role = null,
+        public string|Path|null $org = null,
+        public string|Path|null $orgunit = null,
+        public KindType|Path|null $kind = null,
+        public string|Path|null $note = null,
+        public array|Path|null $adr = null,
+        public array|Path|null $tel = null,
+        public array|Path|null $email = null,
+        public array|Path|null $geo = null,
+        public array|Path|null $url = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Communication.ContactType',
-            new PropertyValue('fn', new ConstantAnnotationValue('String', (string) $this->fn)),
-            new PropertyValue('n', new ConstantAnnotationValue('String', (string) $this->n)),
-            new PropertyValue('nickname', new ConstantAnnotationValue('String', (string) $this->nickname)),
-            new PropertyValue('photo', new ConstantAnnotationValue('String', (string) $this->photo)),
-            new PropertyValue('bday', new ConstantAnnotationValue('Date', (string) $this->bday)),
-            new PropertyValue('anniversary', new ConstantAnnotationValue('Date', (string) $this->anniversary)),
-            new PropertyValue('gender', new ConstantAnnotationValue('String', (string) $this->gender)),
-            new PropertyValue('title', new ConstantAnnotationValue('String', (string) $this->title)),
-            new PropertyValue('role', new ConstantAnnotationValue('String', (string) $this->role)),
-            new PropertyValue('org', new ConstantAnnotationValue('String', (string) $this->org)),
-            new PropertyValue('orgunit', new ConstantAnnotationValue('String', (string) $this->orgunit)),
-            new PropertyValue('kind', new ConstantAnnotationValue('String', (string) $this->kind)),
-            new PropertyValue('note', new ConstantAnnotationValue('String', (string) $this->note)),
-            new PropertyValue('adr', new ConstantAnnotationValue('String', (string) $this->adr)),
-            new PropertyValue('tel', new ConstantAnnotationValue('String', (string) $this->tel)),
-            new PropertyValue('email', new ConstantAnnotationValue('String', (string) $this->email)),
-            new PropertyValue('geo', new ConstantAnnotationValue('String', (string) $this->geo)),
-            new PropertyValue('url', new ConstantAnnotationValue('String', (string) $this->url)),
-        );
+        return (new ContactType(
+            fn: $this->fn,
+            n: $this->n,
+            nickname: $this->nickname,
+            photo: $this->photo,
+            bday: $this->bday,
+            anniversary: $this->anniversary,
+            gender: $this->gender,
+            title: $this->title,
+            role: $this->role,
+            org: $this->org,
+            orgunit: $this->orgunit,
+            kind: $this->kind,
+            note: $this->note,
+            adr: $this->adr,
+            tel: $this->tel,
+            email: $this->email,
+            geo: $this->geo,
+            url: $this->url,
+        ))->toRecord();
     }
 }

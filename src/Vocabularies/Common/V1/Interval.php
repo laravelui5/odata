@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * An interval with lower and upper boundaries described by two properties
@@ -33,23 +31,22 @@ final readonly class Interval implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string $lowerBoundary,
-        public readonly bool $lowerBoundaryIncluded,
-        public readonly string $upperBoundary,
-        public readonly bool $upperBoundaryIncluded,
-        public readonly ?string $label = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $label = null,
+        public string|Path|null $lowerBoundary = null,
+        public bool|Path|null $lowerBoundaryIncluded = null,
+        public string|Path|null $upperBoundary = null,
+        public bool|Path|null $upperBoundaryIncluded = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Common.IntervalType',
-            new PropertyValue('Label', new ConstantAnnotationValue('String', (string) $this->label)),
-            new PropertyValue('LowerBoundary', new ConstantAnnotationValue('PropertyPath', (string) $this->lowerBoundary)),
-            new PropertyValue('LowerBoundaryIncluded', new ConstantAnnotationValue('Boolean', (string) $this->lowerBoundaryIncluded)),
-            new PropertyValue('UpperBoundary', new ConstantAnnotationValue('PropertyPath', (string) $this->upperBoundary)),
-            new PropertyValue('UpperBoundaryIncluded', new ConstantAnnotationValue('Boolean', (string) $this->upperBoundaryIncluded)),
-        );
+        return (new IntervalType(
+            label: $this->label,
+            lowerBoundary: $this->lowerBoundary,
+            lowerBoundaryIncluded: $this->lowerBoundaryIncluded,
+            upperBoundary: $this->upperBoundary,
+            upperBoundaryIncluded: $this->upperBoundaryIncluded,
+        ))->toRecord();
     }
 }

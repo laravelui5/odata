@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
- * If specified as true, there's only one value list mapping and its value list consists of a small number of fixed values
+ * If specified as true, there is only one value list mapping after evaluating [`ValueListRelevantQualifiers`](#ValueListRelevantQualifiers) and its value list consists of a small number of fixed values
  * @see TypedAnnotationInterface
  */
 #[Attribute(Attribute::TARGET_PROPERTY | Attribute::TARGET_PARAMETER)]
@@ -30,7 +30,7 @@ final readonly class ValueListWithFixedValues implements TypedAnnotationInterfac
     ];
 
     public function __construct(
-        public readonly ?string $qualifier = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface

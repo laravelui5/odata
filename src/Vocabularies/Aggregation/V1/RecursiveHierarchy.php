@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Aggregation\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 
 /**
  * Defines a recursive hierarchy (OData-Data-Agg-v4.0, section 5.5.2)
@@ -31,17 +29,16 @@ final readonly class RecursiveHierarchy implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string $nodeProperty,
-        public readonly string $parentNavigationProperty,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $nodeProperty = null,
+        public string|Path|null $parentNavigationProperty = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Aggregation.RecursiveHierarchyType',
-            new PropertyValue('NodeProperty', new ConstantAnnotationValue('PropertyPath', (string) $this->nodeProperty)),
-            new PropertyValue('ParentNavigationProperty', new ConstantAnnotationValue('NavigationPropertyPath', (string) $this->parentNavigationProperty)),
-        );
+        return (new RecursiveHierarchyType(
+            nodeProperty: $this->nodeProperty,
+            parentNavigationProperty: $this->parentNavigationProperty,
+        ))->toRecord();
     }
 }

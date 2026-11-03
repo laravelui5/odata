@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Capabilities\V1;
 
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\SingletonInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
+use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 
 /**
  * Restrictions on navigating properties according to OData URL conventions
@@ -28,20 +28,24 @@ final readonly class NavigationRestrictions implements TypedAnnotationInterface
     public const array APPLIES_TO = [
         EntitySetInterface::class,
         SingletonInterface::class,
+        PropertyInterface::class,
+        NavigationPropertyInterface::class,
     ];
 
+    /**
+     * @param list<NavigationPropertyRestriction>|Path|null $restrictedProperties
+     */
     public function __construct(
-        public readonly array $restrictedProperties,
-        public readonly mixed $navigability = null,
-        public readonly ?string $qualifier = null,
+        public NavigationType|Path|null $navigability = null,
+        public array|Path|null $restrictedProperties = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Capabilities.NavigationRestrictionsType',
-            new PropertyValue('Navigability', new ConstantAnnotationValue('String', (string) $this->navigability)),
-            new PropertyValue('RestrictedProperties', new ConstantAnnotationValue('String', (string) $this->restrictedProperties)),
-        );
+        return (new NavigationRestrictionsType(
+            navigability: $this->navigability,
+            restrictedProperties: $this->restrictedProperties,
+        ))->toRecord();
     }
 }

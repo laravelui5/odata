@@ -5,17 +5,15 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Describes side-effects of modification operations
@@ -36,28 +34,43 @@ final readonly class SideEffects implements TypedAnnotationInterface
         FunctionInterface::class,
     ];
 
+    /**
+     * @param list<string>|Path|null $sourceProperties
+     * @param list<string>|Path|null $sourceEntities
+     * @param list<string>|Path|null $sourceEntitiesInserted
+     * @param list<string>|Path|null $sourceEntitiesUpdated
+     * @param list<string>|Path|null $sourceEntitiesDeleted
+     * @param list<string>|Path|null $sourceEvents
+     * @param list<string>|Path|null $targetProperties
+     * @param list<string>|Path|null $targetEntities
+     */
     public function __construct(
-        public readonly array $sourceProperties,
-        public readonly array $sourceEvents,
-        public readonly array $targetProperties,
-        public readonly bool $discretionary,
-        public readonly ?array $sourceEntities = null,
-        public readonly ?array $targetEntities = null,
-        public readonly ?string $triggerAction = null,
-        public readonly ?string $qualifier = null,
+        public array|Path|null $sourceProperties = null,
+        public array|Path|null $sourceEntities = null,
+        public array|Path|null $sourceEntitiesInserted = null,
+        public array|Path|null $sourceEntitiesUpdated = null,
+        public array|Path|null $sourceEntitiesDeleted = null,
+        public array|Path|null $sourceEvents = null,
+        public array|Path|null $targetProperties = null,
+        public array|Path|null $targetEntities = null,
+        public string|Path|null $triggerAction = null,
+        public bool|Path|null $discretionary = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Common.SideEffectsType',
-            new PropertyValue('SourceProperties', new ConstantAnnotationValue('String', (string) $this->sourceProperties)),
-            new PropertyValue('SourceEntities', new ConstantAnnotationValue('String', (string) $this->sourceEntities)),
-            new PropertyValue('SourceEvents', new ConstantAnnotationValue('String', (string) $this->sourceEvents)),
-            new PropertyValue('TargetProperties', new ConstantAnnotationValue('String', (string) $this->targetProperties)),
-            new PropertyValue('TargetEntities', new ConstantAnnotationValue('String', (string) $this->targetEntities)),
-            new PropertyValue('TriggerAction', new ConstantAnnotationValue('String', (string) $this->triggerAction)),
-            new PropertyValue('Discretionary', new ConstantAnnotationValue('Boolean', (string) $this->discretionary)),
-        );
+        return (new SideEffectsType(
+            sourceProperties: $this->sourceProperties,
+            sourceEntities: $this->sourceEntities,
+            sourceEntitiesInserted: $this->sourceEntitiesInserted,
+            sourceEntitiesUpdated: $this->sourceEntitiesUpdated,
+            sourceEntitiesDeleted: $this->sourceEntitiesDeleted,
+            sourceEvents: $this->sourceEvents,
+            targetProperties: $this->targetProperties,
+            targetEntities: $this->targetEntities,
+            triggerAction: $this->triggerAction,
+            discretionary: $this->discretionary,
+        ))->toRecord();
     }
 }

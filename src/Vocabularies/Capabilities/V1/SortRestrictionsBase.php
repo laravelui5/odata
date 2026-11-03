@@ -4,9 +4,18 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Capabilities\V1;
 
-final readonly class SortRestrictionsBase
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+readonly class SortRestrictionsBase extends AbstractRecord
 {
+    public const string TYPE = 'Org.OData.Capabilities.V1.SortRestrictionsBase';
+
+    public const array FIELDS = [
+        'Sortable' => ['sortable', 'Edm.Boolean', false],
+    ];
+
     public function __construct(
-        public readonly bool $sortable,
+        public bool|Path|null $sortable = null,
     ) {}
 }

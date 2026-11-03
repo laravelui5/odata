@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LogicException;
 
 /**
  * A short, human-readable text that gives a hint or an example to help the user with data entry
@@ -31,12 +33,15 @@ final readonly class Placeholder implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string $value,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $value = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new ConstantAnnotationValue('String', (string) $this->value);
+        if ($this->value === null) {
+            throw new LogicException('The term com.sap.vocabularies.UI.v1.Placeholder requires a value.');
+        }
+        return AnnotationValueWriter::write($this->value, 'Edm.String');
     }
 }

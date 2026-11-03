@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+use LaravelUi5\OData\Vocabularies\Core\V1\Dictionary;
 
 /**
  * Group of semantically connected fields with a representation template and an optional label
@@ -31,19 +30,18 @@ final readonly class ConnectedFields implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string $template,
-        public readonly mixed $data,
-        public readonly ?string $label = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $label = null,
+        public string|Path|null $template = null,
+        public Dictionary|Path|null $data = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.ConnectedFieldsType',
-            new PropertyValue('Label', new ConstantAnnotationValue('String', (string) $this->label)),
-            new PropertyValue('Template', new ConstantAnnotationValue('String', (string) $this->template)),
-            new PropertyValue('Data', new ConstantAnnotationValue('String', (string) $this->data)),
-        );
+        return (new ConnectedFieldsType(
+            label: $this->label,
+            template: $this->template,
+            data: $this->data,
+        ))->toRecord();
     }
 }

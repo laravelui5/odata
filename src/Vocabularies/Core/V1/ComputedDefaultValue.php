@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Core\V1;
 
 use Attribute;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 
 /**
  * A value for this property can be provided by the client on insert and update. If no value is provided on insert, a non-static default value is generated
@@ -28,7 +28,7 @@ final readonly class ComputedDefaultValue implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly ?string $qualifier = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface

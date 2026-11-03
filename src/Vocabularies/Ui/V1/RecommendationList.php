@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Specifies how to get a list of recommended values for a property or parameter
@@ -34,20 +32,22 @@ final readonly class RecommendationList implements TypedAnnotationInterface
         TypeDefinitionInterface::class,
     ];
 
+    /**
+     * @param list<RecommendationBinding>|Path|null $binding
+     */
     public function __construct(
-        public readonly string $collectionPath,
-        public readonly string $rankProperty,
-        public readonly array $binding,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $collectionPath = null,
+        public string|Path|null $rankProperty = null,
+        public array|Path|null $binding = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.RecommendationListType',
-            new PropertyValue('CollectionPath', new ConstantAnnotationValue('String', (string) $this->collectionPath)),
-            new PropertyValue('RankProperty', new ConstantAnnotationValue('String', (string) $this->rankProperty)),
-            new PropertyValue('Binding', new ConstantAnnotationValue('String', (string) $this->binding)),
-        );
+        return (new RecommendationListType(
+            collectionPath: $this->collectionPath,
+            rankProperty: $this->rankProperty,
+            binding: $this->binding,
+        ))->toRecord();
     }
 }

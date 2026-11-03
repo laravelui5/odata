@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Core\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\CollectionAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Lists the MIME types acceptable for the annotated entity type marked with HasStream="true" or the annotated binary, stream, or string property or term
@@ -35,19 +34,14 @@ final readonly class AcceptableMediaTypes implements TypedAnnotationInterface
         FunctionParameterInterface::class,
     ];
 
-        /** @param list<string> $value */
-public function __construct(
-        public readonly array $value = [],
-        public readonly ?string $qualifier = null,
+    /** @param list<string> $value */
+    public function __construct(
+        public array $value = [],
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new CollectionAnnotationValue(
-            ...array_map(
-                static fn($v) => new ConstantAnnotationValue('String', (string) $v),
-                $this->value,
-            ),
-        );
+        return AnnotationValueWriter::write($this->value, 'Collection(Edm.String)');
     }
 }

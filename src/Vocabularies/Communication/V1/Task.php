@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Communication\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 
 /**
  * Task list entry
@@ -31,25 +29,24 @@ final readonly class Task implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly ?string $summary = null,
-        public readonly ?string $description = null,
-        public readonly ?string $due = null,
-        public readonly ?string $completed = null,
-        public readonly ?int $percentcomplete = null,
-        public readonly ?int $priority = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $summary = null,
+        public string|Path|null $description = null,
+        public string|Path|null $due = null,
+        public string|Path|null $completed = null,
+        public int|Path|null $percentcomplete = null,
+        public int|Path|null $priority = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Communication.TaskData',
-            new PropertyValue('summary', new ConstantAnnotationValue('String', (string) $this->summary)),
-            new PropertyValue('description', new ConstantAnnotationValue('String', (string) $this->description)),
-            new PropertyValue('due', new ConstantAnnotationValue('DateTimeOffset', (string) $this->due)),
-            new PropertyValue('completed', new ConstantAnnotationValue('DateTimeOffset', (string) $this->completed)),
-            new PropertyValue('percentcomplete', new ConstantAnnotationValue('Integer', (string) $this->percentcomplete)),
-            new PropertyValue('priority', new ConstantAnnotationValue('Integer', (string) $this->priority)),
-        );
+        return (new TaskData(
+            summary: $this->summary,
+            description: $this->description,
+            due: $this->due,
+            completed: $this->completed,
+            percentcomplete: $this->percentcomplete,
+            priority: $this->priority,
+        ))->toRecord();
     }
 }

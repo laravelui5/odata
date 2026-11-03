@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
 use LaravelUi5\OData\Edm\Annotation\Path;
 use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
@@ -30,8 +30,8 @@ final readonly class Text implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string|Path|null $value = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $value = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
@@ -39,9 +39,6 @@ final readonly class Text implements TypedAnnotationInterface
         if ($this->value === null) {
             return null;
         }
-        if ($this->value instanceof Path) {
-            return $this->value->toAnnotationValue();
-        }
-        return new ConstantAnnotationValue('String', (string) $this->value);
+        return AnnotationValueWriter::write($this->value, 'Edm.String');
     }
 }

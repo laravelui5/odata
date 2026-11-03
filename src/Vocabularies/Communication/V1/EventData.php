@@ -4,20 +4,43 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Communication\V1;
 
-final readonly class EventData
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+final readonly class EventData extends AbstractRecord
 {
+    public const string TYPE = 'com.sap.vocabularies.Communication.v1.EventData';
+
+    public const array FIELDS = [
+        'summary' => ['summary', 'Edm.String', false],
+        'description' => ['description', 'Edm.String', false],
+        'categories' => ['categories', 'Collection(Edm.String)', false],
+        'dtstart' => ['dtstart', 'Edm.DateTimeOffset', false],
+        'dtend' => ['dtend', 'Edm.DateTimeOffset', false],
+        'duration' => ['duration', 'Edm.Duration', false],
+        'class' => ['class', 'Edm.String', false],
+        'status' => ['status', 'Edm.String', false],
+        'location' => ['location', 'Edm.String', false],
+        'transp' => ['transp', 'Edm.Boolean', false],
+        'wholeday' => ['wholeday', 'Edm.Boolean', false],
+        'fbtype' => ['fbtype', 'Edm.String', false],
+    ];
+
+    /**
+     * @param list<string>|Path|null $categories
+     */
     public function __construct(
-        public readonly array $categories,
-        public readonly ?string $summary = null,
-        public readonly ?string $description = null,
-        public readonly ?string $dtstart = null,
-        public readonly ?string $dtend = null,
-        public readonly ?string $duration = null,
-        public readonly ?string $class = null,
-        public readonly ?string $status = null,
-        public readonly ?string $location = null,
-        public readonly ?bool $transp = null,
-        public readonly ?bool $wholeday = null,
-        public readonly ?string $fbtype = null,
+        public string|Path|null $summary = null,
+        public string|Path|null $description = null,
+        public array|Path|null $categories = null,
+        public string|Path|null $dtstart = null,
+        public string|Path|null $dtend = null,
+        public string|Path|null $duration = null,
+        public string|Path|null $class = null,
+        public string|Path|null $status = null,
+        public string|Path|null $location = null,
+        public bool|Path|null $transp = null,
+        public bool|Path|null $wholeday = null,
+        public string|Path|null $fbtype = null,
     ) {}
 }

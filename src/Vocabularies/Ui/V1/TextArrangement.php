@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+use LogicException;
 
 /**
  * Describes the arrangement of a code or ID value and its text
@@ -29,12 +31,15 @@ final readonly class TextArrangement implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly TextArrangementType $value,
-        public readonly ?string $qualifier = null,
+        public TextArrangementType|Path|null $value = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new ConstantAnnotationValue('Integer', (string) $this->value->value);
+        if ($this->value === null) {
+            throw new LogicException('The term com.sap.vocabularies.UI.v1.TextArrangement requires a value.');
+        }
+        return AnnotationValueWriter::write($this->value, 'com.sap.vocabularies.UI.v1.TextArrangementType');
     }
 }

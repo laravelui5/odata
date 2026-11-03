@@ -4,11 +4,22 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Analytics\V1;
 
-final readonly class AggregatedPropertyType
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+final readonly class AggregatedPropertyType extends AbstractRecord
 {
+    public const string TYPE = 'com.sap.vocabularies.Analytics.v1.AggregatedPropertyType';
+
+    public const array FIELDS = [
+        'Name' => ['name', 'Edm.String', true],
+        'AggregationMethod' => ['aggregationMethod', 'Edm.String', true],
+        'AggregatableProperty' => ['aggregatableProperty', 'Edm.PropertyPath', true],
+    ];
+
     public function __construct(
-        public readonly string $name,
-        public readonly string $aggregationMethod,
-        public readonly string $aggregatableProperty,
+        public string|Path|null $name = null,
+        public string|Path|null $aggregationMethod = null,
+        public string|Path|null $aggregatableProperty = null,
     ) {}
 }

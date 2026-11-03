@@ -262,6 +262,8 @@ it('writes every term value through the value writer', function () {
             ->and($constant(makeGenerated('Ui\\V1\\ProbeMinimum', ['2026-01-01', EdmPrimitiveType::Date])))
             ->toBe('Date=2026-01-01')
             ->and($constant(makeGenerated('Ui\\V1\\ProbePath', ['code'])))->toBe('PropertyPath=code')
+            // A value path where a SAP client reads one (CodeList.StandardCode through …/$Path).
+            ->and($constant(makeGenerated('Ui\\V1\\ProbePath', [new Path('code')])))->toBe('Path=code')
             ->and($value(makeGenerated('Ui\\V1\\ProbeDefaulted')))->toBeNull()
             ->and($value(makeGenerated('Ui\\V1\\ProbeCriticalityTerm')))->toBeNull();
 
@@ -272,7 +274,7 @@ it('writes every term value through the value writer', function () {
     });
 
     expect(($this->read)('Ui/V1/ProbeLineItem.php'))->toContain('/** @param list<ProbeAbstract> $value */')
-        ->and(($this->read)('Ui/V1/ProbePath.php'))->toContain('public ?string $value = null,')
+        ->and(($this->read)('Ui/V1/ProbePath.php'))->toContain('public string|Path|null $value = null,')
         ->and(($this->read)('Ui/V1/ProbeFlagsTerm.php'))
         ->toContain('public ProbeFlags|array|Path|null $value = null,');
 });

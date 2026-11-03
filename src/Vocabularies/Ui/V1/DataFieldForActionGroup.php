@@ -4,13 +4,40 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
+use LaravelUi5\OData\Edm\Annotation\Path;
+
 /**
  * Collection of OData actions and intent based navigations
  */
-final readonly class DataFieldForActionGroup
+final readonly class DataFieldForActionGroup extends DataFieldAbstract
 {
+    public const string TYPE = 'com.sap.vocabularies.UI.v1.DataFieldForActionGroup';
+
+    public const array FIELDS = [
+        'Label' => ['label', 'Edm.String', false],
+        'Criticality' => ['criticality', 'com.sap.vocabularies.UI.v1.CriticalityType', false],
+        'CriticalityRepresentation' => ['criticalityRepresentation', 'com.sap.vocabularies.UI.v1.CriticalityRepresentationType', false],
+        'IconUrl' => ['iconUrl', 'Edm.String', false],
+        'ID' => ['id', 'Edm.String', false],
+        'Actions' => ['actions', 'Collection(com.sap.vocabularies.UI.v1.DataFieldForActionAbstract)', false],
+    ];
+
+    /**
+     * @param list<DataFieldForActionAbstract>|Path|null $actions
+     */
     public function __construct(
-        public readonly array $actions,
-        public readonly ?string $iD = null,
-    ) {}
+        string|Path|null $label = null,
+        CriticalityType|Path|null $criticality = null,
+        CriticalityRepresentationType|Path|null $criticalityRepresentation = null,
+        string|Path|null $iconUrl = null,
+        public string|Path|null $id = null,
+        public array|Path|null $actions = null,
+    ) {
+        parent::__construct(
+            label: $label,
+            criticality: $criticality,
+            criticalityRepresentation: $criticalityRepresentation,
+            iconUrl: $iconUrl,
+        );
+    }
 }

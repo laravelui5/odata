@@ -4,17 +4,32 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
-use LaravelUi5\OData\Edm\Annotation\CollectionAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use Attribute;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
+use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
+use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;
+use LaravelUi5\OData\Edm\Contracts\Container\SingletonInterface;
+use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
+use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
+use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
+use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
+use LaravelUi5\OData\Edm\Contracts\SchemaInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumMemberInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface;
 
 /**
  * Collection of end-user messages
  * @see TypedAnnotationInterface
  */
+#[Attribute(Attribute::TARGET_ALL)]
 final readonly class Messages implements TypedAnnotationInterface
 {
     use TypedAnnotationTrait;
@@ -22,21 +37,31 @@ final readonly class Messages implements TypedAnnotationInterface
     public const string TERM = 'com.sap.vocabularies.Common.v1.Messages';
 
     /** @var array<class-string<AnnotationTargetInterface>> */
-    public const array APPLIES_TO = [];
+    public const array APPLIES_TO = [
+        EntityTypeInterface::class,
+        ComplexTypeInterface::class,
+        EnumTypeInterface::class,
+        EnumMemberInterface::class,
+        TypeDefinitionInterface::class,
+        PropertyInterface::class,
+        NavigationPropertyInterface::class,
+        EntitySetInterface::class,
+        SingletonInterface::class,
+        FunctionImportInterface::class,
+        EntityContainerInterface::class,
+        FunctionParameterInterface::class,
+        FunctionInterface::class,
+        SchemaInterface::class,
+    ];
 
-        /** @param list<mixed> $value */
-public function __construct(
-        public readonly array $value = [],
-        public readonly ?string $qualifier = null,
+    /** @param list<mixed> $value */
+    public function __construct(
+        public array $value = [],
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new CollectionAnnotationValue(
-            ...array_map(
-                static fn($v) => new ConstantAnnotationValue('String', (string) $v),
-                $this->value,
-            ),
-        );
+        return AnnotationValueWriter::write($this->value, 'Collection(Edm.ComplexType)');
     }
 }

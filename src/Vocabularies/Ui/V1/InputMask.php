@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Properties or parameters annotated with this term will get a mask in edit mode
@@ -32,20 +30,22 @@ final readonly class InputMask implements TypedAnnotationInterface
         FunctionParameterInterface::class,
     ];
 
+    /**
+     * @param list<InputMaskRuleType>|Path|null $rules
+     */
     public function __construct(
-        public readonly string $mask,
-        public readonly string $placeholderSymbol,
-        public readonly array $rules,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $mask = null,
+        public string|Path|null $placeholderSymbol = null,
+        public array|Path|null $rules = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.InputMaskType',
-            new PropertyValue('Mask', new ConstantAnnotationValue('String', (string) $this->mask)),
-            new PropertyValue('PlaceholderSymbol', new ConstantAnnotationValue('String', (string) $this->placeholderSymbol)),
-            new PropertyValue('Rules', new ConstantAnnotationValue('String', (string) $this->rules)),
-        );
+        return (new InputMaskType(
+            mask: $this->mask,
+            placeholderSymbol: $this->placeholderSymbol,
+            rules: $this->rules,
+        ))->toRecord();
     }
 }

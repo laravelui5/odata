@@ -5,21 +5,21 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Aggregation\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
+use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
+use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 
 /**
  * This entity set or collection supports the `$apply` system query option
  * @see TypedAnnotationInterface
  */
-#[Attribute(Attribute::TARGET_CLASS)]
+#[Attribute(Attribute::TARGET_CLASS | Attribute::TARGET_PROPERTY)]
 final readonly class ApplySupported implements TypedAnnotationInterface
 {
     use TypedAnnotationTrait;
@@ -29,23 +29,38 @@ final readonly class ApplySupported implements TypedAnnotationInterface
     /** @var array<class-string<AnnotationTargetInterface>> */
     public const array APPLIES_TO = [
         EntitySetInterface::class,
+        PropertyInterface::class,
+        NavigationPropertyInterface::class,
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param list<string>|Path|null $transformations
+     * @param list<string>|Path|null $customAggregationMethods
+     * @param list<mixed>|Path|null $groupableProperties
+     * @param list<AggregatablePropertyType>|Path|null $aggregatableProperties
+     */
     public function __construct(
-        public readonly bool $propertyRestrictions,
-        public readonly array $groupableProperties,
-        public readonly array $aggregatableProperties,
-        public readonly ?string $qualifier = null,
+        public array|Path|null $transformations = null,
+        public array|Path|null $customAggregationMethods = null,
+        public RollupType|Path|null $rollup = null,
+        public bool|Path|null $from = null,
+        public bool|Path|null $propertyRestrictions = null,
+        public array|Path|null $groupableProperties = null,
+        public array|Path|null $aggregatableProperties = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Aggregation.ApplySupportedType',
-            new PropertyValue('PropertyRestrictions', new ConstantAnnotationValue('Boolean', (string) $this->propertyRestrictions)),
-            new PropertyValue('GroupableProperties', new ConstantAnnotationValue('String', (string) $this->groupableProperties)),
-            new PropertyValue('AggregatableProperties', new ConstantAnnotationValue('String', (string) $this->aggregatableProperties)),
-        );
+        return (new ApplySupportedType(
+            transformations: $this->transformations,
+            customAggregationMethods: $this->customAggregationMethods,
+            rollup: $this->rollup,
+            from: $this->from,
+            propertyRestrictions: $this->propertyRestrictions,
+            groupableProperties: $this->groupableProperties,
+            aggregatableProperties: $this->aggregatableProperties,
+        ))->toRecord();
     }
 }

@@ -7,7 +7,6 @@ namespace LaravelUi5\OData\Console;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
-use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
 use LaravelUi5\OData\Edm\Vocabularies\VocabularyCatalog;
 use LaravelUi5\OData\Edm\Vocabularies\VocabularyEntryInterface;
 
@@ -423,7 +422,7 @@ PHP;
 
     /**
      * The PHP parameter type of a record field, and its docblock type where PHP cannot say it (lists).
-     * A Path stands in for every value except a model path's.
+     * A Path stands in for every value, a model path's included (see AnnotationValueWriter).
      *
      * @return array{0: string, 1: string|null}
      */
@@ -432,29 +431,26 @@ PHP;
         $isCollection = str_starts_with($type, 'Collection(');
         $inner        = $isCollection ? substr($type, 11, -1) : $type;
         $resolved     = $this->resolveType($inner);
-        $isPath       = in_array($resolved, AnnotationValueWriter::PATH_TYPES, true);
-        $path         = $isPath ? '' : $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\Path');
+        $path         = $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\Path');
 
         if ($this->isComplexType($inner)) {
             $itemType = $imports->reference($this->phpClassOf($inner));
         } elseif ($this->isEnumType($inner)) {
             $itemType = $imports->reference($this->phpClassOf($inner));
             if (!$isCollection && ($this->types->enumType($inner)['isFlags'] ?? false)) {
-                $decl = "{$itemType}|array" . ($path !== '' ? "|{$path}" : '') . '|null';
-                return [$decl, "{$itemType}|list<{$itemType}>" . ($path !== '' ? "|{$path}" : '') . '|null'];
+                return ["{$itemType}|array|{$path}|null", "{$itemType}|list<{$itemType}>|{$path}|null"];
             }
         } else {
             $itemType = self::PRIMITIVE_PHP_TYPES[$resolved] ?? 'mixed';
         }
 
         if ($isCollection) {
-            $suffix = ($path !== '' ? "|{$path}" : '') . '|null';
-            return [$path !== '' ? "array{$suffix}" : '?array', "list<{$itemType}>{$suffix}"];
+            return ["array|{$path}|null", "list<{$itemType}>|{$path}|null"];
         }
         if ($itemType === 'mixed') {
             return ['mixed', null];
         }
-        return [$path !== '' ? "{$itemType}|{$path}|null" : "?{$itemType}", null];
+        return ["{$itemType}|{$path}|null", null];
     }
 
     /** The CSDL type a record field is written with: type definitions resolved, collections kept. */

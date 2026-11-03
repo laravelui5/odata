@@ -28,7 +28,7 @@ final readonly class IsConfigurationDeprecationCode implements TypedAnnotationIn
     ];
 
     public function __construct(
-        public readonly ?string $qualifier = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface

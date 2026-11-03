@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Validation\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LogicException;
 
 /**
  * The value of the annotated property, parameter, or term must be an integer multiple of this positive value. For temporal types, the value is measured in seconds.
@@ -31,12 +33,15 @@ final readonly class MultipleOf implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly float $value,
-        public readonly ?string $qualifier = null,
+        public float|Path|null $value = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new ConstantAnnotationValue('Decimal', (string) $this->value);
+        if ($this->value === null) {
+            throw new LogicException('The term Org.OData.Validation.V1.MultipleOf requires a value.');
+        }
+        return AnnotationValueWriter::write($this->value, 'Edm.Decimal');
     }
 }

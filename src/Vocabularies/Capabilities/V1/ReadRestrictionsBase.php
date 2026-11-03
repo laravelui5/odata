@@ -4,15 +4,36 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Capabilities\V1;
 
-final readonly class ReadRestrictionsBase
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+abstract readonly class ReadRestrictionsBase extends AbstractRecord
 {
+    public const string TYPE = 'Org.OData.Capabilities.V1.ReadRestrictionsBase';
+
+    public const array FIELDS = [
+        'Readable' => ['readable', 'Edm.Boolean', false],
+        'Permissions' => ['permissions', 'Collection(Org.OData.Capabilities.V1.PermissionType)', false],
+        'CustomHeaders' => ['customHeaders', 'Collection(Org.OData.Capabilities.V1.CustomParameter)', false],
+        'CustomQueryOptions' => ['customQueryOptions', 'Collection(Org.OData.Capabilities.V1.CustomParameter)', false],
+        'Description' => ['description', 'Edm.String', false],
+        'LongDescription' => ['longDescription', 'Edm.String', false],
+        'ErrorResponses' => ['errorResponses', 'Collection(Org.OData.Capabilities.V1.HttpResponse)', false],
+    ];
+
+    /**
+     * @param list<PermissionType>|Path|null $permissions
+     * @param list<CustomParameter>|Path|null $customHeaders
+     * @param list<CustomParameter>|Path|null $customQueryOptions
+     * @param list<HttpResponse>|Path|null $errorResponses
+     */
     public function __construct(
-        public readonly bool $readable,
-        public readonly array $customHeaders,
-        public readonly array $customQueryOptions,
-        public readonly array $errorResponses,
-        public readonly ?array $permissions = null,
-        public readonly ?string $description = null,
-        public readonly ?string $longDescription = null,
+        public bool|Path|null $readable = null,
+        public array|Path|null $permissions = null,
+        public array|Path|null $customHeaders = null,
+        public array|Path|null $customQueryOptions = null,
+        public string|Path|null $description = null,
+        public string|Path|null $longDescription = null,
+        public array|Path|null $errorResponses = null,
     ) {}
 }

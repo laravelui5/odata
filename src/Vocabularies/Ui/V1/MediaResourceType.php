@@ -4,16 +4,32 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
-final readonly class MediaResourceType
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+final readonly class MediaResourceType extends AbstractRecord
 {
+    public const string TYPE = 'com.sap.vocabularies.UI.v1.MediaResourceType';
+
+    public const array FIELDS = [
+        'Url' => ['url', 'Edm.String', false],
+        'Stream' => ['stream', 'Edm.Stream', false],
+        'ContentType' => ['contentType', 'Edm.String', false],
+        'ByteSize' => ['byteSize', 'Edm.Int64', false],
+        'ChangedAt' => ['changedAt', 'Edm.DateTimeOffset', false],
+        'Thumbnail' => ['thumbnail', 'com.sap.vocabularies.UI.v1.ImageType', false],
+        'Title' => ['title', 'com.sap.vocabularies.UI.v1.DataField', false],
+        'Description' => ['description', 'com.sap.vocabularies.UI.v1.DataField', false],
+    ];
+
     public function __construct(
-        public readonly ?string $url = null,
-        public readonly mixed $stream = null,
-        public readonly ?string $contentType = null,
-        public readonly ?int $byteSize = null,
-        public readonly ?string $changedAt = null,
-        public readonly mixed $thumbnail = null,
-        public readonly mixed $title = null,
-        public readonly mixed $description = null,
+        public string|Path|null $url = null,
+        public mixed $stream = null,
+        public string|Path|null $contentType = null,
+        public int|Path|null $byteSize = null,
+        public string|Path|null $changedAt = null,
+        public ImageType|Path|null $thumbnail = null,
+        public DataField|Path|null $title = null,
+        public DataField|Path|null $description = null,
     ) {}
 }

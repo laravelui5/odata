@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * A Key Performance Indicator (KPI) bundles a SelectionVariant and a DataPoint, and provides details for progressive disclosure
@@ -32,26 +30,28 @@ final readonly class KPI implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param list<DataPointType>|Path|null $additionalDataPoints
+     */
     public function __construct(
-        public readonly mixed $selectionVariant,
-        public readonly mixed $dataPoint,
-        public readonly array $additionalDataPoints,
-        public readonly ?string $iD = null,
-        public readonly ?string $shortDescription = null,
-        public readonly mixed $detail = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $id = null,
+        public string|Path|null $shortDescription = null,
+        public SelectionVariantType|Path|null $selectionVariant = null,
+        public DataPointType|Path|null $dataPoint = null,
+        public array|Path|null $additionalDataPoints = null,
+        public KPIDetailType|Path|null $detail = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.KPIType',
-            new PropertyValue('ID', new ConstantAnnotationValue('String', (string) $this->iD)),
-            new PropertyValue('ShortDescription', new ConstantAnnotationValue('String', (string) $this->shortDescription)),
-            new PropertyValue('SelectionVariant', new ConstantAnnotationValue('String', (string) $this->selectionVariant)),
-            new PropertyValue('DataPoint', new ConstantAnnotationValue('String', (string) $this->dataPoint)),
-            new PropertyValue('AdditionalDataPoints', new ConstantAnnotationValue('String', (string) $this->additionalDataPoints)),
-            new PropertyValue('Detail', new ConstantAnnotationValue('String', (string) $this->detail)),
-        );
+        return (new KPIType(
+            id: $this->id,
+            shortDescription: $this->shortDescription,
+            selectionVariant: $this->selectionVariant,
+            dataPoint: $this->dataPoint,
+            additionalDataPoints: $this->additionalDataPoints,
+            detail: $this->detail,
+        ))->toRecord();
     }
 }

@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Analytics\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 
 /**
  * Dynamic property for aggregate expression with specified aggregation method defined on the annotated entity type.
@@ -31,19 +29,18 @@ final readonly class AggregatedProperty implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string $name,
-        public readonly string $aggregationMethod,
-        public readonly string $aggregatableProperty,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $name = null,
+        public string|Path|null $aggregationMethod = null,
+        public string|Path|null $aggregatableProperty = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Analytics.AggregatedPropertyType',
-            new PropertyValue('Name', new ConstantAnnotationValue('String', (string) $this->name)),
-            new PropertyValue('AggregationMethod', new ConstantAnnotationValue('String', (string) $this->aggregationMethod)),
-            new PropertyValue('AggregatableProperty', new ConstantAnnotationValue('PropertyPath', (string) $this->aggregatableProperty)),
-        );
+        return (new AggregatedPropertyType(
+            name: $this->name,
+            aggregationMethod: $this->aggregationMethod,
+            aggregatableProperty: $this->aggregatableProperty,
+        ))->toRecord();
     }
 }

@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
 
 /**
  * Information usually displayed in the form of a business card
@@ -31,25 +29,24 @@ final readonly class Badge implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly mixed $headLine,
-        public readonly mixed $title,
-        public readonly ?string $imageUrl = null,
-        public readonly ?string $typeImageUrl = null,
-        public readonly mixed $mainInfo = null,
-        public readonly mixed $secondaryInfo = null,
-        public readonly ?string $qualifier = null,
+        public DataField|Path|null $headLine = null,
+        public DataField|Path|null $title = null,
+        public string|Path|null $imageUrl = null,
+        public string|Path|null $typeImageUrl = null,
+        public DataField|Path|null $mainInfo = null,
+        public DataField|Path|null $secondaryInfo = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.BadgeType',
-            new PropertyValue('HeadLine', new ConstantAnnotationValue('String', (string) $this->headLine)),
-            new PropertyValue('Title', new ConstantAnnotationValue('String', (string) $this->title)),
-            new PropertyValue('ImageUrl', new ConstantAnnotationValue('String', (string) $this->imageUrl)),
-            new PropertyValue('TypeImageUrl', new ConstantAnnotationValue('String', (string) $this->typeImageUrl)),
-            new PropertyValue('MainInfo', new ConstantAnnotationValue('String', (string) $this->mainInfo)),
-            new PropertyValue('SecondaryInfo', new ConstantAnnotationValue('String', (string) $this->secondaryInfo)),
-        );
+        return (new BadgeType(
+            headLine: $this->headLine,
+            title: $this->title,
+            imageUrl: $this->imageUrl,
+            typeImageUrl: $this->typeImageUrl,
+            mainInfo: $this->mainInfo,
+            secondaryInfo: $this->secondaryInfo,
+        ))->toRecord();
     }
 }

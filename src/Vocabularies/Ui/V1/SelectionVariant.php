@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * A SelectionVariant denotes a combination of parameters and filters to query the annotated entity set
@@ -32,24 +30,27 @@ final readonly class SelectionVariant implements TypedAnnotationInterface
         EntityTypeInterface::class,
     ];
 
+    /**
+     * @param list<ParameterAbstract>|Path|null $parameters
+     * @param list<SelectOptionType>|Path|null $selectOptions
+     */
     public function __construct(
-        public readonly array $parameters,
-        public readonly array $selectOptions,
-        public readonly ?string $iD = null,
-        public readonly ?string $text = null,
-        public readonly ?string $filterExpression = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $id = null,
+        public string|Path|null $text = null,
+        public array|Path|null $parameters = null,
+        public string|Path|null $filterExpression = null,
+        public array|Path|null $selectOptions = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'UI.SelectionVariantType',
-            new PropertyValue('ID', new ConstantAnnotationValue('String', (string) $this->iD)),
-            new PropertyValue('Text', new ConstantAnnotationValue('String', (string) $this->text)),
-            new PropertyValue('Parameters', new ConstantAnnotationValue('String', (string) $this->parameters)),
-            new PropertyValue('FilterExpression', new ConstantAnnotationValue('String', (string) $this->filterExpression)),
-            new PropertyValue('SelectOptions', new ConstantAnnotationValue('String', (string) $this->selectOptions)),
-        );
+        return (new SelectionVariantType(
+            id: $this->id,
+            text: $this->text,
+            parameters: $this->parameters,
+            filterExpression: $this->filterExpression,
+            selectOptions: $this->selectOptions,
+        ))->toRecord();
     }
 }

@@ -4,11 +4,22 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Ui\V1;
 
-final readonly class ChartAxisScalingType
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
+final readonly class ChartAxisScalingType extends AbstractRecord
 {
+    public const string TYPE = 'com.sap.vocabularies.UI.v1.ChartAxisScalingType';
+
+    public const array FIELDS = [
+        'ScaleBehavior' => ['scaleBehavior', 'com.sap.vocabularies.UI.v1.ChartAxisScaleBehaviorType', false],
+        'AutoScaleBehavior' => ['autoScaleBehavior', 'com.sap.vocabularies.UI.v1.ChartAxisAutoScaleBehaviorType', false],
+        'FixedScaleMultipleStackedMeasuresBoundaryValues' => ['fixedScaleMultipleStackedMeasuresBoundaryValues', 'com.sap.vocabularies.UI.v1.FixedScaleMultipleStackedMeasuresBoundaryValuesType', false],
+    ];
+
     public function __construct(
-        public readonly mixed $scaleBehavior,
-        public readonly mixed $autoScaleBehavior = null,
-        public readonly mixed $fixedScaleMultipleStackedMeasuresBoundaryValues = null,
+        public ChartAxisScaleBehaviorType|Path|null $scaleBehavior = null,
+        public ChartAxisAutoScaleBehaviorType|Path|null $autoScaleBehavior = null,
+        public FixedScaleMultipleStackedMeasuresBoundaryValuesType|Path|null $fixedScaleMultipleStackedMeasuresBoundaryValues = null,
     ) {}
 }

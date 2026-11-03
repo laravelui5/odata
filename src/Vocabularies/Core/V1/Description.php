@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Core\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EnumMemberInterface;
-use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\SingletonInterface;
 use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
@@ -21,23 +22,13 @@ use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\SchemaInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumMemberInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
- * A brief description of a model element.
- *
- * Applies to all 14 annotation-target interfaces, so it may be placed on
- * any annotatable construct: types, properties, container members, function
- * parameters, and the schema itself.
- *
- * Hand-written proof-of-concept class that validates the full vocabulary
- * annotation stack end-to-end before the generator is run.
- *
+ * A brief description of a model element
  * @see TypedAnnotationInterface
- * @see OData CSDL XML v4.01 §14.2 (Annotation)
- * @see https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Core.V1.xml
  */
 #[Attribute(Attribute::TARGET_ALL)]
 final readonly class Description implements TypedAnnotationInterface
@@ -55,18 +46,18 @@ final readonly class Description implements TypedAnnotationInterface
         TypeDefinitionInterface::class,
         PropertyInterface::class,
         NavigationPropertyInterface::class,
-        FunctionInterface::class,
-        FunctionParameterInterface::class,
         EntitySetInterface::class,
         SingletonInterface::class,
         FunctionImportInterface::class,
         EntityContainerInterface::class,
+        FunctionParameterInterface::class,
+        FunctionInterface::class,
         SchemaInterface::class,
     ];
 
     public function __construct(
-        public readonly ?string $value = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $value = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
@@ -74,6 +65,6 @@ final readonly class Description implements TypedAnnotationInterface
         if ($this->value === null) {
             return null;
         }
-        return new ConstantAnnotationValue('String', (string) $this->value);
+        return AnnotationValueWriter::write($this->value, 'Edm.String');
     }
 }

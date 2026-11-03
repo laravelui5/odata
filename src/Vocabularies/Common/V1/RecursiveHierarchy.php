@@ -4,18 +4,32 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use Attribute;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
+use LaravelUi5\OData\Edm\Contracts\Container\EntityContainerInterface;
+use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
+use LaravelUi5\OData\Edm\Contracts\Container\FunctionImportInterface;
+use LaravelUi5\OData\Edm\Contracts\Container\SingletonInterface;
+use LaravelUi5\OData\Edm\Contracts\FunctionInterface;
+use LaravelUi5\OData\Edm\Contracts\FunctionParameterInterface;
+use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
+use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
+use LaravelUi5\OData\Edm\Contracts\SchemaInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\ComplexTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumMemberInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\EnumTypeInterface;
+use LaravelUi5\OData\Edm\Contracts\Type\TypeDefinitionInterface;
 
 /**
  * Defines a recursive hierarchy.
  * @see TypedAnnotationInterface
  */
+#[Attribute(Attribute::TARGET_ALL)]
 final readonly class RecursiveHierarchy implements TypedAnnotationInterface
 {
     use TypedAnnotationTrait;
@@ -23,22 +37,36 @@ final readonly class RecursiveHierarchy implements TypedAnnotationInterface
     public const string TERM = 'com.sap.vocabularies.Common.v1.RecursiveHierarchy';
 
     /** @var array<class-string<AnnotationTargetInterface>> */
-    public const array APPLIES_TO = [];
+    public const array APPLIES_TO = [
+        EntityTypeInterface::class,
+        ComplexTypeInterface::class,
+        EnumTypeInterface::class,
+        EnumMemberInterface::class,
+        TypeDefinitionInterface::class,
+        PropertyInterface::class,
+        NavigationPropertyInterface::class,
+        EntitySetInterface::class,
+        SingletonInterface::class,
+        FunctionImportInterface::class,
+        EntityContainerInterface::class,
+        FunctionParameterInterface::class,
+        FunctionInterface::class,
+        SchemaInterface::class,
+    ];
 
     public function __construct(
-        public readonly ?string $externalNodeKeyProperty = null,
-        public readonly ?string $nodeDescendantCountProperty = null,
-        public readonly ?string $nodeDrillStateProperty = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $externalNodeKeyProperty = null,
+        public string|Path|null $nodeDescendantCountProperty = null,
+        public string|Path|null $nodeDrillStateProperty = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Common.RecursiveHierarchyType',
-            new PropertyValue('ExternalNodeKeyProperty', new ConstantAnnotationValue('PropertyPath', (string) $this->externalNodeKeyProperty)),
-            new PropertyValue('NodeDescendantCountProperty', new ConstantAnnotationValue('PropertyPath', (string) $this->nodeDescendantCountProperty)),
-            new PropertyValue('NodeDrillStateProperty', new ConstantAnnotationValue('PropertyPath', (string) $this->nodeDrillStateProperty)),
-        );
+        return (new RecursiveHierarchyType(
+            externalNodeKeyProperty: $this->externalNodeKeyProperty,
+            nodeDescendantCountProperty: $this->nodeDescendantCountProperty,
+            nodeDrillStateProperty: $this->nodeDrillStateProperty,
+        ))->toRecord();
     }
 }

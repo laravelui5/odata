@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Core\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
-use LaravelUi5\OData\Edm\Annotation\PropertyValue;
-use LaravelUi5\OData\Edm\Annotation\RecordAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * The content disposition of the media stream of the annotated entity type marked with HasStream="true" or the annotated binary, stream, or string property or term
@@ -33,17 +31,16 @@ final readonly class ContentDisposition implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly string $type,
-        public readonly ?string $filename = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $type = null,
+        public string|Path|null $filename = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
     {
-        return new RecordAnnotationValue(
-            'Core.ContentDispositionType',
-            new PropertyValue('Type', new ConstantAnnotationValue('String', (string) $this->type)),
-            new PropertyValue('Filename', new ConstantAnnotationValue('String', (string) $this->filename)),
-        );
+        return (new ContentDispositionType(
+            type: $this->type,
+            filename: $this->filename,
+        ))->toRecord();
     }
 }

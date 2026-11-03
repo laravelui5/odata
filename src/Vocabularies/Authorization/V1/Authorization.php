@@ -4,13 +4,23 @@ declare(strict_types=1);
 
 namespace LaravelUi5\OData\Vocabularies\Authorization\V1;
 
+use LaravelUi5\OData\Edm\Annotation\AbstractRecord;
+use LaravelUi5\OData\Edm\Annotation\Path;
+
 /**
  * Base type for all Authorization types
  */
-final readonly class Authorization
+abstract readonly class Authorization extends AbstractRecord
 {
+    public const string TYPE = 'Org.OData.Authorization.V1.Authorization';
+
+    public const array FIELDS = [
+        'Name' => ['name', 'Edm.String', true],
+        'Description' => ['description', 'Edm.String', false],
+    ];
+
     public function __construct(
-        public readonly string $name,
-        public readonly ?string $description = null,
+        public string|Path|null $name = null,
+        public string|Path|null $description = null,
     ) {}
 }

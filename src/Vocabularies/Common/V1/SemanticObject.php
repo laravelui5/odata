@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace LaravelUi5\OData\Vocabularies\Common\V1;
 
 use Attribute;
-use LaravelUi5\OData\Edm\Annotation\ConstantAnnotationValue;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
+use LaravelUi5\OData\Edm\Annotation\Path;
+use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 use LaravelUi5\OData\Edm\Contracts\AnnotationTargetInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\AnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\Contracts\Container\EntitySetInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\NavigationPropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Property\PropertyInterface;
 use LaravelUi5\OData\Edm\Contracts\Type\EntityTypeInterface;
-use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
-use LaravelUi5\OData\Edm\Annotation\TypedAnnotationTrait;
 
 /**
  * Name of the Semantic Object represented as this entity type or identified by this property
@@ -35,8 +36,8 @@ final readonly class SemanticObject implements TypedAnnotationInterface
     ];
 
     public function __construct(
-        public readonly ?string $value = null,
-        public readonly ?string $qualifier = null,
+        public string|Path|null $value = null,
+        public ?string $qualifier = null,
     ) {}
 
     protected function buildAnnotationValue(): ?AnnotationValueInterface
@@ -44,6 +45,6 @@ final readonly class SemanticObject implements TypedAnnotationInterface
         if ($this->value === null) {
             return null;
         }
-        return new ConstantAnnotationValue('String', (string) $this->value);
+        return AnnotationValueWriter::write($this->value, 'Edm.String');
     }
 }
