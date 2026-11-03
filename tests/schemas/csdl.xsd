@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Entry point for validating a CSDL XML document in the tests.
+
+  edmx.xsd imports the edm namespace without a schemaLocation, so a validator on its own cannot find it.
+  This schema imports edm.xsd first, then edmx.xsd, each with its location; validate against this file.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:import namespace="http://docs.oasis-open.org/odata/ns/edm" schemaLocation="edm.xsd" />
+  <xs:import namespace="http://docs.oasis-open.org/odata/ns/edmx" schemaLocation="edmx.xsd" />
+</xs:schema>

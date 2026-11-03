@@ -44,11 +44,50 @@ describe('Annotation discovery $metadata', function () {
         expect($xml)->toContain('Term="com.sap.vocabularies.UI.v1.SelectionFields"');
     });
 
-    it('includes LineItem annotation on entity type', function () {
-        $response = $this->get('/odata/$metadata');
-        $xml = $response->streamedContent();
+    it('serializes LineItem as a collection of typed DataField records', function () {
+        $doc = new DOMDocument();
+        $doc->loadXML($this->get('/odata/$metadata')->streamedContent());
+        $xpath = new DOMXPath($doc);
+        $xpath->registerNamespace('edm', 'http://docs.oasis-open.org/odata/ns/edm');
 
-        expect($xml)->toContain('Term="com.sap.vocabularies.UI.v1.LineItem"');
+        $records = iterator_to_array($xpath->query(
+            '//edm:EntityType[@Name="AnnotatedAirport"]'
+            . '/edm:Annotation[@Term="com.sap.vocabularies.UI.v1.LineItem"]/edm:Collection/edm:Record',
+        ));
+        // Property → "Kind=value" for the attribute-notation values of a record.
+        $fields = static function (DOMElement $record) use ($xpath): array {
+            $fields = [];
+            foreach ($xpath->query('edm:PropertyValue', $record) as $pv) {
+                foreach ($pv->attributes as $attribute) {
+                    if ($attribute->name !== 'Property') {
+                        $fields[$pv->getAttribute('Property')] = "{$attribute->name}={$attribute->value}";
+                    }
+                }
+            }
+            return $fields;
+        };
+
+        expect($records)->toHaveCount(2)
+            ->and($records[0]->getAttribute('Type'))->toBe('com.sap.vocabularies.UI.v1.DataField')
+            ->and($fields($records[0]))->toBe(['Label' => 'String=Code', 'Value' => 'Path=code'])
+            ->and($records[1]->getAttribute('Type'))->toBe('com.sap.vocabularies.UI.v1.DataField')
+            ->and($fields($records[1]))->toBe([
+                'Criticality' => 'EnumMember=com.sap.vocabularies.UI.v1.CriticalityType/Positive',
+                'Value'       => 'Path=name',
+            ]);
+    });
+
+    it('serves a $metadata document that validates against the OASIS CSDL schema', function () {
+        $doc = new DOMDocument();
+        $doc->loadXML($this->get('/odata/$metadata')->streamedContent());
+
+        libxml_use_internal_errors(true);
+        libxml_clear_errors();
+        $valid  = $doc->schemaValidate(dirname(__DIR__, 2) . '/schemas/csdl.xsd');
+        $errors = array_map(static fn(LibXMLError $e) => trim($e->message), libxml_get_errors());
+        libxml_clear_errors();
+
+        expect($errors)->toBe([])->and($valid)->toBeTrue();
     });
 
     it('includes Label annotation on property', function () {
