@@ -45,50 +45,71 @@ final class VocabularyGenerator
     // ── Mapping tables ────────────────────────────────────────────────────────
 
     /**
+     * The symbolic values the standard defines for AppliesTo. A value outside this list is warned about;
+     * a value in it without a PHP target (FunctionImport, Record, Annotation …) is skipped quietly.
+     *
+     * @see OData CSDL XML v4.01 §14.1.2 (Applicability)
+     */
+    private const array APPLIES_TO_VALUES = [
+        'Action', 'ActionImport', 'Annotation', 'Apply', 'Cast', 'Collection', 'ComplexType', 'EntityContainer',
+        'EntitySet', 'EntityType', 'EnumType', 'Function', 'FunctionImport', 'If', 'Include', 'IsOf', 'LabeledElement',
+        'Member', 'NavigationProperty', 'Null', 'OnDelete', 'Parameter', 'Property', 'PropertyValue', 'Record',
+        'Reference', 'ReferentialConstraint', 'ReturnType', 'Schema', 'Singleton', 'Term', 'TypeDefinition', 'UrlRef',
+    ];
+
+    /**
      * Maps OData AppliesTo values to PHP Attribute target constants.
-     * Values absent from this table are skipped with a warning.
+     *
+     * Only model elements a PHP declaration can carry are here. Function imports are built in code and take
+     * their annotations through the constructor; annotations, records and terms cannot be annotated yet (OP43).
      *
      * @see OData CSDL XML v4.01 §14.1.2 (Applicability)
      */
     private const array ATTRIBUTE_TARGET_MAP = [
-        'EntityType'         => 'Attribute::TARGET_CLASS',
-        'ComplexType'        => 'Attribute::TARGET_CLASS',
-        'EntitySet'          => 'Attribute::TARGET_CLASS',
-        'Singleton'          => 'Attribute::TARGET_CLASS',
-        'EnumType'           => 'Attribute::TARGET_CLASS',
-        'TypeDefinition'     => 'Attribute::TARGET_CLASS',
-        'EntityContainer'    => 'Attribute::TARGET_CLASS',
-        'Property'           => 'Attribute::TARGET_PROPERTY',
-        'NavigationProperty' => 'Attribute::TARGET_PROPERTY',
-        'Parameter'          => 'Attribute::TARGET_PARAMETER',
-        'EnumMember'         => 'Attribute::TARGET_CLASS_CONSTANT',
-        'Action'             => 'Attribute::TARGET_METHOD',
-        'Function'           => 'Attribute::TARGET_METHOD',
-        // 'Term' intentionally absent — not applicable in PHP
+        'EntityType'         => ['Attribute::TARGET_CLASS'],
+        'ComplexType'        => ['Attribute::TARGET_CLASS'],
+        'EntitySet'          => ['Attribute::TARGET_CLASS'],
+        'Singleton'          => ['Attribute::TARGET_CLASS'],
+        'EnumType'           => ['Attribute::TARGET_CLASS'],
+        'TypeDefinition'     => ['Attribute::TARGET_CLASS'],
+        'EntityContainer'    => ['Attribute::TARGET_CLASS'],
+        'Property'           => ['Attribute::TARGET_PROPERTY'],
+        'NavigationProperty' => ['Attribute::TARGET_PROPERTY'],
+        // An entity set, or a collection-valued property or navigation property.
+        'Collection'         => ['Attribute::TARGET_CLASS', 'Attribute::TARGET_PROPERTY'],
+        'Parameter'          => ['Attribute::TARGET_PARAMETER'],
+        'Member'             => ['Attribute::TARGET_CLASS_CONSTANT'],
+        'Action'             => ['Attribute::TARGET_METHOD'],
+        'Function'           => ['Attribute::TARGET_METHOD'],
     ];
 
     /**
-     * Maps OData AppliesTo values to the PHP interface class-string used in
+     * Maps OData AppliesTo values to the PHP interface class-strings used in
      * the generated APPLIES_TO constant.
      *
      * @see OData CSDL XML v4.01 §14.1.2 (Applicability)
      */
     private const array APPLIES_TO_INTERFACE_MAP = [
-        'EntityType'         => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\EntityTypeInterface',
-        'ComplexType'        => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\ComplexTypeInterface',
-        'EnumType'           => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\EnumTypeInterface',
-        'EnumMember'         => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\EnumMemberInterface',
-        'TypeDefinition'     => 'LaravelUi5\\OData\\Edm\\Contracts\\Type\\TypeDefinitionInterface',
-        'Property'           => 'LaravelUi5\\OData\\Edm\\Contracts\\Property\\PropertyInterface',
-        'NavigationProperty' => 'LaravelUi5\\OData\\Edm\\Contracts\\Property\\NavigationPropertyInterface',
-        'EntitySet'          => 'LaravelUi5\\OData\\Edm\\Contracts\\Container\\EntitySetInterface',
-        'Singleton'          => 'LaravelUi5\\OData\\Edm\\Contracts\\Container\\SingletonInterface',
-        'FunctionImport'     => 'LaravelUi5\\OData\\Edm\\Contracts\\Container\\FunctionImportInterface',
-        'EntityContainer'    => 'LaravelUi5\\OData\\Edm\\Contracts\\Container\\EntityContainerInterface',
-        'Parameter'          => 'LaravelUi5\\OData\\Edm\\Contracts\\FunctionParameterInterface',
-        'Action'             => 'LaravelUi5\\OData\\Edm\\Contracts\\FunctionInterface',
-        'Function'           => 'LaravelUi5\\OData\\Edm\\Contracts\\FunctionInterface',
-        'Schema'             => 'LaravelUi5\\OData\\Edm\\Contracts\\SchemaInterface',
+        'EntityType'         => ['LaravelUi5\\OData\\Edm\\Contracts\\Type\\EntityTypeInterface'],
+        'ComplexType'        => ['LaravelUi5\\OData\\Edm\\Contracts\\Type\\ComplexTypeInterface'],
+        'EnumType'           => ['LaravelUi5\\OData\\Edm\\Contracts\\Type\\EnumTypeInterface'],
+        'Member'             => ['LaravelUi5\\OData\\Edm\\Contracts\\Type\\EnumMemberInterface'],
+        'TypeDefinition'     => ['LaravelUi5\\OData\\Edm\\Contracts\\Type\\TypeDefinitionInterface'],
+        'Property'           => ['LaravelUi5\\OData\\Edm\\Contracts\\Property\\PropertyInterface'],
+        'NavigationProperty' => ['LaravelUi5\\OData\\Edm\\Contracts\\Property\\NavigationPropertyInterface'],
+        'EntitySet'          => ['LaravelUi5\\OData\\Edm\\Contracts\\Container\\EntitySetInterface'],
+        'Singleton'          => ['LaravelUi5\\OData\\Edm\\Contracts\\Container\\SingletonInterface'],
+        'FunctionImport'     => ['LaravelUi5\\OData\\Edm\\Contracts\\Container\\FunctionImportInterface'],
+        'EntityContainer'    => ['LaravelUi5\\OData\\Edm\\Contracts\\Container\\EntityContainerInterface'],
+        'Parameter'          => ['LaravelUi5\\OData\\Edm\\Contracts\\FunctionParameterInterface'],
+        'Action'             => ['LaravelUi5\\OData\\Edm\\Contracts\\FunctionInterface'],
+        'Function'           => ['LaravelUi5\\OData\\Edm\\Contracts\\FunctionInterface'],
+        'Schema'             => ['LaravelUi5\\OData\\Edm\\Contracts\\SchemaInterface'],
+        'Collection'         => [
+            'LaravelUi5\\OData\\Edm\\Contracts\\Container\\EntitySetInterface',
+            'LaravelUi5\\OData\\Edm\\Contracts\\Property\\PropertyInterface',
+            'LaravelUi5\\OData\\Edm\\Contracts\\Property\\NavigationPropertyInterface',
+        ],
     ];
 
     // ── Primitive type mappings ───────────────────────────────────────────────
@@ -488,6 +509,12 @@ PHP;
         $fullyQualified  = $entry->getNamespace() . '.' . $name;
         $appliesToValues = $appliesto !== '' ? preg_split('/\s+/', $appliesto) : [];
 
+        foreach ($appliesToValues as $av) {
+            if (!in_array($av, self::APPLIES_TO_VALUES, true)) {
+                $this->emit("  WARN: {$fullyQualified}: AppliesTo value '{$av}' is not defined by CSDL — skipped.");
+            }
+        }
+
         $isAttribute = $this->isAttributeCandidate($appliesToValues, $entry->getNamespace());
         $attrTargets = $isAttribute ? $this->resolveAttributeTargets($appliesToValues) : null;
 
@@ -783,13 +810,11 @@ PHP;
     private function appliesToInterfaces(array $appliesToValues): array
     {
         if ($appliesToValues === []) {
-            return array_values(array_unique(self::APPLIES_TO_INTERFACE_MAP));
+            return array_values(array_unique(array_merge(...array_values(self::APPLIES_TO_INTERFACE_MAP))));
         }
         $interfaces = [];
         foreach ($appliesToValues as $av) {
-            if (isset(self::APPLIES_TO_INTERFACE_MAP[$av])) {
-                $interfaces[] = self::APPLIES_TO_INTERFACE_MAP[$av];
-            }
+            array_push($interfaces, ...(self::APPLIES_TO_INTERFACE_MAP[$av] ?? []));
         }
         return array_values(array_unique($interfaces));
     }
@@ -806,12 +831,9 @@ PHP;
         $targets = [];
         foreach ($appliesToValues as $av) {
             if (!isset(self::ATTRIBUTE_TARGET_MAP[$av])) {
-                if ($av !== 'Term' && $av !== '') {
-                    $this->emit("  WARN: Unknown AppliesTo value '{$av}' — skipped in Attribute target.");
-                }
                 continue;
             }
-            $targets[] = self::ATTRIBUTE_TARGET_MAP[$av];
+            array_push($targets, ...self::ATTRIBUTE_TARGET_MAP[$av]);
         }
         return array_values(array_unique($targets));
     }

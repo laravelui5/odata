@@ -18,6 +18,9 @@ const GENERATOR_CORE_XML = <<<'XML'
       <TypeDefinition Name="FilterExpressionType" UnderlyingType="Edm.String" />
       <Term Name="Description" Type="Edm.String" />
       <Term Name="Computed" Type="Core.Tag" AppliesTo="Property" />
+      <Term Name="ProbeMinItems" Type="Edm.Int64" AppliesTo="Collection" />
+      <Term Name="ProbeMemberTerm" Type="Edm.String" AppliesTo="Member" />
+      <Term Name="ProbeImportTerm" Type="Edm.String" AppliesTo="FunctionImport Record Bogus" />
       <TypeDefinition Name="Tag" UnderlyingType="Edm.Boolean" />
     </Schema>
   </edmx:DataServices>
@@ -308,4 +311,21 @@ it('gives a term of an abstract record type a record of any type deriving from i
         expect(fn() => makeGenerated('Ui\\V1\\ProbeDefault')->toAnnotation())
             ->toThrow(LogicException::class, 'The term com.sap.vocabularies.UI.v1.ProbeDefault requires a value.');
     });
+});
+
+it('maps the AppliesTo values of the standard, Collection and Member included', function () {
+    $this->generator->run();
+
+    expect(($this->read)('Core/V1/ProbeMinItems.php'))
+        ->toContain('#[Attribute(Attribute::TARGET_CLASS | Attribute::TARGET_PROPERTY)]')
+        ->toContain("        EntitySetInterface::class,\n        PropertyInterface::class,\n        NavigationPropertyInterface::class,\n")
+        ->and(($this->read)('Core/V1/ProbeMemberTerm.php'))
+        ->toContain('#[Attribute(Attribute::TARGET_CLASS_CONSTANT)]')
+        ->toContain('EnumMemberInterface::class,');
+
+    // FunctionImport and Record are CSDL values without a PHP target: no attribute, no warning. Bogus is not CSDL.
+    expect(($this->read)('Core/V1/ProbeImportTerm.php'))->not->toContain('#[Attribute')
+        ->toContain('FunctionImportInterface::class,')
+        ->and(array_values(array_filter($this->lines, static fn(string $l) => str_contains($l, 'WARN'))))
+        ->toBe(["  WARN: Org.OData.Core.V1.ProbeImportTerm: AppliesTo value 'Bogus' is not defined by CSDL — skipped."]);
 });
