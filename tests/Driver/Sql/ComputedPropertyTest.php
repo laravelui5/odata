@@ -19,6 +19,7 @@ use LaravelUi5\OData\Service\Discovery\Attributes\ODataEntity;
 use LaravelUi5\OData\Tests\TestCase;
 use LaravelUi5\OData\Vocabularies\Measures\V1\ISOCurrency;
 use LaravelUi5\OData\Vocabularies\Measures\V1\Unit;
+use function LaravelUi5\OData\Tests\testCase;
 
 /*
  * OP34 (2026-11-02): a computed property is declared on the model's class with #[ODataComputed]; its value is the
@@ -107,7 +108,7 @@ final class ComputedService extends ODataService
 
 function computedGet(string $url): array
 {
-    $response = test()->get($url);
+    $response = testCase()->get($url);
     $response->assertStatus(200);
 
     return json_decode($response->streamedContent(), true);

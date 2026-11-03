@@ -47,12 +47,13 @@ describe('EnumType::fromBackedEnum', function () {
     });
 
     it('throws on a non-existent class-string', function () {
-        expect(fn () => EnumType::fromBackedEnum('Test.Service', 'App\\Does\\Not\\Exist'))
+        // Called as untyped code would: the guard is for input the class-string type does not rule out.
+        expect(fn () => (new ReflectionMethod(EnumType::class, 'fromBackedEnum'))->invoke(null, 'Test.Service', 'App\\Does\\Not\\Exist'))
             ->toThrow(\InvalidArgumentException::class, 'expected a PHP enum class-string');
     });
 
     it('throws on a pure (non-backed) enum', function () {
-        expect(fn () => EnumType::fromBackedEnum('Test.Service', Direction::class))
+        expect(fn () => (new ReflectionMethod(EnumType::class, 'fromBackedEnum'))->invoke(null, 'Test.Service', Direction::class))
             ->toThrow(\InvalidArgumentException::class, 'expected a backed enum, got pure enum');
     });
 

@@ -27,6 +27,8 @@ use LaravelUi5\OData\Edm\Type\PrimitiveType;
 use LaravelUi5\OData\Service\Builder\EdmBuilder;
 use LaravelUi5\OData\Service\Cache\EdmxWriter;
 
+use function LaravelUi5\OData\Tests\narrow;
+
 /**
  * Build a test EdmxInterface with entity types, navigation, functions, singletons.
  */
@@ -179,7 +181,7 @@ it('generates Edmx.php that implements EdmxInterface', function () {
     $original = buildTestEdmx();
     $loaded = writeAndLoad($original, $this->tmpDir);
 
-    expect($loaded)->toBeInstanceOf(EdmxInterface::class);
+    $loaded = narrow(EdmxInterface::class, $loaded);
     expect($loaded->getVersion())->toBe('4.0');
 });
 
@@ -383,14 +385,14 @@ it('preserves enum-typed properties instead of flattening them to String', funct
     $type = $loaded->getSchema('Test.Ns')->getEntityTypes()[0];
     $tier = $type->getProperty('tier');
 
-    expect($tier->getType())->toBeInstanceOf(EnumTypeInterface::class);
+    $tierType = narrow(EnumTypeInterface::class, $tier->getType());
     // The EDM short name comes from the PHP short class name (EnumType::fromBackedEnum).
-    expect($tier->getType()->getQualifiedName())->toBe('Test.Ns.EdmxWriterTestTier');
-    expect($tier->getType()->getUnderlyingType())->toBe(EdmPrimitiveType::Int32);
+    expect($tierType->getQualifiedName())->toBe('Test.Ns.EdmxWriterTestTier');
+    expect($tierType->getUnderlyingType())->toBe(EdmPrimitiveType::Int32);
 
     $members = array_map(
         fn ($m) => [$m->getName(), $m->getValue()],
-        $tier->getType()->getMembers(),
+        $tierType->getMembers(),
     );
     expect($members)->toBe([['Single', 1], ['Platform', 2]]);
 });

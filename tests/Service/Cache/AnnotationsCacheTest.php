@@ -32,6 +32,8 @@ use LaravelUi5\OData\Service\Cache\EdmxWriter;
 use LaravelUi5\OData\Service\Discovery\ModelDiscovery;
 use LaravelUi5\OData\Service\Serialization\CsdlSerializer;
 use LaravelUi5\OData\Tests\TestCase;
+use LaravelUi5\OData\Edm\Contracts\Annotation\ConstantAnnotationValueInterface;
+use function LaravelUi5\OData\Tests\narrow;
 
 uses(TestCase::class);
 
@@ -214,8 +216,8 @@ describe('odata:cache → annotations survive the warm path', function () {
     it('keeps quotes and backslashes in annotation text', function () {
         $warm = writeAndLoadAnnotated(annotationsCacheEdmx(), $this->tmpDir . '/quotes', 'AnnotationsCacheQuotesTest\\Edm');
 
-        $label = $warm->getSchema('Test.Ns')->getEntityType('Order')
-            ->getProperty('note')->getAnnotations()[0]->getValue()->getValue();
+        $label = narrow(ConstantAnnotationValueInterface::class, $warm->getSchema('Test.Ns')->getEntityType('Order')
+            ->getProperty('note')->getAnnotations()[0]->getValue())->getValue();
 
         expect($label)->toBe('Say "hi" \\ bye');
     });

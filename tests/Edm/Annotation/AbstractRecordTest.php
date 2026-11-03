@@ -9,7 +9,7 @@ use LaravelUi5\OData\Edm\Contracts\Annotation\CollectionAnnotationValueInterface
 use LaravelUi5\OData\Edm\Contracts\Annotation\ConstantAnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\RecordAnnotationValueInterface;
 
-use function LaravelUi5\OData\Tests\Vocabularies\narrow;
+use function LaravelUi5\OData\Tests\narrow;
 
 /*
  * Records of vocabulary complex types and the value writer behind them (OP07, step 2). The classes below have the

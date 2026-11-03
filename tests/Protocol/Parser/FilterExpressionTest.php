@@ -17,6 +17,8 @@ use LaravelUi5\OData\Protocol\Planning\Expression\UnaryOperator;
 
 use function LaravelUi5\OData\Tests\Protocol\Parser\translateFilter;
 
+use function LaravelUi5\OData\Tests\narrow;
+
 /**
  * Build an entity type with typed properties for literal-type tests.
  * All properties typed to their "natural" Edm type so the type hint doesn't mask the literal.
@@ -45,47 +47,52 @@ function typedEntityType(): EntityType
 
 it('translates string equality with single quotes', function () {
     $expr = translateFilter("origin eq 'test'");
-    expect($expr)->toBeInstanceOf(BinaryExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Eq);
-    expect($expr->left)->toBeInstanceOf(PropertyPathExpression::class);
-    expect($expr->right)->toBeInstanceOf(LiteralExpression::class);
-    expect($expr->right->value)->toBe('test');
-    expect($expr->right->edmType)->toBe('Edm.String');
+    $left = narrow(PropertyPathExpression::class, $expr->left);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->value)->toBe('test');
+    expect($right->edmType)->toBe('Edm.String');
 });
 
 // ── Integer comparisons ─────────────────────────────────────────────────
 
 it('translates integer equality', function () {
     $expr = translateFilter('id eq 4');
-    expect($expr)->toBeInstanceOf(BinaryExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Eq);
-    expect($expr->right)->toBeInstanceOf(LiteralExpression::class);
-    expect($expr->right->value)->toBe(4);
-    expect($expr->right->edmType)->toBe('Edm.Int32');
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->value)->toBe(4);
+    expect($right->edmType)->toBe('Edm.Int32');
 });
 
 it('translates integer greater-than', function () {
     $expr = translateFilter('id gt 4');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Gt);
 });
 
 it('translates integer less-than', function () {
     $expr = translateFilter('id lt 4');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Lt);
 });
 
 it('translates integer greater-than-or-equal', function () {
     $expr = translateFilter('id ge 4');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Ge);
 });
 
 it('translates integer less-than-or-equal', function () {
     $expr = translateFilter('id le 4');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Le);
 });
 
 it('translates integer not-equal', function () {
     $expr = translateFilter('id ne 4');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Ne);
 });
 
@@ -93,117 +100,135 @@ it('translates integer not-equal', function () {
 
 it('translates property eq property', function () {
     $expr = translateFilter('id eq origin');
-    expect($expr->left)->toBeInstanceOf(PropertyPathExpression::class);
-    expect($expr->right)->toBeInstanceOf(PropertyPathExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $left = narrow(PropertyPathExpression::class, $expr->left);
+    $right = narrow(PropertyPathExpression::class, $expr->right);
 });
 
 // ── Logical connectives ─────────────────────────────────────────────────
 
 it('translates and condition', function () {
     $expr = translateFilter('id lt 4 and id gt 2');
-    expect($expr)->toBeInstanceOf(BinaryExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::And);
-    expect($expr->left)->toBeInstanceOf(BinaryExpression::class);
-    expect($expr->left->operator)->toBe(BinaryOperator::Lt);
-    expect($expr->right)->toBeInstanceOf(BinaryExpression::class);
-    expect($expr->right->operator)->toBe(BinaryOperator::Gt);
+    $left = narrow(BinaryExpression::class, $expr->left);
+    expect($left->operator)->toBe(BinaryOperator::Lt);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    expect($right->operator)->toBe(BinaryOperator::Gt);
 });
 
 it('translates or condition', function () {
     $expr = translateFilter('id lt 4 or id gt 2');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Or);
 });
 
 it('translates chained or conditions', function () {
     $expr = translateFilter('id lt 4 or id lt 3 or id lt 2');
-    expect($expr)->toBeInstanceOf(BinaryExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Or);
 });
 
 it('translates mixed or/and with precedence', function () {
     // "and" binds tighter than "or": id lt 4 or (id lt 3 and id lt 2)
     $expr = translateFilter('id lt 4 or id lt 3 and id lt 2');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Or);
-    expect($expr->right)->toBeInstanceOf(BinaryExpression::class);
-    expect($expr->right->operator)->toBe(BinaryOperator::And);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    expect($right->operator)->toBe(BinaryOperator::And);
 });
 
 it('translates parenthesized conditions', function () {
     $expr = translateFilter('(id lt 4 and id ge 7) or id gt 3');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Or);
-    expect($expr->left->operator)->toBe(BinaryOperator::And);
+    $left = narrow(BinaryExpression::class, $expr->left);
+    expect($left->operator)->toBe(BinaryOperator::And);
 });
 
 it('translates two grouped and conditions with or', function () {
     $expr = translateFilter('(id lt 4 and id ge 7) or (id gt 3 and id gt 2)');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Or);
-    expect($expr->left->operator)->toBe(BinaryOperator::And);
-    expect($expr->right->operator)->toBe(BinaryOperator::And);
+    $left = narrow(BinaryExpression::class, $expr->left);
+    expect($left->operator)->toBe(BinaryOperator::And);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    expect($right->operator)->toBe(BinaryOperator::And);
 });
 
 // ── Not operator ────────────────────────────────────────────────────────
 
 it('translates not equality', function () {
     $expr = translateFilter("not (origin eq 'a')");
-    expect($expr)->toBeInstanceOf(UnaryExpression::class);
+    $expr = narrow(UnaryExpression::class, $expr);
     expect($expr->operator)->toBe(UnaryOperator::Not);
-    expect($expr->operand)->toBeInstanceOf(BinaryExpression::class);
+    $operand = narrow(BinaryExpression::class, $expr->operand);
 });
 
 it('translates not-contains with and', function () {
     $expr = translateFilter("not (contains(origin,'a')) and ((origin eq 'abcd') or (origin eq 'e'))");
-    expect($expr)->toBeInstanceOf(BinaryExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::And);
-    expect($expr->left)->toBeInstanceOf(UnaryExpression::class);
+    $left = narrow(UnaryExpression::class, $expr->left);
 });
 
 it('translates and with negated equality', function () {
     $expr = translateFilter("origin eq 'b' and not (origin eq 'a')");
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::And);
-    expect($expr->right)->toBeInstanceOf(UnaryExpression::class);
+    $right = narrow(UnaryExpression::class, $expr->right);
 });
 
 // ── Arithmetic operators ────────────────────────────────────────────────
 
 it('translates add', function () {
     $expr = translateFilter('id add 3.14 eq 1.59');
-    expect($expr)->toBeInstanceOf(BinaryExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Eq);
-    expect($expr->left)->toBeInstanceOf(BinaryExpression::class);
-    expect($expr->left->operator)->toBe(BinaryOperator::Add);
+    $left = narrow(BinaryExpression::class, $expr->left);
+    expect($left->operator)->toBe(BinaryOperator::Add);
 });
 
 it('translates sub', function () {
     $expr = translateFilter('origin eq 4 sub 3');
-    expect($expr->right)->toBeInstanceOf(BinaryExpression::class);
-    expect($expr->right->operator)->toBe(BinaryOperator::Sub);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    expect($right->operator)->toBe(BinaryOperator::Sub);
 });
 
 it('translates mul', function () {
     $expr = translateFilter('origin eq 4 mul 3');
-    expect($expr->right->operator)->toBe(BinaryOperator::Mul);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    expect($right->operator)->toBe(BinaryOperator::Mul);
 });
 
 it('translates div', function () {
     $expr = translateFilter('origin eq 4 div 3');
-    expect($expr->right->operator)->toBe(BinaryOperator::Div);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    expect($right->operator)->toBe(BinaryOperator::Div);
 });
 
 it('translates divby', function () {
     $expr = translateFilter('origin eq 4 divby 3');
-    expect($expr->right->operator)->toBe(BinaryOperator::DivBy);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    expect($right->operator)->toBe(BinaryOperator::DivBy);
 });
 
 it('translates mod', function () {
     $expr = translateFilter('origin eq 4 mod 3');
-    expect($expr->right->operator)->toBe(BinaryOperator::Mod);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    expect($right->operator)->toBe(BinaryOperator::Mod);
 });
 
 // ── Negative literals ───────────────────────────────────────────────────
 
 it('translates negative float literal', function () {
     $expr = translateFilter('-2.40');
-    expect($expr)->toBeInstanceOf(LiteralExpression::class);
+    $expr = narrow(LiteralExpression::class, $expr);
     expect($expr->value)->toBe(-2.4);
 });
 
@@ -211,7 +236,8 @@ it('translates negative float literal', function () {
 
 it('translates property eq null', function () {
     $expr = translateFilter('origin eq null');
-    expect($expr->right)->toBeInstanceOf(NullLiteralExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(NullLiteralExpression::class, $expr->right);
 });
 
 // ── Boolean literals ────────────────────────────────────────────────────
@@ -219,16 +245,19 @@ it('translates property eq null', function () {
 it('translates boolean eq true', function () {
     $type = typedEntityType();
     $expr = translateFilter('active eq true', $type);
-    expect($expr->right)->toBeInstanceOf(LiteralExpression::class);
-    expect($expr->right->value)->toBe(true);
-    expect($expr->right->edmType)->toBe('Edm.Boolean');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->value)->toBe(true);
+    expect($right->edmType)->toBe('Edm.Boolean');
 });
 
 it('translates boolean eq false', function () {
     $type = typedEntityType();
     $expr = translateFilter('active eq false', $type);
-    expect($expr->right->value)->toBe(false);
-    expect($expr->right->edmType)->toBe('Edm.Boolean');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->value)->toBe(false);
+    expect($right->edmType)->toBe('Edm.Boolean');
 });
 
 // ── Date/time literals (using typed properties to verify literal types) ──
@@ -236,86 +265,112 @@ it('translates boolean eq false', function () {
 it('translates date literal with typed property', function () {
     $type = typedEntityType();
     $expr = translateFilter('created eq 2000-01-01', $type);
-    expect($expr->right)->toBeInstanceOf(LiteralExpression::class);
-    expect($expr->right->edmType)->toBe('Edm.Date');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.Date');
 });
 
 it('translates datetime literal with typed property', function () {
     $type = typedEntityType();
     $expr = translateFilter('modified eq 2000-01-01T12:34:59Z', $type);
-    expect($expr->right->edmType)->toBe('Edm.DateTimeOffset');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.DateTimeOffset');
 });
 
 it('translates time literal with typed property', function () {
     $type = typedEntityType();
     $expr = translateFilter('startTime eq 04:11:12', $type);
-    expect($expr->right->edmType)->toBe('Edm.TimeOfDay');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.TimeOfDay');
 });
 
 it('translates GUID literal with typed property', function () {
     $type = typedEntityType();
     $expr = translateFilter('uid eq 4AA33245-E2D1-470D-9433-01AAFCF0C83F', $type);
-    expect($expr->right->edmType)->toBe('Edm.Guid');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.Guid');
 });
 
 it('translates duration literal with typed property', function () {
     $type = typedEntityType();
     $expr = translateFilter('elapsed eq PT1M', $type);
-    expect($expr->right->edmType)->toBe('Edm.Duration');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.Duration');
 });
 
 it('translates duration PT36H with typed property', function () {
     $type = typedEntityType();
     $expr = translateFilter('elapsed eq PT36H', $type);
-    expect($expr->right->edmType)->toBe('Edm.Duration');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.Duration');
 });
 
 it('translates complex duration P10DT2H30M with typed property', function () {
     $type = typedEntityType();
     $expr = translateFilter('elapsed eq P10DT2H30M', $type);
-    expect($expr->right->edmType)->toBe('Edm.Duration');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.Duration');
 });
 
 it('translates datetime with positive offset', function () {
     $type = typedEntityType();
     $expr = translateFilter('modified eq 2000-01-01T12:34:59+01:00', $type);
-    expect($expr->right->edmType)->toBe('Edm.DateTimeOffset');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.DateTimeOffset');
 });
 
 it('translates datetime with negative offset', function () {
     $type = typedEntityType();
     $expr = translateFilter('modified eq 2000-01-01T12:34:59-01:00', $type);
-    expect($expr->right->edmType)->toBe('Edm.DateTimeOffset');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.DateTimeOffset');
 });
 
 // ── Type hinting — literal type inferred from property ──────────────────
 
 it('hints right-side literal type from left-side Int32 property', function () {
     $expr = translateFilter('id eq 4');
-    expect($expr->right->edmType)->toBe('Edm.Int32');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.Int32');
 });
 
 it('hints right-side literal type from left-side String property', function () {
     $expr = translateFilter("origin eq 'test'");
-    expect($expr->right->edmType)->toBe('Edm.String');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.String');
 });
 
 it('string property hint overrides literal default type', function () {
     // When origin (String) is on the left, the right-side date literal gets hinted as String
     $expr = translateFilter('origin eq 2000-01-01');
-    expect($expr->right->edmType)->toBe('Edm.String');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.String');
 });
 
 it('double property hint applies to integer literal', function () {
     $type = typedEntityType();
     $expr = translateFilter('score eq 4', $type);
-    expect($expr->right->edmType)->toBe('Edm.Double');
+    $expr = narrow(BinaryExpression::class, $expr);
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->edmType)->toBe('Edm.Double');
 });
 
 // ── Case-insensitive operators ──────────────────────────────────────────
 
 it('translates case-insensitive operator EQ', function () {
     $expr = translateFilter("origin EQ 'lax'");
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Eq);
 });
 
@@ -323,58 +378,70 @@ it('translates case-insensitive operator EQ', function () {
 
 it('translates and of two function comparisons', function () {
     $expr = translateFilter("endswith(origin,'Veniam et') eq true and startswith(origin,'Veniam et') eq true");
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::And);
-    expect($expr->left->left)->toBeInstanceOf(FunctionCallExpression::class);
-    expect($expr->right->left)->toBeInstanceOf(FunctionCallExpression::class);
+    $left3 = narrow(BinaryExpression::class, $expr->left);
+    $left = narrow(FunctionCallExpression::class, $left3->left);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    $left2 = narrow(FunctionCallExpression::class, $right->left);
 });
 
 it('translates startswith eq true', function () {
     $expr = translateFilter("startswith(origin,'Veniam et') eq true");
-    expect($expr->left)->toBeInstanceOf(FunctionCallExpression::class);
-    expect($expr->left->name)->toBe('startswith');
-    expect($expr->right->value)->toBe(true);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $left = narrow(FunctionCallExpression::class, $expr->left);
+    expect($left->name)->toBe('startswith');
+    $right = narrow(LiteralExpression::class, $expr->right);
+    expect($right->value)->toBe(true);
 });
 
 it('translates boolean eq startswith reversed', function () {
     $expr = translateFilter("true eq startswith(origin,'Veniam et')");
-    expect($expr->left)->toBeInstanceOf(LiteralExpression::class);
-    expect($expr->right)->toBeInstanceOf(FunctionCallExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $left = narrow(LiteralExpression::class, $expr->left);
+    $right = narrow(FunctionCallExpression::class, $expr->right);
 });
 
 it('translates property gt datetime arithmetic', function () {
     $expr = translateFilter('origin gt (now() sub PT3M)');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Gt);
-    expect($expr->right)->toBeInstanceOf(BinaryExpression::class);
-    expect($expr->right->operator)->toBe(BinaryOperator::Sub);
+    $right = narrow(BinaryExpression::class, $expr->right);
+    expect($right->operator)->toBe(BinaryOperator::Sub);
 });
 
 it('translates nested function calls with cast', function () {
     $expr = translateFilter("(contains(tolower(cast(origin, 'Edm.String')),'alpha')) or (contains(tolower(cast(origin, 'Edm.String')),'alpha'))");
-    expect($expr)->toBeInstanceOf(BinaryExpression::class);
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Or);
 });
 
 it('translates and with negated function comparison', function () {
     $expr = translateFilter("endswith(origin,'Veniam et') eq true and not (startswith(origin,'Veniam et') eq true)");
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::And);
-    expect($expr->right)->toBeInstanceOf(UnaryExpression::class);
+    $right = narrow(UnaryExpression::class, $expr->right);
 });
 
 it('translates or with negated equality', function () {
     $expr = translateFilter("origin eq 'b' or not (origin eq 'a')");
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Or);
-    expect($expr->right)->toBeInstanceOf(UnaryExpression::class);
+    $right = narrow(UnaryExpression::class, $expr->right);
 });
 
 it('translates float in arithmetic expression', function () {
     $expr = translateFilter('id add 3.14 eq 1.59');
-    expect($expr->left->right)->toBeInstanceOf(LiteralExpression::class);
-    expect($expr->left->right->value)->toBe(3.14);
+    $expr = narrow(BinaryExpression::class, $expr);
+    $left = narrow(BinaryExpression::class, $expr->left);
+    $right = narrow(LiteralExpression::class, $left->right);
+    expect($right->value)->toBe(3.14);
 });
 
 it('translates chained add', function () {
     $expr = translateFilter('id add 3 add 5 eq 9');
+    $expr = narrow(BinaryExpression::class, $expr);
     expect($expr->operator)->toBe(BinaryOperator::Eq);
-    expect($expr->left)->toBeInstanceOf(BinaryExpression::class);
-    expect($expr->left->operator)->toBe(BinaryOperator::Add);
+    $left = narrow(BinaryExpression::class, $expr->left);
+    expect($left->operator)->toBe(BinaryOperator::Add);
 });

@@ -13,7 +13,7 @@ use LaravelUi5\OData\Edm\Contracts\Annotation\RecordAnnotationValueInterface;
 use LaravelUi5\OData\Edm\Contracts\Annotation\TypedAnnotationInterface;
 use LaravelUi5\OData\Edm\EdmPrimitiveType;
 
-use function LaravelUi5\OData\Tests\Vocabularies\narrow;
+use function LaravelUi5\OData\Tests\narrow;
 
 /*
  * The generator end to end, offline: the catalog's URIs answered by fixture vocabularies.

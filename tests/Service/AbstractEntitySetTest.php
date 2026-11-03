@@ -15,6 +15,8 @@ use LaravelUi5\OData\Service\Contracts\CustomEntitySetInterface;
 use LaravelUi5\OData\Service\Contracts\EntitySetSourceInterface;
 use LaravelUi5\OData\Service\Contracts\SqlQueryInterface;
 
+use function LaravelUi5\OData\Tests\narrow;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeEntitySet(string $name, array $columns, ?array $key = null): AbstractEntitySet
@@ -57,22 +59,22 @@ describe('AbstractEntitySet', function () {
     describe('contract', function () {
         it('implements CustomEntitySetInterface', function () {
             $set = makeEntitySet('Items', ['id' => EdmPrimitiveType::Int64]);
-            expect($set)->toBeInstanceOf(CustomEntitySetInterface::class);
+            $set = narrow(CustomEntitySetInterface::class, $set);
         });
 
         it('implements ColumnarSchemaInterface', function () {
             $set = makeEntitySet('Items', ['id' => EdmPrimitiveType::Int64]);
-            expect($set)->toBeInstanceOf(ColumnarSchemaInterface::class);
+            $set = narrow(ColumnarSchemaInterface::class, $set);
         });
 
         it('implements SqlQueryInterface', function () {
             $set = makeEntitySet('Items', ['id' => EdmPrimitiveType::Int64]);
-            expect($set)->toBeInstanceOf(SqlQueryInterface::class);
+            $set = narrow(SqlQueryInterface::class, $set);
         });
 
         it('implements EntitySetSourceInterface', function () {
             $set = makeEntitySet('Items', ['id' => EdmPrimitiveType::Int64]);
-            expect($set)->toBeInstanceOf(EntitySetSourceInterface::class);
+            $set = narrow(EntitySetSourceInterface::class, $set);
         });
     });
 
@@ -147,7 +149,7 @@ describe('AbstractEntitySet', function () {
 
             expect($property)->not->toBeNull();
             $propertyType = $property->getType();
-            expect($propertyType)->toBeInstanceOf(EnumTypeInterface::class);
+            $propertyType = narrow(EnumTypeInterface::class, $propertyType);
             expect($propertyType->getQualifiedName())->toBe('Test.Ns.Colour');
             expect($propertyType->getMember('Red')?->getValue())->toBe(1);
             expect($propertyType->getMember('Brown')?->getValue())->toBe(8);

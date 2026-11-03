@@ -67,8 +67,45 @@ carries exactly what `$metadata` declares.
   `year`/`month`/`day` and array shapes in the planner and parser are complete; `CustomQueryOptions` documents that a
   numeric query key arrives as an int; the three bindings' `getSourceClass()` return `string` (they are final and
   never returned null; `ResolverBindingInterface` keeps `?string`). `odata:cache` refuses a service that does not extend
-  `ODataService` with a message instead of a fatal error. The analysis itself stays at level 1 until the generated
-  vocabularies (`OP07`, `OP29`) and the tests are done.
+  `ODataService` with a message instead of a fatal error. With the regenerated vocabularies (below) **all of `src` is
+  clean at level 5, and so are the tests**: `phpstan.neon` runs at level 5, no baseline (`OP32`). One exception for
+  `src` stays, with its reason: the filter parser's unresolved path segments (`OP45`).
+- **BREAKING: the vocabulary classes are regenerated, and write what CSDL and UI5 read** (`OP07`, `OP29`). The generator
+  now reads base types and abstract types, keys every type by its qualified name, and writes one value by its declared
+  type. What a client sees:
+  - **A collection of records is records.** `#[LineItem(['code', 'name'])]` wrote `<Collection><String>code</String>…`,
+    in which UI5 finds no columns. A collection term now takes objects of its record type and writes each as
+    `<Record Type="…">`: `#[LineItem([new DataField(value: new Path('code')), new DataFieldForAction(action: '…')])]`.
+    A string where a record is due fails loud.
+  - **Booleans are `Bool="true"`/`"false"`, enumerations `EnumMember="…Type/Member"`** (flags space-separated). A record
+    field wrote `Boolean="1"` or `Boolean=""`, which OpenUI5 reads as *not set* and the CSDL schema refuses; an enum wrote
+    `Int="7"`. Record fields no longer go out as `(string)` casts (a nested record or list was the string `"Array"`), and
+    an unset field is left out instead of written empty.
+
+  What changes in PHP:
+  - **Each record type is a class in the vocabulary's hierarchy** — `abstract` for an abstract type, `final` where
+    nothing derives from it — with every field, own and inherited, as a **named, optional** parameter in vocabulary
+    order. A term whose type is one record takes the same fields and builds that class. **Call them with named
+    arguments:** required fields used to come first, so an old positional call can land on another field (43 terms,
+    87 record classes). A leading acronym is lower-cased whole (`ID` → `$id`, was `$iD`).
+  - **Required is checked when the schema is built**, not at the call: a single-valued field that is neither nullable
+    nor has a default, and a term value that is required, throw a `LogicException` naming it. `Nullable="false"` no
+    longer makes a constructor parameter required, so a vocabulary that adds a required field regenerates as a minor.
+  - **A `Path` in every term and every field**, enumerations included (`new FieldControl(new Path('fc'))`). For a
+    model-path type a string writes the path itself (`PropertyPath`), a `Path` a value path; the latter is not CSDL for
+    those types (§14.4.1) but what OpenUI5 reads for `CodeList.StandardCode`.
+  - **A term of an open primitive type takes the value first** — `new Minimum(0)`, `new Minimum('2026-01-01',
+    EdmPrimitiveType::Date)`; the kind was a required first argument. Affects `Validation.Minimum`, `Maximum`,
+    `Common.ExternalID`, `FilterDefaultValue`, `FilterDefaultValueHigh`, `UnitSpecificScale`, `UnitSpecificPrecision`
+    and `UI.ParameterDefaultValue`.
+  - **A term without `AppliesTo` is an attribute on every target**, as CSDL reads a missing list. `Core.Description` and
+    `Common.Label` were hand-written for that reason and are generated now; 51 more terms (`Core.LongDescription` among
+    them) become usable as attributes. `AppliesTo="Collection"` maps to classes and properties, which makes
+    `Validation.MinItems`, `MaxItems` and `Analytics.AnalyticalContext` attributes.
+  - New upstream terms come along: `UI.CardItem`, `Common.ExpandAfterConcatSupported`,
+    `PersonalData.RelatedDataCategoryID`. Each field carries the vocabulary's description as `@param`.
+- **`CsdlSerializer` writes the kind `Boolean` as `Bool`**, and a Bool constant in its lexical form (`"1"` → `true`,
+  `""` → `false`), for annotations built by hand or by vocabulary classes of 3.x.
 - **Comments on the read gate are current** (`OP33`): `ReadContext` and `ReadMessage` no longer announce pruning and the
   `sap-messages` header for "the next slice"; `ReadGate` has done both since it shipped.
 - **Docblocks no longer tell the Lodata migration story.** Seven docblocks in six files (`ODataRequest`,
@@ -91,6 +128,9 @@ carries exactly what `$metadata` declares.
 - **`#[ODataAnnotate]`** (`OP35`, `OP38`) — annotates one property of a discovered model, written on the class:
   `#[ODataAnnotate('price', new ISOCurrency(new Path('currency')))]`, repeatable, any number of typed annotations per
   attribute. The property must be one the entity type declares, or discovery fails loud.
+- **`AbstractRecord`** and **`AnnotationValueWriter`** (`Edm\Annotation`, `OP07`) — the base of every vocabulary record
+  class (`TYPE`, `FIELDS`, `toRecord()`) and the writer that turns a PHP value into the expression its declared type asks
+  for. Usable for a record or a term of your own vocabulary.
 - **`ColumnAnnotationResolverInterface`** (`OP35`) — the annotation forward-exit of discovery, beside the facet and
   expression exits: `annotations(string $modelClass, string $column)` per declared column, at schema build, so a cached
   service keeps what it saw. Default `ColumnsUnannotated` answers nothing; bound with `bindIf`. On the same term and

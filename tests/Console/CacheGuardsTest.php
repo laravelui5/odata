@@ -16,6 +16,7 @@ use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use LaravelUi5\OData\Service\Builder\ResolverMapBuilder;
 use LaravelUi5\OData\Tests\TestCase;
+use function LaravelUi5\OData\Tests\narrow;
 
 /**
  * The guards `odata:cache` grew after the 2026-08-19 incident in
@@ -118,7 +119,7 @@ function makeVendoredService(): ODataServiceInterface
 
     require_once $file;
 
-    return new VendoredGuardService(); // @phpstan-ignore class.notFound (written to a temp file above)
+    return narrow(ODataServiceInterface::class, new VendoredGuardService()); // @phpstan-ignore class.notFound (written to a temp file above)
 }
 
 function rmVendoredService(): void

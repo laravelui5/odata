@@ -48,10 +48,11 @@ Decided 2026-11-02 (author): an OData major, worked on directly, without a depre
 - `OP11` — the service document honours `includedInServiceDocument`; `FunctionImport`'s default flips to `true`.
 - `OP41` — `#[ODataEntity]` keeps only the names: `$hidden` and `$visible` always apply, `useHidden` goes, three failure
   cases fail loud or right.
-- `OP32` (partly): the two signature findings need no break; the hand-written `src` is clean at level 5.
+- `OP32` — PHPStan level 5 for `src` and `tests` (done 2026-11-03); the parser's path type is `OP45`.
 - `OP33` — comments on the read gate.
-- `OP07` + `OP29` (decided 2026-11-02) — the vocabulary generator: spec-conform records, optional record fields
-  checked at build, `EnumMember`, `Bool`; regenerate. Then `OP32`'s vocabulary findings go with it.
+- `OP07` + `OP29` (decided 2026-11-02, built 2026-11-03) — the vocabulary generator: spec-conform records, optional
+  record fields checked at build, `EnumMember`, `Bool`, a `Path` everywhere; regenerated. `OP32`'s vocabulary findings
+  went with it.
 
 The entries stay in place under *Pending*; this list is the cut.
 
@@ -142,7 +143,318 @@ need the relations). This would let one discovered set serve a **fast lean list*
 
 In the spirit of the engine: the fast path should be the default, hydration the opt-in that expands require.
 
-### [ ] `OP07` Generated vocabulary attributes emit invalid CSDL — `#[LineItem]` gives no columns, `Boolean="1"`
+### [ ] `OP08` Should the package ship a filter-extraction helper for Tier-3 resolvers? — evaluation
+
+Opened 2026-09-21 out of Rangliste Punkt 6. `resolvers/custom-resolvers` documented a trait
+`App\OData\ExtractsFilterValues` with an `extractFilterParams()` helper "for common filter patterns".
+It exists **nowhere** — not in the package, not in any host in the workspace, not in `pragmatiqu.io`.
+The page was corrected on 2026-09-21 to show a real walk over the `FilterExpression` tree instead,
+written as host code.
+
+**The question this leaves.** Every Tier-3 resolver that cannot translate the whole expression tree
+writes the same small walk: descend the `and` chain, match `property eq literal`, read the column off
+the last `PropertyPathExpression` segment. That is a candidate for the package.
+
+**The argument against, and it is strong.** A helper whose job is to *pick out the parts it
+understands* blesses exactly the failure mode already queued as *Unsupported `$filter` constructs are
+silently dropped, widening the result set*: a resolver that ignores what it did not extract answers a
+`200` with more rows than the client asked for. If such a helper ships, it must **refuse** rather than
+return a partial map — i.e. it is not an "extract" helper at all, it is a *restricted-filter parser*,
+and its value is the refusal as much as the extraction.
+
+**To evaluate:** whether the refusing shape generalises (which constructs belong in the supported set —
+`eq` only? `eq`/`ne`/comparisons? `contains`?), whether it belongs beside `AbstractEntitySet` or as a
+trait, and whether the real answer is simply "document the walk" — which is what the page does today,
+and may be enough. An acceptable outcome is "no helper, and here is why".
+
+### [ ] `OP12` `cachedMetadataXMLPath()` is declared, implemented and read by nothing — **finish specifying**
+
+Surfaced 2026-09-17 in the docs SEO pass. The method sits on the public interface
+(`Service/Contracts/ODataServiceInterface.php:45`) and on `ODataService:82`, and no caller exists in
+the package or its tests: `$metadata` is serialized on every request. `metadata/metadata-document`
+and `services/defining-a-service` present it as a mechanism.
+
+**Decided 2026-09-21 (author): it gets implemented, not removed.** The target behaviour, sketched:
+
+> `odata:cache` produces, beside the Edm class tree, the **finished `$metadata` XML**, and the
+> serializer **streams that file**. The cold path is unchanged — nothing about a non-cached service
+> moves.
+
+That keeps the interface honest, removes a per-request serialization from the warm path, and is
+**additive: Minor or Patch, never a Major.**
+
+**Open before it can be built — this entry is a stub until then:**
+- **Where does the XML go for a pure OData project?** For a Core project the answer is settled:
+  `resources/ui5/Metadata.xml`, beside the app's other generated resources. A standalone OData
+  service has no such tree.
+- **That difference needs a lever** — an argument or an option on `odata:cache` (a target path, or a
+  mode that says "Core layout" vs "standalone"). Which of the two, and what the default is, is
+  unentschieden.
+- How `cachedMetadataXMLPath()` and the cache writer agree on the path (who owns it: the service, the
+  command, or config), and what happens when the file is missing or stale — fall back to
+  serialization silently, or fail loud? The house answer elsewhere is loud, but the warm path must not
+  break a deployment that forgot the command.
+
+Until those are settled, the two doc pages keep describing the mechanism (docs-are-the-spec); they
+must not describe the path or the command flag, because neither is decided.
+
+### [ ] `OP16` The announced `odata-error` trailer is not an HTTP trailer — it corrupts the body instead
+
+Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Minor**).
+While streaming, `ODataResponse::sendContent()` announces `trailer: odata-error` (`:33`). If a
+`ProtocolException` is raised mid-stream, `sendContentStreamed()` echoes
+`OData-error: {json}` **into the body** (`:46`), behind the bytes already sent. That is not a trailer
+field: a real trailer needs chunked transfer encoding and fields *after* the body. Two consequences
+for the client — the announced trailer never arrives, and the body is no longer valid JSON, so a
+strict parser fails on a response that looks successful by status code.
+
+**Fix (Minor, because the wire behaviour changes).** Either emit a genuine trailer — chunked encoding,
+the field sent after the last chunk, which PHP's output layer makes awkward but not impossible — or
+drop the `trailer` header and keep an honest in-body error marker that the docs describe as such. The
+decision belongs to whoever builds it; what must not survive is a header promising something that
+never comes.
+
+**This is one of the two pages that may name the defect.** `advanced/error-handling` and
+`advanced/configuration` describe the streaming error path **with its current flaw and its cure**, so
+that a consumer who hits a truncated body knows what they are looking at and that `odata.streaming =
+false` is the way around it today.
+
+**Narrowed 2026-10-07 (`OP06`).** `EntitySetHandler` now runs the query to the first row before the
+response is committed. An error *before* the first row (a refused filter, a SQL error) gets its own
+status code. What remains is an error *after* rows have gone out.
+
+### [ ] `OP30` Server-driven paging reaches neither navigation collections nor `$batch` parts
+
+Found 2026-10-07 while testing `OP05`. Server-driven paging is decided in the controller
+(`resolveMaxPageSize()`: `Prefer: odata.maxpagesize`, then `odata.pagination.default`, clamped to
+`.max`) and reaches the plan in exactly one place, the top-level entity-set plan
+(`QueryPlanner:141`). Two consequences:
+
+- **A navigation collection is never paged.** `Flights(1)/passengers` with
+  `Prefer: odata.maxpagesize=2` answers all rows at once, and `pagination.max` does not cap it.
+- **A `$batch` part is never paged.** `BatchHandler::dispatchInnerRequest()` builds its
+  `ODataRequest` without `maxPageSize`. Neither a part's own `Prefer` header (now parsed, see `OP27`)
+  nor the config reaches it, so `pagination.max` is no ceiling inside a batch.
+
+The second matters most, because **UI5 sends everything through `$batch`**. The cap a host sets in
+`pagination.max` does not hold for UI5 traffic today.
+
+**To decide before building.** Does UI5's V4 `ODataListBinding` cope with a server-driven page, i.e.
+does it follow `@odata.nextLink` or fail? It pages with `$skip`/`$top` itself, and under
+`$top` the engine does not page (`EntitySetHandler`), so a UI5 list request that carries `$top` is
+safe either way. A request without `$top` (a code list, `requestContexts(0, Infinity)`) would be cut
+at the default. That is why the code-list docs require `pagination.default` unset. Check with the
+probe in `acme` before switching it on.
+
+**Fix (once settled).** Resolve the page size per inner request (its own `Prefer`, then the config)
+and pass it into the navigation plans too. Probably a Minor, since server-visible behaviour changes
+for hosts that set `pagination.default`.
+
+### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
+
+`Protocol/Execution/BatchHandler::parseMultipartParts()` reads the top level of a `multipart/mixed` body. A part it does
+not recognise as a request line — a nested change set (`Content-Type: multipart/mixed; boundary=changeset_…`), a part
+without headers, an empty message, a method outside the regex — is skipped with `continue`, and the response carries one
+part fewer than the request. UI5's `_Requestor` pairs responses with requests by position: the first request without a
+response is rejected with *"HTTP request was not processed because the previous request failed"*, and so is every one
+after it. The `$batch` in the network panel looks healthy — every response that came back is a 200 — so the cause hides.
+Met in the SDK's Partners smoke on 2026-10-25 while chasing another cause (an undeployed database); the shape is real
+regardless.
+
+**Fix (direction):** answer **every** part. A part that cannot be parsed gets its own error response in its position
+(`400`, an OData error body naming what was wrong); a change set on this read-only engine gets one `400`/`405` response
+for the set as a whole, as the protocol pairs a change set with one response. The JSON `$batch` path validates already
+and fails the whole batch loudly; the multipart path should at least keep the positions. **Test:** a body with a GET, an
+unparseable part and a GET answers three parts, the middle one an error.
+
+**Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
+
+### [ ] `OP42` A constant inside a nested collection is dropped from `$metadata` — found 2026-11-03
+
+`CsdlSerializer::appendAnnotationValueAsChild()` writes the items of a collection that stands **inside** another
+collection. It knows records and collections; a constant item falls through both branches and is left out without a
+word. `<Collection><Collection><String>a</String></Collection></Collection>` goes out as
+`<Collection><Collection/></Collection>`. The top-level path (`appendAnnotationValue()`) handles constant items as typed
+child elements (`<String>a</String>`, `<Bool>true</Bool>`); the nested path does not.
+
+No vocabulary term produces the shape: no term or record field in the catalog is typed `Collection(Collection(…))`, so
+the generated classes never reach it. It affects an annotation built by hand. Found while building `OP07` step 6.
+
+**Fix (direction):** one writer for collection items at every depth — the constant branch of `appendAnnotationValue()`
+(kind → element name through `KIND_TO_XML_ATTR`, lexical form through `constantLexical()`) used by the nested path too.
+**Test:** a collection holding a collection of a `String` and a `Bool` serializes both items.
+
+**Target:** Patch.
+
+### [ ] `OP43` Annotations, records and terms cannot carry annotations themselves — found 2026-11-03
+
+CSDL lets an annotation be annotated (§14.2: *"An `edm:Annotation` element MAY contain `edm:Annotation` elements that
+annotate the annotation"*), and a record and its property values too (§14.4.10: `edm:Record` and `edm:PropertyValue`
+each *"MAY contain `edm:Annotation` elements"*).
+The vocabularies use it: 44 `AppliesTo` values in the catalog name `Annotation`, `Record`, `PropertyValue` or `Term` —
+`UI.Importance` and `UI.PartOfPreview` on a `DataField` record of a `LineItem`, `UI.Criticality` on an annotation,
+`Validation.Exclusive` on a `Validation.Minimum`, `Common.ValueListShowValuesImmediately` on a `Common.ValueList`.
+
+Our model has no place for them: `Annotation`, `RecordAnnotationValue` and `PropertyValue` implement no
+`HasAnnotations`, and `CsdlSerializer` writes no annotation below an annotation or record. The generator lists these
+terms with an empty attribute target (`AppliesTo` without a PHP target, see `OP07`), so they exist as classes but cannot
+reach `$metadata`.
+
+`Term` is a different case: annotating a term is the work of a vocabulary's author, and the engine declares no terms of
+its own. That part stays out.
+
+**Fix (direction):** annotations on `Annotation`, `RecordAnnotationValue` and `PropertyValue` (an optional list, as
+`HasAnnotations` gives the model elements), written by `CsdlSerializer` and carried through `odata:cache` (`EdmxWriter`).
+The declaring side follows the value classes of `OP07`: an `AbstractRecord` takes its annotations as a constructor
+argument (`new DataField(value: …, annotations: [new Importance(ImportanceType::High)])`) — the name must not collide
+with a record field, which the generator can check as it does for `Qualifier`. Settle the shape before building; it is
+an addition, so a minor.
+
+**Target:** Minor.
+
+### [ ] `OP44` `Vocabulary` has no case for CodeList — its terms ship, its reference must be added by hand — found 2026-11-03
+
+`EdmBuilderInterface::useVocabulary(Vocabulary $vocabulary)` looks the enum's value up in `VocabularyCatalog::default()`
+and adds that entry's `edmx:Reference`. The catalog holds twelve vocabularies, the enum names eleven: `CodeList`
+(`com.sap.vocabularies.CodeList.v1`) is missing, although its classes are generated and shipped (`CurrencyCodes`,
+`UnitsOfMeasure`, `StandardCode`, `ExternalCode`). A service that announces a code list — the documented way to give UI5
+the decimals of a currency (`docs/odata/annotations/applying-annotations` § *Code lists*) — cannot say
+`useVocabulary(Vocabulary::CodeList)`; it has to write
+`addReference(VocabularyCatalog::default()->getEntry('com.sap.vocabularies.CodeList.v1')->toReference())`, which no
+page tells it. Found while writing the docs for `OP07`.
+
+**Fix:** add `case CodeList = 'com.sap.vocabularies.CodeList.v1';`, and a test that every catalog entry has an enum
+case (and the reverse), so the two cannot drift again. Docs: the count in *Vocabulary references* (11 → 12) and the
+code-list section, which should show the reference. Chiron's annotation reference likewise.
+
+**Target:** Minor (an added enum case; a consumer's exhaustive `match` over `Vocabulary` would need the new arm).
+
+### [ ] `OP45` A filter path is a string until it is resolved — `PropertyPathExpression::$segments` does not say so — found 2026-10-09, split from `OP32` 2026-11-03
+
+`PropertyPathExpression::$segments` is declared `list<PropertyInterface|NavigationPropertyInterface>`. The
+`FilterParser` builds it with **strings** (the names as written in `$filter`, `$orderby`, `$compute` and a lambda's
+collection), and `PropertyResolver` swaps each for the property of the entity type, or answers `400`. Between the two
+steps the declared type is false. PHPStan therefore calls the resolver's `is_string()` checks impossible
+(`function.impossibleType`, level 4 up); `phpstan.neon` ignores that identifier for `PropertyResolver.php`, the
+reason written beside it. It is the only exception for `src` left after `OP32`.
+
+Nothing fails at runtime: every driver reads segments after the resolver has run. The cost is that the type tells a
+reader of a driver nothing true about a tree straight from the parser, and that a new caller who skips the resolver
+gets strings where the type promises properties.
+
+**Fix (direction):** a type for the unresolved path — an `UnresolvedPathExpression` (segment names) that the parser
+builds and the resolver replaces with a `PropertyPathExpression` (properties) — so each tree says which stage it is
+in. It touches the parser, `PropertyResolver`, the lambda path, and the readers of `segments` in the drivers
+(`FilterToEloquent`, `AbstractFilterTranslator`, `SqlEntitySetResolver`, `EloquentEntitySetResolver`). Done when the
+ignore goes from `phpstan.neon` and level 5 stays green.
+
+**Target:** Minor, if the parser's output stays internal (it is not part of a published interface today: check
+`FilterExpressionVisitor` and the resolver contracts before calling it so); otherwise major.
+
+---
+
+## Done
+
+Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
+section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
+that passed through Pending.
+
+### [x] `OP32` PHPStan level 5 — collective ticket for what levels 2–5 find
+
+> **Done 2026-11-03** for the next major. `phpstan.neon` is at **level 5**, `src` and `tests`, no baseline. The
+> vocabularies went with `OP07`/`OP29`; the tests use `narrow()` and `testCase()` from `tests/Helpers.php` (a runtime
+> assertion that tells PHPStan the type, counted by Pest) instead of reading a property after
+> `expect()->toBeInstanceOf()`. Fake class-strings in the binding tests became real classes; the two tests of
+> `EnumType::fromBackedEnum()`'s guard call it as untyped code would, through reflection. Two exceptions remain in
+> `phpstan.neon`, each with its reason: the hierarchy guards in tests (`pest.expectation.redundant`, and
+> `function.alreadyNarrowedType` for `SqlQueryInterfaceTest`), and the parser's unresolved path segments, split off as
+> `OP45`.
+
+Found 2026-10-09, when the dev setup moved to Pest 5 (PHPUnit 13, Testbench 11) and
+`pest-plugin-phpstan` replaced the abandoned `peststan`. Core went to level 5 the same day
+(`core 3.0.1`). odata **stays at level 1** until the related tickets are closed and the blast radius
+is known. A trial run at level 5 (no baseline, `src` + `tests`):
+
+| Level | `src` | `tests` |
+|:--|--:|--:|
+| 1 (today) | 0 | 0 |
+| 2 | 72 | 209 |
+| 4 | 386 | 213 |
+| 5 | 395 | 218 |
+
+**Generated vocabularies — 357 of the 395 `src` findings.** They belong to the generator, not to the
+committed files.
+
+- **69 × `cast.string`** — `(string) $this->groupableProperties` on an array, which writes the string
+  `"Array"` into the CSDL. This is `OP07`, now counted exactly.
+- **288 × `return.unusedType`** — the template declares `?AnnotationValueInterface` for
+  `buildAnnotationValue()`, which never returns `null`. Harmless; noise from the template.
+
+**Hand-written `src` — 38 findings**, none that fails at runtime on the samples checked:
+
+- *Incomplete docblocks:* array shapes missing a key (`expand` in `QueryPlanner:697`, `operandCount`
+  in `FilterParser:377`), `$containerAnnotations` typed as `array{}` (`ODataService:209`).
+- *Interface cuts PHPStan cannot see:* `VirtualExpandResolverInterface::entityType()` /
+  `entitySetName()` (`ODataService:365–400`), `buildForCache()` on `ODataServiceInterface`
+  (`CacheCommand:80`).
+- *Dead code:* `is_string()` on property objects (`PropertyResolver:112/135`), `isset()` on keys
+  that always exist (`BatchHandler:250`), redundant `?->` before `??` (`ModelDiscovery`), checks that
+  are always true or false (`OData:148`, `CustomQueryOptions:45`, `ExpressionLexer:280`,
+  `FilterParser:603`, `VocabularyGenerator:503`), `?string` on three `getSourceClass()` that never
+  return `null`.
+- *Tool limits:* the visitor dispatch by `match` in `FilterExpression::accept()`, two `match` over a
+  regex-guarded string (`EloquentEntitySetResolver:515`, `SqlEntitySetResolver:206`).
+- **Two touch a signature** and need a look of their own before any edit:
+  `ODataResponse::sendContent()` / `sendContentBuffered()` (`static` against `$this`), and
+  `ProtocolException::toResponse($request = null)` against `Responsable::toResponse(Request)`.
+
+**Tests — 218 findings.** 187 are one pattern: `expect($expr)->toBeInstanceOf(X::class)` followed by
+`$expr->name`. A Pest expectation does not narrow the variable for PHPStan. Preferred cure: a small
+typed helper (`$call = narrow(FunctionCallExpression::class, $expr)`) that asserts at runtime and
+hands PHPStan the type — mechanical, ~180 sites, and keeps typos in tests visible. An ignore by path
+would be cheaper and hide exactly those typos.
+
+**Order.**
+1. `OP07` + `OP29` repair the generator; regenerate. The vocabulary findings go with it.
+2. Estimate the blast radius of the two signature findings.
+3. Fix the hand-written `src` findings and the tests, raise `phpstan.neon` to level 5, no baseline.
+
+**Done when** `composer analyse` is green at level 5. The `src` fixes are a patch, unless one of the
+two signature findings cannot be solved without a break.
+
+**Progress 2026-11-02** (with the next major). Measured again: level 5 finds 394 in `src` (356 in the generated
+vocabularies) and 223 in `tests`. **Neither signature finding needs a break:** `ODataResponse::sendContentBuffered()`
+returned the *error* response where `static` promised itself (now `$this`, the private helpers say `@return $this`),
+and `ProtocolException::toResponse()`'s docblock said `null` where it meant `Request|null`. **All 37 hand-written `src`
+findings are fixed**; one real catch among them: PHPStan assumed the lexer's `maybeExpression()` pure, so a second
+digit loop "could never run" — the `maybe…` methods are `@phpstan-impure` now. `FilterExpression::accept()` dispatches by
+`instanceof`, `CacheCommand` narrows to `ODataService`, the bindings' `getSourceClass()` return `string`.
+
+**Left, and why it is not in the major:**
+- ~~**The generated vocabularies (356)**~~ — gone with `OP07` + `OP29` (2026-11-03): the template writes the exact
+  return type of `buildAnnotationValue()` (`null` for a marker, non-null where the body always writes) and no
+  redundant `?->` before `??`.
+- **The tests (223)** — the `narrow()` helper, mechanical, no break; any minor. *(2026-11-03: `narrow()`, `elementAt()`
+  and `elementsAt()` exist in `tests/Vocabularies/Helpers.php`; the vocabulary tests written with `OP07` use them and
+  are clean at 5. The rest still needs the pass.)*
+- **One type debt, ignored in `phpstan.neon` with its reason:** `PropertyPathExpression::$segments` says resolved
+  properties, but the filter parser puts strings there until `PropertyResolver` resolves them. The honest fix is a
+  type for an unresolved path; it touches every driver that reads segments.
+
+`phpstan.neon` stays at level 1 until those are done; `src` is green at 5 today, vocabularies included
+(`vendor/bin/phpstan analyse --level=5 src`, since 2026-11-03).
+
+### [x] `OP07` Generated vocabulary attributes emit invalid CSDL — `#[LineItem]` gives no columns, `Boolean="1"`
+
+> **Built 2026-11-03** for the next major, with `OP29` (`CHANGELOG.md` `[4.0.0]`). The generator reads a type model
+> (`Console/VocabularyTypeModel`: qualified names, base and abstract types, redeclared fields, defaults, field
+> descriptions); record types are classes over `Edm/Annotation/AbstractRecord`; one `AnnotationValueWriter` writes
+> terms and fields by declared type. Found on the way: a required field is a single-valued one that is neither nullable
+> nor has a default (§14.4.10; 94 upstream fields are `Nullable="false"` with a default, `DataFieldForAction.Inline`
+> among them); SAP redeclares inherited fields to narrow them; OpenUI5 reads `CodeList.StandardCode` as a value path,
+> so a model-path type takes a `Path` too (author, 2026-11-03, SAP-compatible). Tests: `tests/Vocabularies/` (one per
+> term family, every document against the OASIS schema through `tests/schemas/csdl.xsd`, and a breadth test over every
+> generated class), `tests/Console/Vocabulary*Test`. Follow-ups: `OP42`, `OP43`.
 
 > **Decided 2026-11-02 (author): fixed in the next major, together with `OP29`.** The work is mostly mechanical; the
 > API shape is what must break now, while a major is open and nobody depends on it, so that the next annotation the
@@ -243,87 +555,9 @@ the CSDL kind names (`Bool`, `Int`, `String`, `Path` …), plus `Boolean` → `B
 `KIND_TO_XML_ATTR` as a guard. A `$metadata` test per affected term family (DataField collection,
 boolean capability) keeps it fixed.
 
-### [ ] `OP08` Should the package ship a filter-extraction helper for Tier-3 resolvers? — evaluation
+### [x] `OP29` The vocabulary generator has drifted from the committed classes — regenerate deliberately
 
-Opened 2026-09-21 out of Rangliste Punkt 6. `resolvers/custom-resolvers` documented a trait
-`App\OData\ExtractsFilterValues` with an `extractFilterParams()` helper "for common filter patterns".
-It exists **nowhere** — not in the package, not in any host in the workspace, not in `pragmatiqu.io`.
-The page was corrected on 2026-09-21 to show a real walk over the `FilterExpression` tree instead,
-written as host code.
-
-**The question this leaves.** Every Tier-3 resolver that cannot translate the whole expression tree
-writes the same small walk: descend the `and` chain, match `property eq literal`, read the column off
-the last `PropertyPathExpression` segment. That is a candidate for the package.
-
-**The argument against, and it is strong.** A helper whose job is to *pick out the parts it
-understands* blesses exactly the failure mode already queued as *Unsupported `$filter` constructs are
-silently dropped, widening the result set*: a resolver that ignores what it did not extract answers a
-`200` with more rows than the client asked for. If such a helper ships, it must **refuse** rather than
-return a partial map — i.e. it is not an "extract" helper at all, it is a *restricted-filter parser*,
-and its value is the refusal as much as the extraction.
-
-**To evaluate:** whether the refusing shape generalises (which constructs belong in the supported set —
-`eq` only? `eq`/`ne`/comparisons? `contains`?), whether it belongs beside `AbstractEntitySet` or as a
-trait, and whether the real answer is simply "document the walk" — which is what the page does today,
-and may be enough. An acceptable outcome is "no helper, and here is why".
-
-### [ ] `OP12` `cachedMetadataXMLPath()` is declared, implemented and read by nothing — **finish specifying**
-
-Surfaced 2026-09-17 in the docs SEO pass. The method sits on the public interface
-(`Service/Contracts/ODataServiceInterface.php:45`) and on `ODataService:82`, and no caller exists in
-the package or its tests: `$metadata` is serialized on every request. `metadata/metadata-document`
-and `services/defining-a-service` present it as a mechanism.
-
-**Decided 2026-09-21 (author): it gets implemented, not removed.** The target behaviour, sketched:
-
-> `odata:cache` produces, beside the Edm class tree, the **finished `$metadata` XML**, and the
-> serializer **streams that file**. The cold path is unchanged — nothing about a non-cached service
-> moves.
-
-That keeps the interface honest, removes a per-request serialization from the warm path, and is
-**additive: Minor or Patch, never a Major.**
-
-**Open before it can be built — this entry is a stub until then:**
-- **Where does the XML go for a pure OData project?** For a Core project the answer is settled:
-  `resources/ui5/Metadata.xml`, beside the app's other generated resources. A standalone OData
-  service has no such tree.
-- **That difference needs a lever** — an argument or an option on `odata:cache` (a target path, or a
-  mode that says "Core layout" vs "standalone"). Which of the two, and what the default is, is
-  unentschieden.
-- How `cachedMetadataXMLPath()` and the cache writer agree on the path (who owns it: the service, the
-  command, or config), and what happens when the file is missing or stale — fall back to
-  serialization silently, or fail loud? The house answer elsewhere is loud, but the warm path must not
-  break a deployment that forgot the command.
-
-Until those are settled, the two doc pages keep describing the mechanism (docs-are-the-spec); they
-must not describe the path or the command flag, because neither is decided.
-
-### [ ] `OP16` The announced `odata-error` trailer is not an HTTP trailer — it corrupts the body instead
-
-Surfaced 2026-09-17 in the docs SEO pass, decided 2026-09-21 (**Code bewegt sich; Minor**).
-While streaming, `ODataResponse::sendContent()` announces `trailer: odata-error` (`:33`). If a
-`ProtocolException` is raised mid-stream, `sendContentStreamed()` echoes
-`OData-error: {json}` **into the body** (`:46`), behind the bytes already sent. That is not a trailer
-field: a real trailer needs chunked transfer encoding and fields *after* the body. Two consequences
-for the client — the announced trailer never arrives, and the body is no longer valid JSON, so a
-strict parser fails on a response that looks successful by status code.
-
-**Fix (Minor, because the wire behaviour changes).** Either emit a genuine trailer — chunked encoding,
-the field sent after the last chunk, which PHP's output layer makes awkward but not impossible — or
-drop the `trailer` header and keep an honest in-body error marker that the docs describe as such. The
-decision belongs to whoever builds it; what must not survive is a header promising something that
-never comes.
-
-**This is one of the two pages that may name the defect.** `advanced/error-handling` and
-`advanced/configuration` describe the streaming error path **with its current flaw and its cure**, so
-that a consumer who hits a truncated body knows what they are looking at and that `odata.streaming =
-false` is the way around it today.
-
-**Narrowed 2026-10-07 (`OP06`).** `EntitySetHandler` now runs the query to the first row before the
-response is committed. An error *before* the first row (a refused filter, a SQL error) gets its own
-status code. What remains is an error *after* rows have gone out.
-
-### [ ] `OP29` The vocabulary generator has drifted from the committed classes — regenerate deliberately
+> **Built 2026-11-03** with `OP07`: regenerated in full, 4 new files, none orphaned, the diff reviewed by family.
 
 > **Decided 2026-11-02 (author): in the next major, with `OP07`** (its four rules). ~~The hand-written classes keep a
 > skip marker;~~ *(2026-11-03: no hand-written classes remain — `OP07` rule 4, a term without `AppliesTo` applies to
@@ -354,175 +588,6 @@ fixed now. What remains decides how a full regeneration has to be done:
 review the diff as a release of its own. Do it together with `OP07`, since both are the generator's
 value shapes. Minor if the defaults land, otherwise major. Feeds `OP32`: 357 of its level-5
 findings sit in the generated classes.
-
-### [ ] `OP30` Server-driven paging reaches neither navigation collections nor `$batch` parts
-
-Found 2026-10-07 while testing `OP05`. Server-driven paging is decided in the controller
-(`resolveMaxPageSize()`: `Prefer: odata.maxpagesize`, then `odata.pagination.default`, clamped to
-`.max`) and reaches the plan in exactly one place, the top-level entity-set plan
-(`QueryPlanner:141`). Two consequences:
-
-- **A navigation collection is never paged.** `Flights(1)/passengers` with
-  `Prefer: odata.maxpagesize=2` answers all rows at once, and `pagination.max` does not cap it.
-- **A `$batch` part is never paged.** `BatchHandler::dispatchInnerRequest()` builds its
-  `ODataRequest` without `maxPageSize`. Neither a part's own `Prefer` header (now parsed, see `OP27`)
-  nor the config reaches it, so `pagination.max` is no ceiling inside a batch.
-
-The second matters most, because **UI5 sends everything through `$batch`**. The cap a host sets in
-`pagination.max` does not hold for UI5 traffic today.
-
-**To decide before building.** Does UI5's V4 `ODataListBinding` cope with a server-driven page, i.e.
-does it follow `@odata.nextLink` or fail? It pages with `$skip`/`$top` itself, and under
-`$top` the engine does not page (`EntitySetHandler`), so a UI5 list request that carries `$top` is
-safe either way. A request without `$top` (a code list, `requestContexts(0, Infinity)`) would be cut
-at the default. That is why the code-list docs require `pagination.default` unset. Check with the
-probe in `acme` before switching it on.
-
-**Fix (once settled).** Resolve the page size per inner request (its own `Prefer`, then the config)
-and pass it into the navigation plans too. Probably a Minor, since server-visible behaviour changes
-for hosts that set `pagination.default`.
-
-### [ ] `OP32` PHPStan level 5 — collective ticket for what levels 2–5 find
-
-Found 2026-10-09, when the dev setup moved to Pest 5 (PHPUnit 13, Testbench 11) and
-`pest-plugin-phpstan` replaced the abandoned `peststan`. Core went to level 5 the same day
-(`core 3.0.1`). odata **stays at level 1** until the related tickets are closed and the blast radius
-is known. A trial run at level 5 (no baseline, `src` + `tests`):
-
-| Level | `src` | `tests` |
-|:--|--:|--:|
-| 1 (today) | 0 | 0 |
-| 2 | 72 | 209 |
-| 4 | 386 | 213 |
-| 5 | 395 | 218 |
-
-**Generated vocabularies — 357 of the 395 `src` findings.** They belong to the generator, not to the
-committed files.
-
-- **69 × `cast.string`** — `(string) $this->groupableProperties` on an array, which writes the string
-  `"Array"` into the CSDL. This is `OP07`, now counted exactly.
-- **288 × `return.unusedType`** — the template declares `?AnnotationValueInterface` for
-  `buildAnnotationValue()`, which never returns `null`. Harmless; noise from the template.
-
-**Hand-written `src` — 38 findings**, none that fails at runtime on the samples checked:
-
-- *Incomplete docblocks:* array shapes missing a key (`expand` in `QueryPlanner:697`, `operandCount`
-  in `FilterParser:377`), `$containerAnnotations` typed as `array{}` (`ODataService:209`).
-- *Interface cuts PHPStan cannot see:* `VirtualExpandResolverInterface::entityType()` /
-  `entitySetName()` (`ODataService:365–400`), `buildForCache()` on `ODataServiceInterface`
-  (`CacheCommand:80`).
-- *Dead code:* `is_string()` on property objects (`PropertyResolver:112/135`), `isset()` on keys
-  that always exist (`BatchHandler:250`), redundant `?->` before `??` (`ModelDiscovery`), checks that
-  are always true or false (`OData:148`, `CustomQueryOptions:45`, `ExpressionLexer:280`,
-  `FilterParser:603`, `VocabularyGenerator:503`), `?string` on three `getSourceClass()` that never
-  return `null`.
-- *Tool limits:* the visitor dispatch by `match` in `FilterExpression::accept()`, two `match` over a
-  regex-guarded string (`EloquentEntitySetResolver:515`, `SqlEntitySetResolver:206`).
-- **Two touch a signature** and need a look of their own before any edit:
-  `ODataResponse::sendContent()` / `sendContentBuffered()` (`static` against `$this`), and
-  `ProtocolException::toResponse($request = null)` against `Responsable::toResponse(Request)`.
-
-**Tests — 218 findings.** 187 are one pattern: `expect($expr)->toBeInstanceOf(X::class)` followed by
-`$expr->name`. A Pest expectation does not narrow the variable for PHPStan. Preferred cure: a small
-typed helper (`$call = narrow(FunctionCallExpression::class, $expr)`) that asserts at runtime and
-hands PHPStan the type — mechanical, ~180 sites, and keeps typos in tests visible. An ignore by path
-would be cheaper and hide exactly those typos.
-
-**Order.**
-1. `OP07` + `OP29` repair the generator; regenerate. The vocabulary findings go with it.
-2. Estimate the blast radius of the two signature findings.
-3. Fix the hand-written `src` findings and the tests, raise `phpstan.neon` to level 5, no baseline.
-
-**Done when** `composer analyse` is green at level 5. The `src` fixes are a patch, unless one of the
-two signature findings cannot be solved without a break.
-
-**Progress 2026-11-02** (with the next major). Measured again: level 5 finds 394 in `src` (356 in the generated
-vocabularies) and 223 in `tests`. **Neither signature finding needs a break:** `ODataResponse::sendContentBuffered()`
-returned the *error* response where `static` promised itself (now `$this`, the private helpers say `@return $this`),
-and `ProtocolException::toResponse()`'s docblock said `null` where it meant `Request|null`. **All 37 hand-written `src`
-findings are fixed**; one real catch among them: PHPStan assumed the lexer's `maybeExpression()` pure, so a second
-digit loop "could never run" — the `maybe…` methods are `@phpstan-impure` now. `FilterExpression::accept()` dispatches by
-`instanceof`, `CacheCommand` narrows to `ODataService`, the bindings' `getSourceClass()` return `string`.
-
-**Left, and why it is not in the major:**
-- **The generated vocabularies (356)** — step 1, `OP07` + `OP29`, the generator's own release.
-- **The tests (223)** — the `narrow()` helper, mechanical, no break; any minor.
-- **One type debt, ignored in `phpstan.neon` with its reason:** `PropertyPathExpression::$segments` says resolved
-  properties, but the filter parser puts strings there until `PropertyResolver` resolves them. The honest fix is a
-  type for an unresolved path; it touches every driver that reads segments.
-
-`phpstan.neon` stays at level 1 until those are done; `src` alone is green at 5 today
-(`vendor/bin/phpstan analyse --level=5 src`, vocabularies aside).
-
-### [ ] `OP37` `$batch` drops a part it cannot read — no response, and the client blames the request after it — found 2026-10-25
-
-`Protocol/Execution/BatchHandler::parseMultipartParts()` reads the top level of a `multipart/mixed` body. A part it does
-not recognise as a request line — a nested change set (`Content-Type: multipart/mixed; boundary=changeset_…`), a part
-without headers, an empty message, a method outside the regex — is skipped with `continue`, and the response carries one
-part fewer than the request. UI5's `_Requestor` pairs responses with requests by position: the first request without a
-response is rejected with *"HTTP request was not processed because the previous request failed"*, and so is every one
-after it. The `$batch` in the network panel looks healthy — every response that came back is a 200 — so the cause hides.
-Met in the SDK's Partners smoke on 2026-10-25 while chasing another cause (an undeployed database); the shape is real
-regardless.
-
-**Fix (direction):** answer **every** part. A part that cannot be parsed gets its own error response in its position
-(`400`, an OData error body naming what was wrong); a change set on this read-only engine gets one `400`/`405` response
-for the set as a whole, as the protocol pairs a change set with one response. The JSON `$batch` path validates already
-and fails the whole batch loudly; the multipart path should at least keep the positions. **Test:** a body with a GET, an
-unparseable part and a GET answers three parts, the middle one an error.
-
-**Target:** Patch (a fix; a client that worked keeps working, one that tripped gets an honest answer).
-
-### [ ] `OP42` A constant inside a nested collection is dropped from `$metadata` — found 2026-11-03
-
-`CsdlSerializer::appendAnnotationValueAsChild()` writes the items of a collection that stands **inside** another
-collection. It knows records and collections; a constant item falls through both branches and is left out without a
-word. `<Collection><Collection><String>a</String></Collection></Collection>` goes out as
-`<Collection><Collection/></Collection>`. The top-level path (`appendAnnotationValue()`) handles constant items as typed
-child elements (`<String>a</String>`, `<Bool>true</Bool>`); the nested path does not.
-
-No vocabulary term produces the shape: no term or record field in the catalog is typed `Collection(Collection(…))`, so
-the generated classes never reach it. It affects an annotation built by hand. Found while building `OP07` step 6.
-
-**Fix (direction):** one writer for collection items at every depth — the constant branch of `appendAnnotationValue()`
-(kind → element name through `KIND_TO_XML_ATTR`, lexical form through `constantLexical()`) used by the nested path too.
-**Test:** a collection holding a collection of a `String` and a `Bool` serializes both items.
-
-**Target:** Patch.
-
-### [ ] `OP43` Annotations, records and terms cannot carry annotations themselves — found 2026-11-03
-
-CSDL lets an annotation be annotated (§14.2: *"An `edm:Annotation` element MAY contain `edm:Annotation` elements that
-annotate the annotation"*), and a record and its property values too (§14.4.10: `edm:Record` and `edm:PropertyValue`
-each *"MAY contain `edm:Annotation` elements"*).
-The vocabularies use it: 44 `AppliesTo` values in the catalog name `Annotation`, `Record`, `PropertyValue` or `Term` —
-`UI.Importance` and `UI.PartOfPreview` on a `DataField` record of a `LineItem`, `UI.Criticality` on an annotation,
-`Validation.Exclusive` on a `Validation.Minimum`, `Common.ValueListShowValuesImmediately` on a `Common.ValueList`.
-
-Our model has no place for them: `Annotation`, `RecordAnnotationValue` and `PropertyValue` implement no
-`HasAnnotations`, and `CsdlSerializer` writes no annotation below an annotation or record. The generator lists these
-terms with an empty attribute target (`AppliesTo` without a PHP target, see `OP07`), so they exist as classes but cannot
-reach `$metadata`.
-
-`Term` is a different case: annotating a term is the work of a vocabulary's author, and the engine declares no terms of
-its own. That part stays out.
-
-**Fix (direction):** annotations on `Annotation`, `RecordAnnotationValue` and `PropertyValue` (an optional list, as
-`HasAnnotations` gives the model elements), written by `CsdlSerializer` and carried through `odata:cache` (`EdmxWriter`).
-The declaring side follows the value classes of `OP07`: an `AbstractRecord` takes its annotations as a constructor
-argument (`new DataField(value: …, annotations: [new Importance(ImportanceType::High)])`) — the name must not collide
-with a record field, which the generator can check as it does for `Qualifier`. Settle the shape before building; it is
-an addition, so a minor.
-
-**Target:** Minor.
-
----
-
-## Done
-
-Shipped items live in [`CHANGELOG.md`](./CHANGELOG.md) under their version. This
-section keeps the roadmap-level breadcrumb — the *why it was queued* — for items
-that passed through Pending.
 
 ### [x] `OP33` Stale "next slice" comments on the read forward-exit — from SDK `OP09`, 2026-10-09
 

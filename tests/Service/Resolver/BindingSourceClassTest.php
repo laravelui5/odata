@@ -7,6 +7,7 @@ use LaravelUi5\OData\Service\Resolver\CustomBinding;
 use LaravelUi5\OData\Service\Resolver\EloquentBinding;
 use LaravelUi5\OData\Service\Resolver\SqlBinding;
 use LaravelUi5\OData\Service\Resolver\SqlSourceBinding;
+use LaravelUi5\OData\Driver\Sql\SqlEntitySetResolver;
 
 /**
  * `ResolverBindingInterface::getSourceClass()` — the authored class-string a consumer
@@ -21,13 +22,13 @@ it('returns the Eloquent model for a discoverModel binding', function () {
 });
 
 it('returns the resolver class for a custom binding', function () {
-    $binding = new CustomBinding('App\\OData\\BillableProjects');
-    expect($binding->getSourceClass())->toBe('App\\OData\\BillableProjects');
+    $binding = new CustomBinding(SqlEntitySetResolver::class);
+    expect($binding->getSourceClass())->toBe(SqlEntitySetResolver::class);
 });
 
 it('returns the source class for a source binding', function () {
-    $binding = new SqlSourceBinding('App\\OData\\PartnerColleagues');
-    expect($binding->getSourceClass())->toBe('App\\OData\\PartnerColleagues');
+    $binding = new SqlSourceBinding(SqlBinding::class);
+    expect($binding->getSourceClass())->toBe(SqlBinding::class);
 });
 
 it('returns null for a raw table binding (no authored class)', function () {

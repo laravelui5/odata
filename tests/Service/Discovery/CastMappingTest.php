@@ -7,6 +7,8 @@ use LaravelUi5\OData\Edm\EdmPrimitiveType;
 use LaravelUi5\OData\Service\Builder\EdmBuilder;
 use LaravelUi5\OData\Service\Discovery\ModelDiscovery;
 use LaravelUi5\OData\Tests\TestCase;
+use LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface;
+use function LaravelUi5\OData\Tests\narrow;
 
 uses(TestCase::class);
 
@@ -31,8 +33,9 @@ function castMappingType(string $column): EdmPrimitiveType
     $builder = (new EdmBuilder())->namespace('Test.Ns');
     $discovery->apply($builder, 'Test.Ns');
 
-    return $builder->build()->getSchema('Test.Ns')->getEntityTypes()[0]
-        ->getProperty($column)->getType()->getPrimitiveType();
+    $type = $builder->build()->getSchema('Test.Ns')->getEntityTypes()[0]->getProperty($column)->getType();
+
+    return narrow(PrimitiveTypeInterface::class, $type)->getPrimitiveType();
 }
 
 // OP17: an immutable_date is a pure date, like `date` — not a DateTimeOffset.

@@ -11,6 +11,9 @@ use LaravelUi5\OData\Fixtures\Models\Flight;
 use LaravelUi5\OData\Service\Builder\EdmBuilder;
 use LaravelUi5\OData\Service\Discovery\ModelDiscovery;
 use LaravelUi5\OData\Tests\TestCase;
+use LaravelUi5\OData\Edm\Contracts\Annotation\ConstantAnnotationValueInterface;
+use LaravelUi5\OData\Edm\Contracts\Annotation\CollectionAnnotationValueInterface;
+use function LaravelUi5\OData\Tests\narrow;
 
 /**
  * Tests that PHP vocabulary attributes (#[Description], #[Hidden], #[Label],
@@ -48,7 +51,7 @@ describe('Annotation discovery → entity type', function () {
         expect($annotation)->not->toBeNull()
             ->and($annotation)->toBeInstanceOf(AnnotationInterface::class)
             ->and($annotation->getValue())->toBeInstanceOf(ConstantAnnotationValue::class)
-            ->and($annotation->getValue()->getValue())->toBe('An airport with IATA code');
+            ->and(narrow(ConstantAnnotationValueInterface::class, $annotation->getValue())->getValue())->toBe('An airport with IATA code');
     });
 
     it('discovers class-level SelectionFields annotation', function () {
@@ -58,11 +61,11 @@ describe('Annotation discovery → entity type', function () {
 
         expect($annotation)->not->toBeNull()
             ->and($annotation->getValue())->toBeInstanceOf(CollectionAnnotationValue::class)
-            ->and($annotation->getValue()->count())->toBe(2);
+            ->and(narrow(CollectionAnnotationValueInterface::class, $annotation->getValue())->count())->toBe(2);
 
-        $items = $annotation->getValue()->getItems();
-        expect($items[0]->getValue())->toBe('code')
-            ->and($items[1]->getValue())->toBe('name');
+        $items = narrow(CollectionAnnotationValueInterface::class, $annotation->getValue())->getItems();
+        expect(narrow(ConstantAnnotationValueInterface::class, $items[0])->getValue())->toBe('code')
+            ->and(narrow(ConstantAnnotationValueInterface::class, $items[1])->getValue())->toBe('name');
     });
 
     it('discovers class-level LineItem annotation', function () {
@@ -72,7 +75,7 @@ describe('Annotation discovery → entity type', function () {
 
         expect($annotation)->not->toBeNull()
             ->and($annotation->getValue())->toBeInstanceOf(CollectionAnnotationValue::class)
-            ->and($annotation->getValue()->count())->toBe(2);
+            ->and(narrow(CollectionAnnotationValueInterface::class, $annotation->getValue())->count())->toBe(2);
     });
 
     it('discovers multiple class-level annotations', function () {
@@ -94,7 +97,7 @@ describe('Annotation discovery → properties', function () {
 
         expect($annotation)->not->toBeNull()
             ->and($annotation->getValue())->toBeInstanceOf(ConstantAnnotationValue::class)
-            ->and($annotation->getValue()->getValue())->toBe('IATA Code');
+            ->and(narrow(ConstantAnnotationValueInterface::class, $annotation->getValue())->getValue())->toBe('IATA Code');
     });
 
     it('discovers Description annotation on a property', function () {
@@ -104,7 +107,7 @@ describe('Annotation discovery → properties', function () {
         $annotation = $codeProp->getAnnotation('Org.OData.Core.V1.Description');
 
         expect($annotation)->not->toBeNull()
-            ->and($annotation->getValue()->getValue())->toBe('The IATA airport code');
+            ->and(narrow(ConstantAnnotationValueInterface::class, $annotation?->getValue())->getValue())->toBe('The IATA airport code');
     });
 
     it('discovers multiple annotations on a single property', function () {

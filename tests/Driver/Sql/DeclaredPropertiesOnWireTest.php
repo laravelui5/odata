@@ -22,6 +22,7 @@ use LaravelUi5\OData\Service\Contracts\QueryPlanInterface;
 use LaravelUi5\OData\Service\Contracts\VirtualExpandResolverInterface;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataEntity;
 use LaravelUi5\OData\Tests\TestCase;
+use function LaravelUi5\OData\Tests\testCase;
 
 /*
  * OP36, widened to a rule (2026-11-02): the Eloquent path emits exactly the declared properties, at every level.
@@ -165,7 +166,7 @@ beforeEach(function () {
 
 function wireGet(string $url): array
 {
-    $response = test()->get($url);
+    $response = testCase()->get($url);
     $response->assertStatus(200);
 
     return json_decode($response->streamedContent(), true);

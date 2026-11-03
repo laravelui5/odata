@@ -20,6 +20,8 @@ use LaravelUi5\OData\Service\Resolver\SqlBinding;
 use LaravelUi5\OData\Service\Resolver\SqlSourceBinding;
 use LaravelUi5\OData\Tests\TestCase;
 
+use function LaravelUi5\OData\Tests\narrow;
+
 uses(TestCase::class);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -61,7 +63,7 @@ describe('EloquentBinding', function () {
         $binding = new EloquentBinding(Flight::class);
         $resolver = $binding->createResolver();
 
-        expect($resolver)->toBeInstanceOf(EloquentEntitySetResolver::class);
+        $resolver = narrow(EloquentEntitySetResolver::class, $resolver);
     });
 
     it('stores the model class', function () {
@@ -76,7 +78,7 @@ describe('SqlBinding', function () {
         $binding = new SqlBinding('my_view');
         $resolver = $binding->createResolver();
 
-        expect($resolver)->toBeInstanceOf(SqlEntitySetResolver::class);
+        $resolver = narrow(SqlEntitySetResolver::class, $resolver);
     });
 
     it('stores table and connection', function () {
@@ -95,9 +97,9 @@ describe('SqlBinding', function () {
 
 describe('SqlSourceBinding', function () {
     it('stores the source class', function () {
-        $binding = new SqlSourceBinding('App\\Sources\\MySource');
+        $binding = new SqlSourceBinding(SqlBinding::class);
 
-        expect($binding->sourceClass)->toBe('App\\Sources\\MySource');
+        expect($binding->sourceClass)->toBe(SqlBinding::class);
     });
 
     it('creates a SqlEntitySetResolver', function () {
@@ -107,7 +109,7 @@ describe('SqlSourceBinding', function () {
         $binding = new SqlSourceBinding(TestEntitySetSource::class);
         $resolver = $binding->createResolver();
 
-        expect($resolver)->toBeInstanceOf(SqlEntitySetResolver::class);
+        $resolver = narrow(SqlEntitySetResolver::class, $resolver);
     });
 });
 
@@ -124,7 +126,7 @@ describe('ResolverMapBuilder', function () {
 
         expect($bindings)->toHaveKey('Flights')
             ->and($bindings['Flights'])->toBeInstanceOf(EloquentBinding::class)
-            ->and($bindings['Flights']->modelClass)->toBe(Flight::class);
+            ->and(narrow(EloquentBinding::class, $bindings['Flights'])->modelClass)->toBe(Flight::class);
     });
 
     it('registers sql bindings by entity set', function () {
@@ -137,8 +139,8 @@ describe('ResolverMapBuilder', function () {
 
         expect($bindings)->toHaveKey('ValueHelp')
             ->and($bindings['ValueHelp'])->toBeInstanceOf(SqlBinding::class)
-            ->and($bindings['ValueHelp']->table)->toBe('value_help_view')
-            ->and($bindings['ValueHelp']->connection)->toBe('reporting');
+            ->and(narrow(SqlBinding::class, $bindings['ValueHelp'])->table)->toBe('value_help_view')
+            ->and(narrow(SqlBinding::class, $bindings['ValueHelp'])->connection)->toBe('reporting');
     });
 
     it('registers sql source bindings by entity set', function () {
@@ -151,7 +153,7 @@ describe('ResolverMapBuilder', function () {
 
         expect($bindings)->toHaveKey('ValueHelp')
             ->and($bindings['ValueHelp'])->toBeInstanceOf(SqlSourceBinding::class)
-            ->and($bindings['ValueHelp']->sourceClass)->toBe(TestEntitySetSource::class);
+            ->and(narrow(SqlSourceBinding::class, $bindings['ValueHelp'])->sourceClass)->toBe(TestEntitySetSource::class);
     });
 
     it('builds a frozen ResolverMap', function () {

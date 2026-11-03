@@ -138,7 +138,7 @@ describe('CsdlSerializer::serialize', function () {
         it('emits a Reference element with Uri and Include', function () {
             $include = new class implements \LaravelUi5\OData\Edm\Contracts\IncludedSchemaInterface {
                 public function getNamespace(): string { return 'Org.OData.Core.V1'; }
-                public function getAlias(): ?string { return 'Core'; }
+                public function getAlias(): string { return 'Core'; }
             };
             $reference = new class ($include) implements \LaravelUi5\OData\Edm\Contracts\ReferenceInterface {
                 public function __construct(private object $include) {}

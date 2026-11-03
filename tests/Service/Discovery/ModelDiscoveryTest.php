@@ -16,6 +16,9 @@ use LaravelUi5\OData\Service\Discovery\Attributes\ODataEntity;
 use LaravelUi5\OData\Service\Discovery\ModelDiscovery;
 use LaravelUi5\OData\Tests\TestCase;
 
+use function LaravelUi5\OData\Tests\narrow;
+use LaravelUi5\OData\Edm\Contracts\Type\PrimitiveTypeInterface;
+
 uses(TestCase::class);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,7 +77,7 @@ describe('ModelDiscovery → type mapping', function () {
         $idProp = $flightType->getProperty('id');
 
         expect($idProp->getType())->toBeInstanceOf(PrimitiveType::class)
-            ->and($idProp->getType()->getPrimitiveType())->toBe(EdmPrimitiveType::Int32);
+            ->and(narrow(PrimitiveTypeInterface::class, $idProp->getType())->getPrimitiveType())->toBe(EdmPrimitiveType::Int32);
     });
 
     it('maps string column to String', function () {
@@ -82,7 +85,7 @@ describe('ModelDiscovery → type mapping', function () {
         $flightType = $edmx->getSchemas()['Test.Ns']->getEntityTypes()[0];
         $originProp = $flightType->getProperty('origin');
 
-        expect($originProp->getType()->getPrimitiveType())->toBe(EdmPrimitiveType::String);
+        expect(narrow(PrimitiveTypeInterface::class, $originProp->getType())->getPrimitiveType())->toBe(EdmPrimitiveType::String);
     });
 
     it('casts override DB type (float cast on duration)', function () {
@@ -90,7 +93,7 @@ describe('ModelDiscovery → type mapping', function () {
         $flightType = $edmx->getSchemas()['Test.Ns']->getEntityTypes()[0];
         $durationProp = $flightType->getProperty('duration');
 
-        expect($durationProp->getType()->getPrimitiveType())->toBe(EdmPrimitiveType::Double);
+        expect(narrow(PrimitiveTypeInterface::class, $durationProp->getType())->getPrimitiveType())->toBe(EdmPrimitiveType::Double);
     });
 
     it('casts integer override maps to Int32', function () {
@@ -98,7 +101,7 @@ describe('ModelDiscovery → type mapping', function () {
         $passengerType = $edmx->getSchemas()['Test.Ns']->getEntityTypes()[0];
         $flightIdProp = $passengerType->getProperty('flight_id');
 
-        expect($flightIdProp->getType()->getPrimitiveType())->toBe(EdmPrimitiveType::Int32);
+        expect(narrow(PrimitiveTypeInterface::class, $flightIdProp->getType())->getPrimitiveType())->toBe(EdmPrimitiveType::Int32);
     });
 
     it('casts boolean maps to Boolean', function () {
@@ -106,7 +109,7 @@ describe('ModelDiscovery → type mapping', function () {
         $passengerType = $edmx->getSchemas()['Test.Ns']->getEntityTypes()[0];
         $chipsProp = $passengerType->getProperty('chips');
 
-        expect($chipsProp->getType()->getPrimitiveType())->toBe(EdmPrimitiveType::Boolean);
+        expect(narrow(PrimitiveTypeInterface::class, $chipsProp->getType())->getPrimitiveType())->toBe(EdmPrimitiveType::Boolean);
     });
 
     it('casts datetime with format maps to DateTimeOffset', function () {
@@ -114,7 +117,7 @@ describe('ModelDiscovery → type mapping', function () {
         $passengerType = $edmx->getSchemas()['Test.Ns']->getEntityTypes()[0];
         $openTimeProp = $passengerType->getProperty('open_time');
 
-        expect($openTimeProp->getType()->getPrimitiveType())->toBe(EdmPrimitiveType::DateTimeOffset);
+        expect(narrow(PrimitiveTypeInterface::class, $openTimeProp->getType())->getPrimitiveType())->toBe(EdmPrimitiveType::DateTimeOffset);
     });
 
     // Regression: before 2026-08-28 discovery instantiated models with
@@ -127,12 +130,12 @@ describe('ModelDiscovery → type mapping', function () {
         $crew = $edmx->getSchemas()['Test.Ns']->getEntityTypes()[0];
 
         // boolean() is tinyint on SQLite and MySQL — Int32 without the cast
-        expect($crew->getProperty('on_duty')->getType()->getPrimitiveType())
+        expect(narrow(PrimitiveTypeInterface::class, $crew->getProperty('on_duty')->getType())->getPrimitiveType())
             ->toBe(EdmPrimitiveType::Boolean)
             // varchar columns — String without the cast
-            ->and($crew->getProperty('rank')->getType()->getPrimitiveType())
+            ->and(narrow(PrimitiveTypeInterface::class, $crew->getProperty('rank')->getType())->getPrimitiveType())
             ->toBe(EdmPrimitiveType::Int32)
-            ->and($crew->getProperty('hired_at')->getType()->getPrimitiveType())
+            ->and(narrow(PrimitiveTypeInterface::class, $crew->getProperty('hired_at')->getType())->getPrimitiveType())
             ->toBe(EdmPrimitiveType::DateTimeOffset);
     });
 
@@ -141,7 +144,7 @@ describe('ModelDiscovery → type mapping', function () {
         $passengerType = $edmx->getSchemas()['Test.Ns']->getEntityTypes()[0];
         $emailsProp = $passengerType->getProperty('emails');
 
-        expect($emailsProp->getType()->getPrimitiveType())->toBe(EdmPrimitiveType::String);
+        expect(narrow(PrimitiveTypeInterface::class, $emailsProp->getType())->getPrimitiveType())->toBe(EdmPrimitiveType::String);
     });
 });
 
@@ -265,7 +268,7 @@ describe('ODataService → discoverModel integration', function () {
             ->and($container->getEntitySet('Passengers'))->not->toBeNull();
 
         $flightResolver = $schema->getResolver($container->getEntitySet('Flights'));
-        expect($flightResolver)->toBeInstanceOf(EloquentEntitySetResolver::class);
+        $flightResolver = narrow(EloquentEntitySetResolver::class, $flightResolver);
     });
 
     it('coexists with manually defined entity types', function () {

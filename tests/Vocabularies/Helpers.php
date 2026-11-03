@@ -23,6 +23,8 @@ use RecursiveIteratorIterator;
 use ReflectionClass;
 use UnexpectedValueException;
 
+use function LaravelUi5\OData\Tests\narrow;
+
 /*
  * Helpers for the vocabulary tests: a one-type service to put annotations into $metadata, and the OASIS schema check.
  */
@@ -76,23 +78,6 @@ function csdlSchemaErrors(string $xml): array
     libxml_use_internal_errors($previous);
 
     return $errors;
-}
-
-/**
- * `$value` as an instance of `$class`, or a failed test: asserts at runtime and tells PHPStan the type, which a Pest
- * expectation does not (OP32).
- *
- * @template T of object
- * @param class-string<T> $class
- * @return T
- */
-function narrow(string $class, mixed $value): object
-{
-    if (!$value instanceof $class) {
-        throw new UnexpectedValueException(sprintf('Expected %s, got %s.', $class, get_debug_type($value)));
-    }
-
-    return $value;
 }
 
 /**

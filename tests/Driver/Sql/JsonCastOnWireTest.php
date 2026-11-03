@@ -12,6 +12,7 @@ use LaravelUi5\OData\Service\Contracts\ODataServiceInterface;
 use LaravelUi5\OData\Service\Contracts\ODataServiceRegistryInterface;
 use LaravelUi5\OData\Service\Discovery\Attributes\ODataEntity;
 use LaravelUi5\OData\Tests\TestCase;
+use function LaravelUi5\OData\Tests\testCase;
 
 /*
  * OP39 (2026-11-02): discovery declares an array/json/object/collection cast as Edm.String, and the wire carries that
@@ -90,14 +91,14 @@ beforeEach(function () {
 
 function jsonGet(string $url): array
 {
-    $response = test()->get($url);
+    $response = testCase()->get($url);
     $response->assertStatus(200);
 
     return json_decode($response->streamedContent(), true);
 }
 
 it('declares the casts as Edm.String', function () {
-    $xml = test()->get('/odata/$metadata')->streamedContent();
+    $xml = testCase()->get('/odata/$metadata')->streamedContent();
 
     foreach (['input', 'options', 'tags', 'extra', 'raw'] as $name) {
         expect($xml)->toContain('<Property Name="' . $name . '" Type="Edm.String"');

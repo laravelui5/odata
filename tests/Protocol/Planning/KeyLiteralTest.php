@@ -11,10 +11,13 @@ use LaravelUi5\OData\Edm\Type\EntityType;
 use LaravelUi5\OData\Edm\Type\PrimitiveType;
 use LaravelUi5\OData\Exception\BadRequestException;
 use LaravelUi5\OData\Http\ODataRequest;
+use LaravelUi5\OData\Protocol\Planning\EntityQueryPlan;
 use LaravelUi5\OData\Protocol\Planning\QueryPlanner;
 use LaravelUi5\OData\Service\Builder\EdmBuilder;
 use LaravelUi5\OData\Service\Contracts\EntitySetResolverInterface;
 use LaravelUi5\OData\Service\Contracts\RuntimeSchemaInterface;
+
+use function LaravelUi5\OData\Tests\narrow;
 
 /*
  * OP14: a key literal is validated against the key's type. A blind cast turned
@@ -67,6 +70,7 @@ function keyOf(string $path): array
 {
     $plan = (new QueryPlanner())->plan(new ODataRequest($path), keyLiteralSchema());
 
+    $plan = narrow(EntityQueryPlan::class, $plan);
     return array_map(fn ($literal) => $literal->value, $plan->key->values);
 }
 

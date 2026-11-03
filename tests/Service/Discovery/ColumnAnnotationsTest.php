@@ -18,6 +18,8 @@ use LaravelUi5\OData\Tests\TestCase;
 use LaravelUi5\OData\Vocabularies\Common\V1\Label;
 use LaravelUi5\OData\Vocabularies\Core\V1\Description;
 use LaravelUi5\OData\Vocabularies\Core\V1\IsLanguageDependent;
+use LaravelUi5\OData\Edm\Contracts\Annotation\ConstantAnnotationValueInterface;
+use function LaravelUi5\OData\Tests\narrow;
 
 /*
  * OP35 + OP38 (2026-11-02): a discovered column is annotated on the model's class with #[ODataAnnotate], or across
@@ -91,7 +93,8 @@ function columnTerms(EntityTypeInterface $type, string $column): array
     $terms = [];
     foreach ($type->getProperty($column)->getAnnotations() as $annotation) {
         $key         = $annotation->getTerm() . ($annotation->getQualifier() !== null ? '#' . $annotation->getQualifier() : '');
-        $terms[$key] = $annotation->getValue()?->getValue();
+        $value       = $annotation->getValue();
+        $terms[$key] = $value === null ? null : narrow(ConstantAnnotationValueInterface::class, $value)->getValue();
     }
 
     return $terms;

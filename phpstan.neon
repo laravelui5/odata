@@ -4,7 +4,7 @@ includes:
     - vendor/phpstan/phpstan-mockery/extension.neon
 
 parameters:
-    level: 1
+    level: 5
     paths:
         - src
         - tests
@@ -14,8 +14,13 @@ parameters:
         -
             identifier: pest.expectation.redundant
             path: tests/*
+        # The same kind of guard written without Pest: is_subclass_of() on two interfaces whose relation PHPStan
+        # already knows. Kept because it fails the day someone cuts the interface hierarchy.
+        -
+            identifier: function.alreadyNarrowedType
+            path: tests/Service/Contracts/SqlQueryInterfaceTest.php
         # The filter parser leaves path segments as strings until PropertyResolver resolves them; the segment type
-        # (PropertyPathExpression::$segments) does not say so yet. Seen from level 4 up (OP32).
+        # (PropertyPathExpression::$segments) does not say so yet. Seen from level 4 up; the fix is OP45.
         -
             identifier: function.impossibleType
             path: src/Protocol/Parser/PropertyResolver.php

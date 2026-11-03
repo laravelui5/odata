@@ -14,5 +14,6 @@ declare(strict_types=1);
  * base class and require no uses() call at all.
  */
 
+require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Protocol/Parser/Helpers.php';
 require_once __DIR__ . '/Vocabularies/Helpers.php';

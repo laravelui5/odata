@@ -27,6 +27,8 @@ use LaravelUi5\OData\Service\Builder\EdmBuilder;
 use LaravelUi5\OData\Service\Contracts\EntitySetResolverInterface;
 use LaravelUi5\OData\Service\Contracts\RuntimeSchemaInterface;
 
+use function LaravelUi5\OData\Tests\narrow;
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /**
@@ -91,62 +93,68 @@ describe('QueryPlanner', function () {
 
     it('returns ServiceDocumentQueryPlan for empty path', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest(''), plannerSchema());
-        expect($plan)->toBeInstanceOf(ServiceDocumentQueryPlan::class);
-        expect($plan->edmx)->toBeInstanceOf(EdmxInterface::class);
+        $plan = narrow(ServiceDocumentQueryPlan::class, $plan);
+        $edmx = narrow(EdmxInterface::class, $plan->edmx);
     });
 
     it('returns ServiceDocumentQueryPlan for root slash', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/'), plannerSchema());
-        expect($plan)->toBeInstanceOf(ServiceDocumentQueryPlan::class);
+        $plan = narrow(ServiceDocumentQueryPlan::class, $plan);
     });
 
     it('returns MetadataQueryPlan for $metadata', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/$metadata'), plannerSchema());
-        expect($plan)->toBeInstanceOf(MetadataQueryPlan::class);
-        expect($plan->edmx)->toBeInstanceOf(EdmxInterface::class);
+        $plan = narrow(MetadataQueryPlan::class, $plan);
+        $edmx = narrow(EdmxInterface::class, $plan->edmx);
     });
 
     it('carries the same EdmxInterface instance in MetadataQueryPlan', function () {
         $schema = plannerSchema();
         $plan   = (new QueryPlanner)->plan(new ODataRequest('/$metadata'), $schema);
+        $plan = narrow(MetadataQueryPlan::class, $plan);
         expect($plan->edmx)->toBe($schema->getEdmx());
     });
 
     it('returns BatchQueryPlan for $batch', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/$batch'), plannerSchema());
-        expect($plan)->toBeInstanceOf(BatchQueryPlan::class);
+        $plan = narrow(BatchQueryPlan::class, $plan);
     });
 
     // ---- entity set collection -----------------------------------------------
 
     it('returns EntitySetQueryPlan for a known entity set', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/Products'), plannerSchema());
-        expect($plan)->toBeInstanceOf(EntitySetQueryPlan::class);
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
     });
 
     it('resolves the correct EntitySetInterface on EntitySetQueryPlan', function () {
         $schema = plannerSchema();
         $plan   = (new QueryPlanner)->plan(new ODataRequest('/Products'), $schema);
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->target->getName())->toBe('Products');
     });
 
     it('defaults to null filter on EntitySetQueryPlan', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/Products'), plannerSchema());
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->filter)->toBeNull();
     });
 
     it('defaults to empty select (select-all) on EntitySetQueryPlan', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/Products'), plannerSchema());
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->select->isSelectAll())->toBeTrue();
     });
 
     it('defaults to empty orderby on EntitySetQueryPlan', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/Products'), plannerSchema());
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->orderBy->isEmpty())->toBeTrue();
     });
 
     it('defaults top and skip to null', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/Products'), plannerSchema());
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->top)->toBeNull();
         expect($plan->skip)->toBeNull();
     });
@@ -155,11 +163,12 @@ describe('QueryPlanner', function () {
 
     it('returns EntityQueryPlan for entity set with positional key', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/Products(1)'), plannerSchema());
-        expect($plan)->toBeInstanceOf(EntityQueryPlan::class);
+        $plan = narrow(EntityQueryPlan::class, $plan);
     });
 
     it('builds correct KeyExpression for single positional key', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/Products(42)'), plannerSchema());
+        $plan = narrow(EntityQueryPlan::class, $plan);
         expect($plan->key->isSingleKey())->toBeTrue();
         expect($plan->key->values['id']->value)->toBe(42);
         expect($plan->key->values['id']->edmType)->toBe('Edm.Int32');
@@ -167,6 +176,7 @@ describe('QueryPlanner', function () {
 
     it('builds correct KeyExpression for named key', function () {
         $plan = (new QueryPlanner)->plan(new ODataRequest('/Products(id=7)'), plannerSchema());
+        $plan = narrow(EntityQueryPlan::class, $plan);
         expect($plan->key->values['id']->value)->toBe(7);
         expect($plan->key->values['id']->edmType)->toBe('Edm.Int32');
     });
@@ -179,13 +189,15 @@ describe('QueryPlanner', function () {
             plannerSchema()
         );
 
-        expect($plan->filter)->toBeInstanceOf(BinaryExpression::class);
-        expect($plan->filter->operator)->toBe(BinaryOperator::Eq);
-        expect($plan->filter->left)->toBeInstanceOf(PropertyPathExpression::class);
-        expect($plan->filter->left->segments[0]->getName())->toBe('id');
-        expect($plan->filter->right)->toBeInstanceOf(LiteralExpression::class);
-        expect($plan->filter->right->value)->toBe(42);
-        expect($plan->filter->right->edmType)->toBe('Edm.Int32');
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
+        $filter = narrow(BinaryExpression::class, $plan->filter);
+        expect($filter->operator)->toBe(BinaryOperator::Eq);
+        $left = narrow(PropertyPathExpression::class, $filter->left);
+        expect($left->segments[0]->getName())->toBe('id');
+        $right = narrow(LiteralExpression::class, $filter->right);
+        $right2 = narrow(LiteralExpression::class, $filter->right);
+        expect($right2->value)->toBe(42);
+        expect($right2->edmType)->toBe('Edm.Int32');
     });
 
     it('infers literal Edm type from the compared property', function () {
@@ -194,8 +206,11 @@ describe('QueryPlanner', function () {
             plannerSchema()
         );
 
-        expect($plan->filter->right->edmType)->toBe('Edm.String');
-        expect($plan->filter->right->value)->toBe('Widget');
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
+        $filter = narrow(BinaryExpression::class, $plan->filter);
+        $right = narrow(LiteralExpression::class, $filter->right);
+        expect($right->edmType)->toBe('Edm.String');
+        expect($right->value)->toBe('Widget');
     });
 
     // ---- $select -------------------------------------------------------------
@@ -206,11 +221,12 @@ describe('QueryPlanner', function () {
             plannerSchema()
         );
 
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->select->isSelectAll())->toBeFalse();
         expect($plan->select->items)->toHaveCount(2);
-        expect($plan->select->items[0])->toBeInstanceOf(PropertySelectItem::class);
-        expect($plan->select->items[0]->property->getName())->toBe('name');
-        expect($plan->select->items[1]->property->getName())->toBe('code');
+        $item0 = narrow(PropertySelectItem::class, $plan->select->items[0]);
+        expect($item0->property->getName())->toBe('name');
+        expect(narrow(PropertySelectItem::class, $plan->select->items[1])->property->getName())->toBe('code');
     });
 
     // ---- $orderby ------------------------------------------------------------
@@ -221,10 +237,11 @@ describe('QueryPlanner', function () {
             plannerSchema()
         );
 
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->orderBy->isEmpty())->toBeFalse();
         expect($plan->orderBy->items[0]->direction)->toBe(OrderDirection::Asc);
-        expect($plan->orderBy->items[0]->expression)->toBeInstanceOf(PropertyPathExpression::class);
-        expect($plan->orderBy->items[0]->expression->segments[0]->getName())->toBe('name');
+        $expression = narrow(PropertyPathExpression::class, $plan->orderBy->items[0]->expression);
+        expect($expression->segments[0]->getName())->toBe('name');
     });
 
     it('defaults to Asc when direction is omitted from $orderby', function () {
@@ -233,6 +250,7 @@ describe('QueryPlanner', function () {
             plannerSchema()
         );
 
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->orderBy->items[0]->direction)->toBe(OrderDirection::Asc);
     });
 
@@ -242,6 +260,7 @@ describe('QueryPlanner', function () {
             plannerSchema()
         );
 
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->orderBy->items[0]->direction)->toBe(OrderDirection::Desc);
     });
 
@@ -253,6 +272,7 @@ describe('QueryPlanner', function () {
             plannerSchema()
         );
 
+        $plan = narrow(EntitySetQueryPlan::class, $plan);
         expect($plan->top)->toBe(10);
         expect($plan->skip)->toBe(5);
     });
