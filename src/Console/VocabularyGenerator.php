@@ -7,6 +7,7 @@ namespace LaravelUi5\OData\Console;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
+use LaravelUi5\OData\Edm\Annotation\AnnotationValueWriter;
 use LaravelUi5\OData\Edm\Vocabularies\VocabularyCatalog;
 use LaravelUi5\OData\Edm\Vocabularies\VocabularyEntryInterface;
 
@@ -338,26 +339,72 @@ final class VocabularyGenerator
             return null;
         }
 
-        $properties  = $this->types->ownProperties($entry->getNamespace() . '.' . $name);
         $description = $this->extractDescription($node, $xpath);
-
-        $code     = $this->buildComplexTypeClassCode($name, $properties, $entry->getPhpNamespace(), $description);
-        $filePath = $outputDir . DIRECTORY_SEPARATOR . $name . '.php';
+        $code        = $this->buildComplexTypeClassCode($entry->getNamespace() . '.' . $name, $entry->getPhpNamespace(), $description);
+        $filePath    = $outputDir . DIRECTORY_SEPARATOR . $name . '.php';
         file_put_contents($filePath, $code);
         return $filePath;
     }
 
     /**
-     * @param list<array{name: string, type: string, nullable: bool}> $properties
+     * A complex type as a record class in the type hierarchy: abstract for an abstract type, final for a
+     * type nothing derives from. Every field, own or inherited, is a named optional parameter; the class
+     * promotes the fields it declares first and hands the inherited ones to its parent.
      */
-    private function buildComplexTypeClassCode(
-        string $name,
-        array $properties,
-        string $phpNs,
-        string $description,
-    ): string {
-        $ctorParams = $this->buildComplexTypeCtorParams($properties);
-        $docblock   = $description !== '' ? "/**\n * {$description}\n */\n" : '';
+    private function buildComplexTypeClassCode(string $qualifiedName, string $phpNs, string $description): string
+    {
+        $name     = VocabularyTypeModel::simpleName($qualifiedName);
+        $baseType = $this->types->baseType($qualifiedName);
+        $hasBase  = $baseType !== null && $this->types->isComplexType($baseType);
+        $imports  = new VocabularyImports($phpNs, $name);
+
+        $parent = $hasBase
+            ? $imports->reference($this->phpClassOf($baseType))
+            : $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\AbstractRecord');
+
+        $params    = [];
+        $docParams = [];
+        $handOver  = [];
+        $fields    = [];
+        foreach ($this->types->properties($qualifiedName) as $prop) {
+            $property = lcfirst($prop['name']);
+            [$phpType, $docType] = $this->fieldPhpType($prop['type'], $imports);
+            $own      = $this->types->declaringType($qualifiedName, $prop['name']) === $qualifiedName;
+            $promote  = $own ? 'public ' : '';
+            $params[] = "        {$promote}{$phpType} \${$property} = null,";
+            if ($docType !== null) {
+                $docParams[] = "     * @param {$docType} \${$property}";
+            }
+            if (!$own) {
+                $handOver[] = "            {$property}: \${$property},";
+            }
+            $fields[] = sprintf(
+                "        '%s' => ['%s', '%s', %s],",
+                $prop['name'],
+                $property,
+                $this->fieldType($prop['type']),
+                $prop['nullable'] ? 'true' : 'false',
+            );
+        }
+
+        $ctor = '';
+        $ownCount = count($params) - count($handOver);
+        if ($ownCount > 0) {
+            $doc  = $docParams !== [] ? "    /**\n" . implode("\n", $docParams) . "\n     */\n" : '';
+            $body = $handOver !== []
+                ? "\n        parent::__construct(\n" . implode("\n", $handOver) . "\n        );\n    "
+                : '';
+            $ctor = "\n\n{$doc}    public function __construct(\n" . implode("\n", $params) . "\n    ) {{$body}}";
+        }
+
+        $modifier = match (true) {
+            $this->types->isAbstract($qualifiedName)         => 'abstract ',
+            $this->types->derivedTypes($qualifiedName) === [] => 'final ',
+            default                                           => '',
+        };
+        $fieldsBlock = $fields !== [] ? "\n" . implode("\n", $fields) . "\n    " : '';
+        $docblock    = $description !== '' ? "/**\n * {$description}\n */\n" : '';
+        $usesBlock   = $imports->block() !== '' ? $imports->block() . "\n\n" : '';
 
         return <<<PHP
 <?php
@@ -366,40 +413,66 @@ declare(strict_types=1);
 
 namespace {$phpNs};
 
-{$docblock}final readonly class {$name}
+{$usesBlock}{$docblock}{$modifier}readonly class {$name} extends {$parent}
 {
-    public function __construct(
-{$ctorParams}    ) {}
+    public const string TYPE = '{$qualifiedName}';
+
+    public const array FIELDS = [{$fieldsBlock}];{$ctor}
 }
 
 PHP;
     }
 
     /**
-     * @param list<array{name: string, type: string, nullable: bool}> $properties
+     * The PHP parameter type of a record field, and its docblock type where PHP cannot say it (lists).
+     * A Path stands in for every value except a model path's.
+     *
+     * @return array{0: string, 1: string|null}
      */
-    private function buildComplexTypeCtorParams(array $properties): string
+    private function fieldPhpType(string $type, VocabularyImports $imports): array
     {
-        if ($properties === []) {
-            return '';
+        $isCollection = str_starts_with($type, 'Collection(');
+        $inner        = $isCollection ? substr($type, 11, -1) : $type;
+        $resolved     = $this->resolveType($inner);
+        $isPath       = in_array($resolved, AnnotationValueWriter::PATH_TYPES, true);
+        $path         = $isPath ? '' : $imports->reference('LaravelUi5\\OData\\Edm\\Annotation\\Path');
+
+        if ($this->isComplexType($inner)) {
+            $itemType = $imports->reference($this->phpClassOf($inner));
+        } elseif ($this->isEnumType($inner)) {
+            $itemType = $imports->reference($this->phpClassOf($inner));
+            if (!$isCollection && ($this->types->enumType($inner)['isFlags'] ?? false)) {
+                $decl = "{$itemType}|array" . ($path !== '' ? "|{$path}" : '') . '|null';
+                return [$decl, "{$itemType}|list<{$itemType}>" . ($path !== '' ? "|{$path}" : '') . '|null'];
+            }
+        } else {
+            $itemType = self::PRIMITIVE_PHP_TYPES[$resolved] ?? 'mixed';
         }
 
-        // PHP requires required (non-nullable, no default) params before optional ones.
-        // Stable-sort: non-nullable properties first, nullable (optional) properties last.
-        $required = array_filter($properties, fn($p) => !$p['nullable']);
-        $optional = array_filter($properties, fn($p) => $p['nullable']);
-        $sorted   = [...array_values($required), ...array_values($optional)];
-
-        $lines = [];
-        foreach ($sorted as $prop) {
-            $phpType  = $this->phpTypeForOdataType($prop['type']);
-            // `mixed` already includes null — never write `?mixed`
-            $nullable = ($prop['nullable'] && $phpType !== 'mixed') ? '?' : '';
-            $default  = $prop['nullable'] ? ' = null' : '';
-            $propName = lcfirst($prop['name']);
-            $lines[]  = "        public readonly {$nullable}{$phpType} \${$propName}{$default},";
+        if ($isCollection) {
+            $suffix = ($path !== '' ? "|{$path}" : '') . '|null';
+            return ["array{$suffix}", "list<{$itemType}>{$suffix}"];
         }
-        return implode("\n", $lines) . "\n";
+        if ($itemType === 'mixed') {
+            return ['mixed', null];
+        }
+        return [$path !== '' ? "{$itemType}|{$path}|null" : "?{$itemType}", null];
+    }
+
+    /** The CSDL type a record field is written with: type definitions resolved, collections kept. */
+    private function fieldType(string $type): string
+    {
+        if (str_starts_with($type, 'Collection(')) {
+            return 'Collection(' . $this->resolveType(substr($type, 11, -1)) . ')';
+        }
+        return $this->resolveType($type);
+    }
+
+    /** The generated PHP class of a qualified vocabulary type. */
+    private function phpClassOf(string $qualifiedName): string
+    {
+        $phpNs = $this->types->phpNamespaceOf($qualifiedName) ?? '';
+        return $phpNs . '\\' . VocabularyTypeModel::simpleName($qualifiedName);
     }
 
     // ── Term class generation ─────────────────────────────────────────────────

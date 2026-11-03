@@ -208,16 +208,37 @@ final class VocabularyTypeModel
     /**
      * All properties of a complex type: those of the root base type first, its own last.
      *
+     * A derived type may declare an inherited property again to narrow it (`UI.DataFieldWithUrl` redeclares `Value`,
+     * `Edm.Untyped` in `UI.DataField`, as `Edm.PrimitiveType`). The redeclaration replaces the inherited property in
+     * its place, so each name occurs once, with the type and nullability of the most derived declaration.
+     *
      * @return list<array{name: string, type: string, nullable: bool}>
      */
     public function properties(string $qualifiedName): array
     {
         $properties = [];
         foreach ([...array_reverse($this->ancestors($qualifiedName)), $qualifiedName] as $type) {
-            array_push($properties, ...$this->ownProperties($type));
+            foreach ($this->ownProperties($type) as $property) {
+                $properties[$property['name']] = $property;
+            }
         }
 
-        return $properties;
+        return array_values($properties);
+    }
+
+    /**
+     * The type that first declares a property of `$qualifiedName`, itself or a base type; null when none does.
+     */
+    public function declaringType(string $qualifiedName, string $property): ?string
+    {
+        $declaring = null;
+        foreach ([$qualifiedName, ...$this->ancestors($qualifiedName)] as $type) {
+            if (in_array($property, array_column($this->ownProperties($type), 'name'), true)) {
+                $declaring = $type;
+            }
+        }
+
+        return $declaring;
     }
 
     /**

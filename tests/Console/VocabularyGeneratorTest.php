@@ -36,6 +36,40 @@ const GENERATOR_COMMON_XML = <<<'XML'
         <Property Name="FromCommon" Type="Common.FilterExpressionType" />
       </ComplexType>
       <Term Name="Label" Type="Edm.String" Nullable="false" />
+      <ComplexType Name="ProbeRoot">
+        <Property Name="Label" Type="Edm.String" />
+      </ComplexType>
+      <ComplexType Name="ProbeShared">
+        <Property Name="A" Type="Edm.String" />
+      </ComplexType>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>
+XML;
+
+const GENERATOR_UI_XML = <<<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+  <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/Common.xml">
+    <edmx:Include Namespace="com.sap.vocabularies.Common.v1" Alias="Common" />
+  </edmx:Reference>
+  <edmx:DataServices>
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="com.sap.vocabularies.UI.v1" Alias="UI">
+      <EnumType Name="ProbeCriticality"><Member Name="Neutral" Value="0" /><Member Name="Positive" Value="3" /></EnumType>
+      <ComplexType Name="ProbeAbstract" Abstract="true" BaseType="Common.ProbeRoot">
+        <Property Name="Criticality" Type="UI.ProbeCriticality" />
+      </ComplexType>
+      <ComplexType Name="ProbeField" BaseType="UI.ProbeAbstract">
+        <Property Name="Value" Type="Edm.Untyped" Nullable="false" />
+      </ComplexType>
+      <ComplexType Name="ProbeFieldWithUrl" BaseType="UI.ProbeField">
+        <Property Name="Value" Type="Edm.PrimitiveType" Nullable="false" />
+        <Property Name="Url" Type="Edm.String" Nullable="false" />
+        <Property Name="Items" Type="Collection(UI.ProbeAbstract)" />
+      </ComplexType>
+      <ComplexType Name="ProbeShared" BaseType="Common.ProbeShared">
+        <Property Name="B" Type="Edm.Boolean" />
+      </ComplexType>
     </Schema>
   </edmx:DataServices>
 </edmx:Edmx>
@@ -46,6 +80,7 @@ beforeEach(function () {
     $fetcher = static fn(string $uri): string => match (basename($uri)) {
         'Org.OData.Core.V1.xml' => GENERATOR_CORE_XML,
         'Common.xml'            => GENERATOR_COMMON_XML,
+        'UI.xml'                => GENERATOR_UI_XML,
         default                 => '<?xml version="1.0"?><edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">'
             . '<edmx:DataServices><Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="empty.'
             . basename($uri, '.xml') . '"/></edmx:DataServices></edmx:Edmx>',
@@ -92,18 +127,85 @@ it('resolves a property type in the vocabulary its alias names, not by simple na
     $this->generator->run();
 
     $code = ($this->read)('Common/V1/RestrictionType.php');
-    expect($code)->toContain('public readonly ?string $fromCore = null,')
-        ->and($code)->not->toContain('?string $fromCommon');
+    expect($code)->toContain('public string|Path|null $fromCore = null,')
+        ->and($code)->toContain('public FilterExpressionType|Path|null $fromCommon = null,')
+        ->and($code)->toContain("'FromCore' => ['fromCore', 'Edm.String', true],")
+        ->and($code)->toContain("'FromCommon' => ['fromCommon', 'com.sap.vocabularies.Common.v1.FilterExpressionType', true],");
 });
 
 it('reads every vocabulary before generating a single one', function () {
     expect($this->generator->run('Common'))->toBeTrue();
 
-    expect(($this->read)('Common/V1/RestrictionType.php'))->toContain('?string $fromCore')
+    expect(($this->read)('Common/V1/RestrictionType.php'))->toContain('string|Path|null $fromCore')
         ->and(is_file("{$this->outputRoot}/Vocabularies/Core/V1/Description.php"))->toBeFalse();
 });
 
 it('refuses an unknown alias', function () {
     expect($this->generator->run('Nope'))->toBeFalse()
         ->and($this->lines)->toContain('ERROR: Unknown vocabulary alias: Nope');
+});
+
+it('writes complex types as a class hierarchy, across vocabularies', function () {
+    $this->generator->run();
+
+    expect(($this->read)('Ui/V1/ProbeAbstract.php'))
+        ->toContain('use LaravelUi5\\OData\\Vocabularies\\Common\\V1\\ProbeRoot;')
+        ->toContain('abstract readonly class ProbeAbstract extends ProbeRoot')
+        ->toContain("public const string TYPE = 'com.sap.vocabularies.UI.v1.ProbeAbstract';")
+        ->toContain('public ProbeCriticality|Path|null $criticality = null,')
+        ->toContain("label: \$label,")
+        ->and(($this->read)('Common/V1/ProbeRoot.php'))->toContain('readonly class ProbeRoot extends AbstractRecord')
+        ->not->toContain('final readonly class ProbeRoot')
+        ->and(($this->read)('Ui/V1/ProbeField.php'))->toContain("\nreadonly class ProbeField extends ProbeAbstract")
+        ->and(($this->read)('Ui/V1/ProbeShared.php'))
+        ->toContain('final readonly class ProbeShared extends \\LaravelUi5\\OData\\Vocabularies\\Common\\V1\\ProbeShared');
+
+    // A redeclared field is handed to the parent that declared it; the narrowed type stands in FIELDS.
+    expect(($this->read)('Ui/V1/ProbeFieldWithUrl.php'))
+        ->toContain('final readonly class ProbeFieldWithUrl extends ProbeField')
+        ->toContain("        mixed \$value = null,\n        public string|Path|null \$url = null,")
+        ->toContain("            value: \$value,\n        );")
+        ->toContain("'Value' => ['value', 'Edm.PrimitiveType', false],")
+        ->toContain("@param list<ProbeAbstract>|Path|null \$items");
+});
+
+it('writes record classes that load and write their records', function () {
+    $this->generator->run();
+    $root     = "{$this->outputRoot}/Vocabularies/";
+    $loader   = static function (string $class) use ($root): void {
+        $prefix = 'LaravelUi5\\OData\\Vocabularies\\';
+        $file   = $root . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+        if (str_starts_with($class, $prefix) && str_contains($class, 'Probe') && is_file($file)) {
+            require_once $file;
+        }
+    };
+    spl_autoload_register($loader);
+
+    try {
+        $class    = 'LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeFieldWithUrl';
+        $field    = 'LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeField';
+        $positive = constant('LaravelUi5\\OData\\Vocabularies\\Ui\\V1\\ProbeCriticality::Positive');
+        // The classes exist only once generated, so they are built by reflection.
+        $make     = static fn(string $c, array $args) => (new ReflectionClass($c))->newInstanceArgs($args);
+        $record   = $make($class, [
+            'label'       => 'Code',
+            'criticality' => $positive,
+            'value'       => 'code',
+            'url'         => 'https://example.test',
+            'items'       => [$make($field, ['value' => true])],
+        ])->toRecord();
+
+        expect($record->getType())->toBe('com.sap.vocabularies.UI.v1.ProbeFieldWithUrl')
+            ->and(array_map(static fn($pv) => $pv->getProperty(), $record->getPropertyValues()))
+            ->toBe(['Label', 'Criticality', 'Value', 'Url', 'Items'])
+            ->and($record->getPropertyValue('Criticality')->getValue()->getValue())
+            ->toBe('com.sap.vocabularies.UI.v1.ProbeCriticality/Positive')
+            ->and($record->getPropertyValue('Items')->getValue()->getItems()[0]->getType())
+            ->toBe('com.sap.vocabularies.UI.v1.ProbeField');
+
+        expect(fn() => $make($class, ['value' => 'code'])->toRecord())
+            ->toThrow(LogicException::class, 'requires the field Url');
+    } finally {
+        spl_autoload_unregister($loader);
+    }
 });

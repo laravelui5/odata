@@ -126,6 +126,31 @@ it('lists inherited properties root first, own last', function () {
         ->and($model->properties('test.Ui.v1.Field')[2]['nullable'])->toBeFalse();
 });
 
+it('lets a redeclared property replace the inherited one in its place', function () {
+    $model = new VocabularyTypeModel();
+    $model->load(vocabularyEntry('test.Ui.v1', 'Ui'), vocabularyXpath(<<<'XML'
+<Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="test.Ui.v1" Alias="Ui">
+  <ComplexType Name="Field">
+    <Property Name="Value" Type="Edm.Untyped" Nullable="false" />
+    <Property Name="Label" Type="Edm.String" />
+  </ComplexType>
+  <ComplexType Name="FieldWithUrl" BaseType="Ui.Field">
+    <Property Name="Value" Type="Edm.PrimitiveType" Nullable="false" />
+    <Property Name="Url" Type="Edm.String" />
+  </ComplexType>
+</Schema>
+XML));
+
+    expect($model->properties('test.Ui.v1.FieldWithUrl'))->toBe([
+        ['name' => 'Value', 'type' => 'Edm.PrimitiveType', 'nullable' => false],
+        ['name' => 'Label', 'type' => 'Edm.String', 'nullable' => true],
+        ['name' => 'Url', 'type' => 'Edm.String', 'nullable' => true],
+    ])
+        ->and($model->declaringType('test.Ui.v1.FieldWithUrl', 'Value'))->toBe('test.Ui.v1.Field')
+        ->and($model->declaringType('test.Ui.v1.FieldWithUrl', 'Url'))->toBe('test.Ui.v1.FieldWithUrl')
+        ->and($model->declaringType('test.Ui.v1.FieldWithUrl', 'Nope'))->toBeNull();
+});
+
 it('resolves a type definition through a chain into another vocabulary', function () {
     expect(loadedTypeModel()->resolve('test.Ui.v1.Flag'))->toBe('Edm.Boolean');
 });
