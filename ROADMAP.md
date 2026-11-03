@@ -50,6 +50,8 @@ Decided 2026-11-02 (author): an OData major, worked on directly, without a depre
   cases fail loud or right.
 - `OP32` (partly): the two signature findings need no break; the hand-written `src` is clean at level 5.
 - `OP33` — comments on the read gate.
+- `OP07` + `OP29` (decided 2026-11-02) — the vocabulary generator: spec-conform records, optional record fields
+  checked at build, `EnumMember`, `Bool`; regenerate. Then `OP32`'s vocabulary findings go with it.
 
 The entries stay in place under *Pending*; this list is the cut.
 
@@ -142,18 +144,93 @@ In the spirit of the engine: the fast path should be the default, hydration the 
 
 ### [ ] `OP07` Generated vocabulary attributes emit invalid CSDL — `#[LineItem]` gives no columns, `Boolean="1"`
 
+> **Decided 2026-11-02 (author): fixed in the next major, together with `OP29`.** The work is mostly mechanical; the
+> API shape is what must break now, while a major is open and nobody depends on it, so that the next annotation the
+> SDK or the Foundation needs is a minor. Four rules for the generator:
+> 1. **Every record field is a named, optional parameter.** `Nullable="false"` no longer makes a required
+>    constructor parameter; `toRecord()` checks required fields and fails loud at schema build. An upstream
+>    vocabulary that adds a required field (as `SideEffects` did) then regenerates as a minor, never a major.
+> 2. **Enumeration values as `EnumMember`** (`UI.CriticalityType/Positive`, flags space-separated) — *verified
+>    2026-11-02, see below.*
+> 3. **Spec-conform only, no shorthands.** A collection of records takes typed objects:
+>    `#[LineItem([new DataField(new Path('code')), new DataFieldForAction(...)])]`. The string list was never a
+>    design: since the public release the generator gave every collection term `list<mixed>` and wrote each element
+>    as a string; `LineItem` inherited that. No override table, so nothing is maintained beside the vocabulary.
+> 4. ~~**Hand-written classes stay** (`Core.Description`, `Common.Label` with `TARGET_ALL`): a marker the generator
+>    respects and skips.~~ **Replaced 2026-11-03 (author): a term without `AppliesTo` applies to every target.** CSDL
+>    reads a missing `AppliesTo` as *anywhere*; the generator read it as *nowhere* (`isAttributeCandidate()` wanted one
+>    known value) and wrote neither `#[Attribute]` nor `APPLIES_TO`. `Description` and `Label` lack `AppliesTo`
+>    upstream, so they were written by hand before the public release as a proof of concept — a workaround for that
+>    gap, not an exception by design. 51 further classes share the gap (`Core.LongDescription` among them) and cannot
+>    be used as attributes today. The generator now writes `#[Attribute(Attribute::TARGET_ALL)]` and the full
+>    `APPLIES_TO` for them; `Description` and `Label` are generated like every other term, no skip marker. `Label`'s
+>    `$value` becomes optional (rule 1); `#[Label('x')]` keeps working.
+>
+> To build: read `BaseType` and `Abstract`, key types by qualified name; value classes as a hierarchy (abstract base
+> classes, inherited fields, `toRecord()` writing `<Record Type="…">` with only the fields set); one value writer by
+> type (primitive with the CSDL kind, enum, nested record, collection, `Path|value` in every field); `Boolean` → `Bool`
+> in `CsdlSerializer` as a guard; regenerate; structural `$metadata` tests per term family and validation against
+> `tests/schemas/edm.xsd`. Removes the 356 vocabulary findings of `OP32`.
+
 Surfaced 2026-09-17 in the docs SEO pass (`docs/ROADMAP.md`, `/odata/` → *Docs and code disagree*),
 re-checked in code 2026-09-18. Two defects in the attributes `bin/generate.php` produces under
 `src/Vocabularies/`:
 
 - **Collections of records become collections of strings.** `#[LineItem([...])]`
   (`Ui/V1/LineItem.php`) maps every element to `new ConstantAnnotationValue('String', (string) $v)`.
-  `UI.LineItem` is a collection of `UI.DataField` records, so a UI5 client finds no columns. The same
-  string mapping sits in 55 generated attributes; each one whose term's element type is a record
-  (DataField, FieldGroup data, SelectionFields paths …) is affected.
-- **The kind `Boolean` is written verbatim.** 27 attributes build `ConstantAnnotationValue('Boolean', …)`,
-  and `CsdlSerializer::KIND_TO_XML_ATTR` maps only `Integer` → `Int`, so the XML reads `Boolean="1"`
-  where CSDL expects `Bool="true"` (e.g. `Aggregation/V1/ApplySupportedDefaults.php`).
+  `UI.LineItem` is a collection of `UI.DataFieldAbstract` records, so a UI5 client finds no columns.
+  *Corrected 2026-11-02:* `#[LineItem(['code','name'])]` writes
+  `<Collection><String>code</String><String>name</String></Collection>`. The string mapping sits in
+  46 generated collection terms; affected is each whose element type is a complex type (`LineItem`,
+  `Facets`, `Identification` …). **`SelectionFields` is not affected** — it writes `<PropertyPath>`, and
+  `AnnotationDiscoveryHttpTest` checks it. The test of the `AnnotatedAirport` fixture checks only that
+  `LineItem` occurs, not its structure, which is why this never went red.
+- **The kind `Boolean` is written verbatim.** 27 attributes build `ConstantAnnotationValue('Boolean', (string) …)`,
+  all of them as a field inside a record, and `CsdlSerializer::KIND_TO_XML_ATTR` maps only `Integer` → `Int`.
+  The XML reads `Boolean="1"` for true and `Boolean=""` for false (`(string) false` is empty) where CSDL
+  expects `Bool="true"` / `Bool="false"` (e.g. `PresentationVariant::$includeGrandTotal`,
+  `ApplySupportedDefaults::$from`).
+
+**Found with the correction (2026-11-02), same generator:**
+- **Record fields are all written as primitive constants.** `buildAnnotationValueBody()` takes each field's
+  kind from `PRIMITIVE_KINDS` and casts with `(string)`: a nested complex or collection field becomes the
+  string `"Array"` (the `OP29` finding), a null field is still written (as an empty constant), and no field
+  takes a `Path`, although CSDL allows a dynamic expression in any of them (`Criticality Path="…"` is the
+  common case).
+- **Enumeration values are written as `Int`.** An enum-typed value goes out as
+  `ConstantAnnotationValue('Integer', $v->value)`; CSDL XML writes it as `EnumMember="UI.CriticalityType/Positive"`.
+  **Verified 2026-11-02:**
+  - *CSDL XML 4.01* §14.3.7: an enumeration value is an `edm:EnumMember` expression, the qualified enum type, a
+    slash and the member name; for an `IsFlags` type a whitespace-separated list. §14.3.10: `edm:Int` evaluates
+    to a primitive integer, not an enum value. The vocabularies write their own examples that way
+    (`EnumMember="Core.RevisionKind/Modified"` in UI.xml).
+  - *OpenUI5* (`sap/ui/model/odata/v4/lib/_MetadataConverter.js`, `getAnnotationValue`, master): `EnumMember`
+    becomes `{$EnumMember: "…"}`, `Int` a bare number, and **an unknown attribute such as `Boolean` falls into
+    `default` and becomes `undefined`** — UI5 drops today's `Boolean="1"` silently.
+  - *This package*: `CsdlSerializer` passes any kind through as the attribute or element name, and
+    `EdmxWriter` writes kind and value literally, so `EnumMember` and `Bool` need no change there. A throwaway
+    probe (deleted afterwards) wrote `EnumMember` as attribute and as collection element, flags included, and
+    `Bool="true"` in a record; the warm `$metadata` equalled the cold one, and the document validated against the
+    OASIS `edmx.xsd`/`edm.xsd` in `tests/schemas/` — and failed on `Boolean="1"` with *"The attribute 'Boolean' is
+    not allowed"*. The XSD check is the guard the fix should keep; `edmx.xsd` imports `edm.xsd` without a
+    `schemaLocation`, so the test copies it with one set, and the probe's empty container had to get a set
+    (an empty `EntityContainer` is invalid).
+- **The value classes are hollow.** For each complex type the generator emits a class (`DataField`,
+  `DataFieldAbstract`, `FieldGroupType` …), but with the type's **own** properties only (`DataField` has
+  `value`, not the inherited `label`), as `final` even for abstract types, and with no way to write
+  itself as a record. Nothing reads them.
+
+**Is the information in the sources? Yes.** The vocabulary XML carries everything structural: the term's
+type (`Collection(UI.DataFieldAbstract)`), each complex type's `BaseType` and `Abstract` (UI alone: 18 and 5),
+each property's type and `Nullable`, enum members with their names, type definitions. The generator reads
+`Type`, `Name` and `Nullable` and ignores `BaseType` and `Abstract`; it also keys complex types by their
+simple name across vocabularies. **Not** in the sources, because it is the annotator's choice: which concrete
+subtype an element of an abstract type is, and whether a value is a constant or a `Path`.
+
+**Open: is the fix a break?** For `LineItem` probably not: a string can keep meaning
+`DataField(Value: Path(string))`. Terms whose elements a string cannot express (`Facets`, `FieldGroup`'s
+`Data`) need typed arguments, and the value classes change their constructors. With `OP29`'s new required
+`SideEffects` parameters that makes the generator release a major — unless it rides an OData major.
 
 The hand-built path works: `RecordAnnotationValue` with `PropertyValue`s and a `Bool` constant, as
 `annotations/applying-annotations` shows since the SEO pass. The docs still present `#[LineItem]` as
@@ -248,13 +325,18 @@ status code. What remains is an error *after* rows have gone out.
 
 ### [ ] `OP29` The vocabulary generator has drifted from the committed classes — regenerate deliberately
 
+> **Decided 2026-11-02 (author): in the next major, with `OP07`** (its four rules). ~~The hand-written classes keep a
+> skip marker;~~ *(2026-11-03: no hand-written classes remain — `OP07` rule 4, a term without `AppliesTo` applies to
+> every target.)* `SideEffects`' new fields need no defaults, because no record field is a required parameter any more.
+
 Found 2026-10-07 while building `OP19` level 3. A full run of the generator into a scratch directory
 differs from `src/Vocabularies/` in 311 files. Most of it was the generator's stale imports, which are
 fixed now. What remains decides how a full regeneration has to be done:
 
 - **Two classes are hand-written.** `Core.Description` (with an `APPLIES_TO` over all 14 targets) and
   `Common.Label` carry `#[Attribute(Attribute::TARGET_ALL)]`. The generator would overwrite both.
-  Either it learns the `TARGET_ALL` case, or it skips a marked hand-written class.
+  Either it learns the `TARGET_ALL` case, or it skips a marked hand-written class. *Decided 2026-11-03: it learns
+  the case (`OP07` rule 4).*
 - **Upstream added required parameters.** `Common.SideEffects` / `SideEffectsType` gained
   `sourceEntitiesInserted`, `…Updated` and `…Deleted`, each a required `array`, and the generator
   places them before the optional ones. Regenerating breaks every existing
@@ -550,8 +632,12 @@ and `$hidden`/`$visible` always apply. The per-column override on a discovered m
 `resolveFacets()` and `AttributeReader::readProperty()`. Tests moved: `ColumnFacetsTest` answers per model through a
 facet resolver (`ColumnFacetsPerModel`), `PropertyHooksAndHiddenTest` became `HiddenAndVisibleTest` without the hook
 block, `AnnotatedAirport` and the code-list models in `CodeListHttpTest` annotate through `#[ODataAnnotate]`. **Still
-open:** the docs (`services/model-discovery`, `annotations/applying-annotations`, upgrade notes) and Chiron — the
-major's docs pass.
+open:** nothing. *Chiron (2026-11-02, `[Unreleased]`, uncommitted): the OData skill, its references and the core
+guideline teach 4.0; its `conflict` bound moves to `<4.0 || >=5.0`. The docs are written (2026-11-02) and merged
+into the `docs` branch `sdk-3.0`, ten pages: `services/model-discovery` (the rule, `$hidden`/`$visible`, the wire, the
+class attributes, `#[ODataComputed]`, *Upgrading from 3.x*), `annotations/applying-annotations`, `overview`,
+`vocabulary-terms`, `query-options/compute`, `select-and-expand`, `metadata/service-document`,
+`resolvers/eloquent-resolver`, `choosing-a-resolver`, `recipes/coming-from-lodata`.*
 
 ### [x] `OP35` Discovered columns cannot be annotated from outside — `Core.IsLanguageDependent` for translated fields — from SDK i18n, 2026-10-23
 

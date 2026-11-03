@@ -140,19 +140,10 @@ final class VocabularyGenerator
         'Edm.Single'                 => 'Float',
     ];
 
-    // ── Per-vocabulary mutable state ──────────────────────────────────────────
+    // ── Run state ─────────────────────────────────────────────────────────────
 
-    /** ComplexType definitions keyed by simple name, accumulated across all vocabulary passes. */
-    private array $complexTypes = [];
-
-    /** TypeDefinition underlying types keyed by simple name, accumulated across all passes. */
-    private array $typeDefinitions = [];
-
-    /**
-     * EnumType definitions keyed by simple name, accumulated across all passes.
-     * Each entry: {isFlags: bool, members: list<{name: string, value: int}>, phpNamespace: string}
-     */
-    private array $enumTypes = [];
+    /** The types of all vocabularies in the catalog, keyed by qualified name; filled before any file is written. */
+    private VocabularyTypeModel $types;
 
     /** Terms whose buildAnnotationValue() body could not be fully resolved. */
     private array $stubs = [];
@@ -162,11 +153,16 @@ final class VocabularyGenerator
     /**
      * @param string        $outputRoot Absolute path to the package src/ directory
      * @param \Closure|null $output     Optional fn(string $line): void for progress output
+     * @param \Closure|null $fetcher    Optional fn(string $uri): ?string returning a vocabulary's CSDL XML;
+     *                                  defaults to an HTTP GET of the URI
      */
     public function __construct(
         private readonly string   $outputRoot,
         private readonly ?\Closure $output = null,
-    ) {}
+        private readonly ?\Closure $fetcher = null,
+    ) {
+        $this->types = new VocabularyTypeModel();
+    }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -179,23 +175,37 @@ final class VocabularyGenerator
     public function run(?string $alias = null): bool
     {
         $this->stubs = [];
+        $this->types = new VocabularyTypeModel();
 
-        $catalog = VocabularyCatalog::default();
+        $entries = VocabularyCatalog::default()->getEntries();
 
+        $selected = $entries;
         if ($alias !== null) {
-            foreach ($catalog->getEntries() as $entry) {
-                if ($entry->getAlias() === $alias) {
-                    $this->processEntry($entry);
-                    $this->emitStubSummary();
-                    return true;
-                }
+            $selected = array_values(array_filter($entries, fn($e) => $e->getAlias() === $alias));
+            if ($selected === []) {
+                $this->emit("ERROR: Unknown vocabulary alias: {$alias}");
+                return false;
             }
-            $this->emit("ERROR: Unknown vocabulary alias: {$alias}");
-            return false;
         }
 
-        foreach ($catalog->getEntries() as $entry) {
-            $this->processEntry($entry);
+        // Every vocabulary is read before any file is written, also for a single alias:
+        // a type may refer to a base or property type of another vocabulary.
+        $documents = [];
+        foreach ($entries as $entry) {
+            $xpath = $this->loadDocument($entry);
+            if ($xpath !== null) {
+                $this->types->load($entry, $xpath);
+                $documents[$entry->getAlias()] = $xpath;
+            }
+        }
+        foreach ($this->types->unresolvedReferences() as $reference) {
+            $this->emit("WARN: Unresolved type reference {$reference} — mapped to mixed.");
+        }
+
+        foreach ($selected as $entry) {
+            if (isset($documents[$entry->getAlias()])) {
+                $this->processEntry($entry, $documents[$entry->getAlias()]);
+            }
         }
         $this->emitStubSummary();
         return true;
@@ -203,92 +213,34 @@ final class VocabularyGenerator
 
     // ── Per-vocabulary processing ─────────────────────────────────────────────
 
-    private function processEntry(VocabularyEntryInterface $entry): void
+    private function loadDocument(VocabularyEntryInterface $entry): ?DOMXPath
     {
-        $this->emit("Processing {$entry->getAlias()} ({$entry->getNamespace()})...");
-
-        $xml = $this->fetchXml($entry->getUri());
+        $xml = $this->fetcher !== null ? ($this->fetcher)($entry->getUri()) : $this->fetchXml($entry->getUri());
         if ($xml === null) {
-            $this->emit("  ERROR: Failed to fetch XML from {$entry->getUri()}");
-            return;
+            $this->emit("ERROR: Failed to fetch XML from {$entry->getUri()}");
+            return null;
         }
 
         $dom = new DOMDocument();
         libxml_use_internal_errors(true);
         if (!$dom->loadXML($xml)) {
-            $this->emit("  ERROR: Failed to parse XML from {$entry->getUri()}");
-            return;
+            libxml_clear_errors();
+            $this->emit("ERROR: Failed to parse XML from {$entry->getUri()}");
+            return null;
         }
         libxml_clear_errors();
 
         $xpath = new DOMXPath($dom);
         $xpath->registerNamespace('edm', 'http://docs.oasis-open.org/odata/ns/edm');
+        return $xpath;
+    }
 
-        // Pass 0a: collect TypeDefinition underlying types.
-        $typeDefNodes = $xpath->query('//edm:Schema/edm:TypeDefinition');
-        if ($typeDefNodes !== false) {
-            foreach ($typeDefNodes as $node) {
-                if (!($node instanceof DOMElement)) {
-                    continue;
-                }
-                $name = $node->getAttribute('Name');
-                $underlying = $node->getAttribute('UnderlyingType') ?: 'Edm.String';
-                if ($name !== '') {
-                    $this->typeDefinitions[$name] = $underlying;
-                }
-            }
-        }
+    private function processEntry(VocabularyEntryInterface $entry, DOMXPath $xpath): void
+    {
+        $this->emit("Processing {$entry->getAlias()} ({$entry->getNamespace()})...");
 
-        // Pass 0b: collect EnumType definitions.
-        $enumTypeNodes = $xpath->query('//edm:Schema/edm:EnumType');
-        if ($enumTypeNodes !== false) {
-            foreach ($enumTypeNodes as $node) {
-                if (!($node instanceof DOMElement)) {
-                    continue;
-                }
-                $name = $node->getAttribute('Name');
-                if ($name === '') {
-                    continue;
-                }
-                $isFlags = $node->getAttribute('IsFlags') === 'true';
-                $members = [];
-                $memberNodes = $xpath->query('edm:Member', $node);
-                if ($memberNodes !== false) {
-                    foreach ($memberNodes as $memberNode) {
-                        if (!($memberNode instanceof DOMElement)) {
-                            continue;
-                        }
-                        $mName  = $memberNode->getAttribute('Name');
-                        $mValue = $memberNode->getAttribute('Value');
-                        if ($mName !== '') {
-                            $members[] = [
-                                'name'  => $mName,
-                                'value' => $mValue !== '' ? (int) $mValue : count($members),
-                            ];
-                        }
-                    }
-                }
-                $this->enumTypes[$name] = [
-                    'isFlags'      => $isFlags,
-                    'members'      => $members,
-                    'phpNamespace' => $entry->getPhpNamespace(),
-                ];
-            }
-        }
-
-        // Pass 1: collect all ComplexType definitions so term generation can reference them.
+        $enumTypeNodes    = $xpath->query('//edm:Schema/edm:EnumType');
         $complexTypeNodes = $xpath->query('//edm:Schema/edm:ComplexType');
-        if ($complexTypeNodes !== false) {
-            foreach ($complexTypeNodes as $node) {
-                if (!($node instanceof DOMElement)) {
-                    continue;
-                }
-                $name = $node->getAttribute('Name');
-                if ($name !== '') {
-                    $this->complexTypes[$name] = $this->parseComplexTypeProperties($node, $xpath);
-                }
-            }
-        }
 
         $outputDir = $this->outputDirForEntry($entry);
 
@@ -373,31 +325,6 @@ final class VocabularyGenerator
         return $dir;
     }
 
-    // ── ComplexType parsing ───────────────────────────────────────────────────
-
-    /**
-     * @return list<array{name: string, type: string, nullable: bool}>
-     */
-    private function parseComplexTypeProperties(DOMElement $node, DOMXPath $xpath): array
-    {
-        $properties = [];
-        $propNodes  = $xpath->query('edm:Property', $node);
-        if ($propNodes === false) {
-            return $properties;
-        }
-        foreach ($propNodes as $propNode) {
-            if (!($propNode instanceof DOMElement)) {
-                continue;
-            }
-            $properties[] = [
-                'name'     => $propNode->getAttribute('Name'),
-                'type'     => $propNode->getAttribute('Type'),
-                'nullable' => strtolower($propNode->getAttribute('Nullable') ?: 'true') !== 'false',
-            ];
-        }
-        return $properties;
-    }
-
     // ── ComplexType class generation ──────────────────────────────────────────
 
     private function generateComplexTypeClass(
@@ -411,7 +338,7 @@ final class VocabularyGenerator
             return null;
         }
 
-        $properties  = $this->complexTypes[$name] ?? [];
+        $properties  = $this->types->ownProperties($entry->getNamespace() . '.' . $name);
         $description = $this->extractDescription($node, $xpath);
 
         $code     = $this->buildComplexTypeClassCode($name, $properties, $entry->getPhpNamespace(), $description);
@@ -484,7 +411,7 @@ PHP;
         string $outputDir,
     ): ?string {
         $name      = $node->getAttribute('Name');
-        $rawType   = $node->getAttribute('Type') ?: 'Edm.Boolean';
+        $rawType   = $this->types->qualify($node->getAttribute('Type') ?: 'Edm.Boolean', $entry->getNamespace());
         $appliesto = trim($node->getAttribute('AppliesTo'));
         $nullable  = strtolower($node->getAttribute('Nullable') ?: 'true') !== 'false';
 
@@ -588,16 +515,13 @@ PHP;
         // Enum type from a different PHP namespace needs a use import.
         if (!$isComplex && $this->isEnumType($innerType)) {
             $simpleName  = $this->simpleTypeName($innerType);
-            $enumNs      = $this->enumTypes[$simpleName]['phpNamespace'] ?? $phpNs;
+            $enumNs      = $this->types->phpNamespaceOf($innerType) ?? $phpNs;
             if ($enumNs !== $phpNs) {
                 $uses[] = $enumNs . '\\' . $simpleName;
             }
         }
-        foreach ($appliesToValues as $av) {
-            if (isset(self::APPLIES_TO_INTERFACE_MAP[$av])) {
-                $uses[] = self::APPLIES_TO_INTERFACE_MAP[$av];
-            }
-        }
+        $appliesToInterfaces = $this->appliesToInterfaces($appliesToValues);
+        array_push($uses, ...$appliesToInterfaces);
         $uses = array_values(array_unique($uses));
         sort($uses);
         $usesBlock = implode("\n", array_map(fn($u) => "use {$u};", $uses));
@@ -611,12 +535,9 @@ PHP;
 
         // ── APPLIES_TO constant ───────────────────────────────────────────────
         $appliesToLines = [];
-        foreach ($appliesToValues as $av) {
-            if (isset(self::APPLIES_TO_INTERFACE_MAP[$av])) {
-                $fqcn             = self::APPLIES_TO_INTERFACE_MAP[$av];
-                $short            = substr($fqcn, strrpos($fqcn, '\\') + 1);
-                $appliesToLines[] = "        {$short}::class,";
-            }
+        foreach ($appliesToInterfaces as $fqcn) {
+            $short            = substr($fqcn, strrpos($fqcn, '\\') + 1);
+            $appliesToLines[] = "        {$short}::class,";
         }
         $appliesToBlock = $appliesToLines !== []
             ? "\n" . implode("\n", $appliesToLines) . "\n    "
@@ -788,8 +709,7 @@ PHP;
                 $pvLines[] = "            new PropertyValue('{$prop['name']}', new ConstantAnnotationValue('{$kind}', (string) \$this->{$propName})),";
             }
             $pvBlock = implode("\n", $pvLines);
-            $recordType = $this->qualifiedTypeName($innerType);
-            return "return new RecordAnnotationValue(\n            '{$recordType}',\n{$pvBlock}\n        );";
+            return "return new RecordAnnotationValue(\n            '{$innerType}',\n{$pvBlock}\n        );";
         }
 
         // Enum type — use the PHP enum backing value.
@@ -839,27 +759,6 @@ PHP;
     }
 
     /**
-     * A vocabulary type name with its alias replaced by the full namespace
-     * (`CodeList.CodeListSource` → `com.sap.vocabularies.CodeList.v1.CodeListSource`).
-     * A `$metadata` that declares no `edmx:Reference` with that alias could not
-     * resolve the short form.
-     */
-    private function qualifiedTypeName(string $typeName): string
-    {
-        $dot = strrpos($typeName, '.');
-        if ($dot === false) {
-            return $typeName;
-        }
-        $prefix = substr($typeName, 0, $dot);
-        foreach (VocabularyCatalog::default()->getEntries() as $entry) {
-            if ($entry->getAlias() === $prefix) {
-                return $entry->getNamespace() . substr($typeName, $dot);
-            }
-        }
-        return $typeName;
-    }
-
-    /**
      * Whether the generated constructor accepts a {@see \LaravelUi5\OData\Edm\Annotation\Path}:
      * a single primitive value (TypeDefinitions resolved, booleans excluded — a marker
      * term has no value) or an `Edm.PrimitiveType` term.
@@ -885,9 +784,12 @@ PHP;
      * Returns true when the term qualifies as a PHP #[Attribute].
      *
      * Three conditions must all hold:
-     *   1. Type is not a Container-path type (EntitySetPath / NavigationPropertyPath).
-     *   2. AppliesTo contains at least one value in ATTRIBUTE_TARGET_MAP.
+     *   1. Type is not Edm.EntitySetPath.
+     *   2. AppliesTo is absent, or contains at least one value in ATTRIBUTE_TARGET_MAP.
      *   3. The vocabulary is not Org.OData.Capabilities.V1.
+     *
+     * A term without AppliesTo applies to every model element (CSDL XML 4.01 §14.1.2), so it is
+     * an attribute on every target — Core.Description and Common.Label are such terms.
      *
      * @param list<string> $appliesToValues
      */
@@ -900,15 +802,9 @@ PHP;
             return false;
         }
 
-        $innerType = str_starts_with($rawType, 'Collection(') ? substr($rawType, 11, -1) : $rawType;
-        if (isset($this->complexTypes[$innerType])) {
-            foreach ($this->complexTypes[$innerType] as $prop) {
-                if ($prop['type'] === 'Edm.NavigationPropertyPath') {
-                    return false;
-                }
-            }
+        if ($appliesToValues === []) {
+            return true;
         }
-
         foreach ($appliesToValues as $av) {
             if (isset(self::ATTRIBUTE_TARGET_MAP[$av])) {
                 return true;
@@ -918,11 +814,34 @@ PHP;
     }
 
     /**
+     * The interfaces for the APPLIES_TO constant: every target interface when AppliesTo is absent.
+     *
+     * @param  list<string> $appliesToValues
+     * @return list<string> deduplicated interface class-strings
+     */
+    private function appliesToInterfaces(array $appliesToValues): array
+    {
+        if ($appliesToValues === []) {
+            return array_values(array_unique(self::APPLIES_TO_INTERFACE_MAP));
+        }
+        $interfaces = [];
+        foreach ($appliesToValues as $av) {
+            if (isset(self::APPLIES_TO_INTERFACE_MAP[$av])) {
+                $interfaces[] = self::APPLIES_TO_INTERFACE_MAP[$av];
+            }
+        }
+        return array_values(array_unique($interfaces));
+    }
+
+    /**
      * @param  list<string> $appliesToValues
      * @return list<string> deduplicated PHP constant expressions
      */
     private function resolveAttributeTargets(array $appliesToValues): array
     {
+        if ($appliesToValues === []) {
+            return ['Attribute::TARGET_ALL'];
+        }
         $targets = [];
         foreach ($appliesToValues as $av) {
             if (!isset(self::ATTRIBUTE_TARGET_MAP[$av])) {
@@ -970,44 +889,35 @@ PHP;
         return self::PRIMITIVE_PHP_TYPES[$this->resolveType($odataType)] ?? 'mixed';
     }
 
+    /** Whether the qualified $type is a loaded ComplexType. */
     private function isComplexType(string $type): bool
     {
-        if (str_starts_with($type, 'Edm.')) {
-            return false;
-        }
-        $simpleName = str_contains($type, '.') ? substr($type, strrpos($type, '.') + 1) : $type;
-        return array_key_exists($simpleName, $this->complexTypes);
+        return $this->types->isComplexType($type);
     }
 
     /**
-     * Returns the property list for a complex type by simple name, alias-qualified name,
-     * or fully qualified name. Returns [] when the type is not in the accumulated map.
+     * The properties a qualified complex type declares itself; [] when it is not loaded.
      *
      * @return list<array{name: string, type: string, nullable: bool}>
      */
     private function getComplexTypeProperties(string $type): array
     {
-        $simpleName = str_contains($type, '.') ? substr($type, strrpos($type, '.') + 1) : $type;
-        return $this->complexTypes[$simpleName] ?? [];
+        return $this->types->ownProperties($type);
     }
 
     /**
-     * Resolves a TypeDefinition alias to its underlying OData type.
+     * Resolves a qualified TypeDefinition to its underlying OData type.
      * Returns the type unchanged if it is not a TypeDefinition.
      */
     private function resolveType(string $type): string
     {
-        $simpleName = $this->simpleTypeName($type);
-        return $this->typeDefinitions[$simpleName] ?? $type;
+        return $this->types->resolve($type);
     }
 
-    /** Returns true when $type refers to a known EnumType. */
+    /** Returns true when the qualified $type is a loaded EnumType. */
     private function isEnumType(string $type): bool
     {
-        if (str_starts_with($type, 'Edm.')) {
-            return false;
-        }
-        return array_key_exists($this->simpleTypeName($type), $this->enumTypes);
+        return $this->types->isEnumType($type);
     }
 
     /** Extracts the simple (unqualified) name from an OData type string. */
@@ -1029,7 +939,7 @@ PHP;
             return null;
         }
 
-        $enumInfo    = $this->enumTypes[$name] ?? null;
+        $enumInfo    = $this->types->enumType($entry->getNamespace() . '.' . $name);
         if ($enumInfo === null) {
             return null;
         }
