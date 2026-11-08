@@ -196,6 +196,19 @@ an addition, so a minor.
 
 ## Done
 
+### [x] `OP48` A set cannot refuse server-driven paging — a code list is cut at the default 200 — found 2026-11-08 — *built 2026-11-08, ships as `5.1.0`*
+
+Found by the LaravelUi5 Foundation's code-list service: `Subdivisions` (5,653 rows) answered 200, because
+`pagination.default` is `200` out of the box, and UI5 keeps only the first page of a code list. The code-list docs
+asked the host to leave the setting unset — for every set of the host, and a host that forgets sees empty fields and
+no error.
+
+> **Built:** `Service\Contracts\UnpagedEntitySetInterface`, a marker on the resolver; `EntitySetHandler` drops the
+> page size for such a set — default, maximum and the client's `Prefer` alike (decided 2026-11-08, the author: the
+> marker overrides a client's preference too; UI5 narrows with `$filter`). `tests/Service/UnpagedEntitySetHttpTest.php`.
+> **Not covered:** sets of `discoverModel()` — they have no resolver of their own to carry the marker; an attribute on
+> the model (`#[ODataUnpaged]`) is the way once a consumer needs it.
+
 ### [x] `OP47` `odata:cache` writes the `$metadata` document only under the host's `resources/edmx/` — from Core `OP39` (8), noted 2026-11-03 — *built 2026-11-03, ships as `5.0.0`*
 
 `ManagesMetadataDocument` (OP12) lets `odata:cache` and `odata:clear` write and delete a service's XML document only when

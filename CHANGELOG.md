@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Entries are tagged with the version that carried them, in reverse-chronological
 order. The companion `ROADMAP.md` tracks scheduled, not-yet-shipped work.
 
+## [5.1.0] - 2026-11-08 — A set the server never pages
+
+A minor. A code list must reach UI5 whole: UI5 loads it without `$top` and keeps only the first page, so a page cut at
+the default 200 renders every later code empty. Until now that held only if the host switched `pagination.default`
+off for every set. Now the set says so itself.
+
+### Added
+
+- **`UnpagedEntitySetInterface`** (`OP48`) — a marker for a resolver whose set the server never pages: no
+  `pagination.default`, no `pagination.max`, and a client's `Prefer: odata.maxpagesize` declined (no
+  `Preference-Applied`, no `@odata.nextLink`). `$top`, `$skip` and `$filter` still apply. For small, bounded sets a
+  client loads whole — code lists; an `AbstractEntitySet` takes it with `implements UnpagedEntitySetInterface`.
+  Consumer: the LaravelUi5 Foundation's code-list service.
+
+### Changed
+
+- The docs no longer ask a host that serves code lists to leave `pagination.default` unset; they point at the marker
+  (`annotations/applying-annotations`, `query-options/pagination`).
+
 ## [5.0.0] - 2026-11-03 — A service claims its `$metadata` document
 
 A major for one method: `ODataServiceInterface` grows, which breaks a class that implements it directly (decided

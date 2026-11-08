@@ -8,6 +8,7 @@ use LaravelUi5\OData\Http\ODataResponse;
 use LaravelUi5\OData\Protocol\Planning\EntitySetQueryPlan;
 use LaravelUi5\OData\Protocol\Planning\SelectList;
 use LaravelUi5\OData\Service\Contracts\RuntimeSchemaInterface;
+use LaravelUi5\OData\Service\Contracts\UnpagedEntitySetInterface;
 
 /**
  * Handles EntitySetQueryPlan — produces a streamed OData JSON collection.
@@ -36,9 +37,11 @@ final readonly class EntitySetHandler
         $resolver   = $this->schema->getResolver($plan->target);
         $selectKeys = SelectHelper::allowedKeys($plan->select, $plan->expand, $plan->compute);
 
-        // Server-driven paging: maxPageSize applies when no explicit $top.
-        $pageSize = ($plan->maxPageSize !== null && $plan->top === null)
-            ? $plan->maxPageSize
+        // Server-driven paging: maxPageSize applies when no explicit $top — and never to a set that is delivered whole
+        // (UnpagedEntitySetInterface, ROADMAP OP48): its client's preference is declined, so nothing says it applied.
+        $maxPageSize = $resolver instanceof UnpagedEntitySetInterface ? null : $plan->maxPageSize;
+        $pageSize    = ($maxPageSize !== null && $plan->top === null)
+            ? $maxPageSize
             : null;
 
         $headers = [
@@ -46,8 +49,8 @@ final readonly class EntitySetHandler
             'OData-Version' => ODataVersion::current(),
         ];
 
-        if ($plan->maxPageSize !== null) {
-            $headers['Preference-Applied'] = 'odata.maxpagesize=' . $plan->maxPageSize;
+        if ($maxPageSize !== null) {
+            $headers['Preference-Applied'] = 'odata.maxpagesize=' . $maxPageSize;
         }
 
         $response = new ODataResponse(null, 200, $headers);
